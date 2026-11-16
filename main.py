@@ -116,6 +116,12 @@ def main(argv: list[str] | None = None) -> int:
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(levelname)s | %(name)s | %(message)s",
     )
+    # TASK_pvp_lan_1116: no free text slot on the Settings screen for this
+    # (checked both texts keys — webcam_name/volume_value, both already
+    # bound), so log it at startup per the task's own fallback.
+    from src import VERSION
+
+    logging.getLogger(__name__).info("Protected M v%s", VERSION)
 
     def _thread_excepthook(args: threading.ExceptHookArgs) -> None:
         logging.getLogger("thread").error(

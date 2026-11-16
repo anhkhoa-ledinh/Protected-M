@@ -1056,6 +1056,13 @@ class HcpdApplication:
                 self._pvp.close()
                 self._pvp = None
             self._pvp_connect(state)
+            if state.pvp_token:
+                # Match/local state (self._album.game, self._game) survived
+                # the disconnect untouched — rejoin just needs to re-attach
+                # this new socket to that same seat, not restart the whole
+                # lobby handshake (see _pvp_handle_matched's "resumed" path).
+                self._pvp_send_when_ready({"t": proto.REJOIN,
+                                           "token": state.pvp_token})
 
     def _pvp_leave_match(self, reason: str = "left") -> None:
         """Dọn phiên PvP hiện tại (huỷ/rời/lỗi) — KHÔNG đóng kết nối, chỉ
@@ -1162,6 +1169,22 @@ class HcpdApplication:
     def _pvp_handle_matched(self, msg: dict, now: float) -> None:
         F = self._album.flow
         state = self._album.state
+        if msg.get("resumed"):
+            # TASK_pvp_lan_1116 P5: reconnect — the match/local state
+            # (self._album.game, self._game) survived the disconnect
+            # untouched (see _pvp_handle_status), so resuming only needs a
+            # new token and the right screen back, NOT the whole lobby
+            # handshake (that would re-send the photo/bugs and restart the
+            # match from scratch).
+            state.pvp_token = str(msg.get("token") or state.pvp_token)
+            F.say(state, "Reconnected.", 3.0)
+            if self._pvp_active:
+                hunting = (state.mode == F.PVP_MODES[0]
+                          or state.pvp_role == "hunter")
+                state.go(F.PVP_HUNT if hunting else F.PVP_HIDE)
+            else:
+                state.go(F.PVP_FOUND)
+            return
         state.mode = str(msg.get("mode") or state.mode)
         try:
             state.level = int(msg.get("level", state.level))

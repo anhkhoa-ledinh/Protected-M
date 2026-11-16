@@ -418,6 +418,51 @@ class PvpTickEyeTest(unittest.TestCase):
         self.assertEqual(app._pvp.sent, [])
 
 
+# ---- P5: reconnect sends rejoin, resumed matched doesn't restart ----------
+
+class PvpReconnectTest(unittest.TestCase):
+    def test_reconnect_action_queues_a_rejoin_with_the_stored_token(self) -> None:
+        import src.ui_album.v3_routes as routes
+
+        app = _app()
+        app._pvp.is_connected = False  # fresh connection, hello not done yet
+        app._album.state.pvp_token = "tok123"
+        app._pvp_action(routes.ACT_PVP_RECONNECT, 0.0)
+        self.assertEqual(app._pvp_pending, {"t": proto.REJOIN, "token": "tok123"})
+
+    def test_reconnect_without_a_token_does_not_send_rejoin(self) -> None:
+        import src.ui_album.v3_routes as routes
+
+        app = _app()
+        app._pvp.is_connected = False
+        app._album.state.pvp_token = ""
+        app._pvp_action(routes.ACT_PVP_RECONNECT, 0.0)
+        self.assertIsNone(app._pvp_pending)
+
+    def test_resumed_matched_does_not_reset_an_active_match(self) -> None:
+        app = _app()
+        app._album.state.mode = F.PVP_MODES[0]
+        app._album.state.screen = F.OFFLINE
+        app._pvp_active = True
+        match = object()
+        game = object()
+        app._album.game = match
+        app._game = game
+        app._pvp_handle_matched({"resumed": True, "token": "newtok"}, 1.0)
+        self.assertIs(app._album.game, match)   # not wiped/recreated
+        self.assertIs(app._game, game)
+        self.assertEqual(app._album.state.pvp_token, "newtok")
+        self.assertEqual(app._album.state.screen, F.PVP_HUNT)
+        self.assertFalse(app._pvp_photo_sent)   # no fresh-match reset ran
+
+    def test_resumed_matched_before_start_goes_back_to_pvp_found(self) -> None:
+        app = _app()
+        app._pvp_active = False
+        app._album.state.screen = F.OFFLINE
+        app._pvp_handle_matched({"resumed": True, "token": "tok"}, 1.0)
+        self.assertEqual(app._album.state.screen, F.PVP_FOUND)
+
+
 # ---- _pvp_send_when_ready / _tick_pvp ---------------------------------------
 
 class PvpSendWhenReadyTest(unittest.TestCase):
