@@ -4,10 +4,8 @@ TASK_bug_art_0530 Phase 3. Mỗi dòng: file, tác giả, URL nguồn, giấy ph
 
 Các file nằm ở `assets/ui_album/sprites/` (đúng thư mục mà `AlbumManifest`
 đọc mọi sprite của bộ bọ, bất kể giao diện album hay v3 — xem
-`src/ui_album/manifest.py:19`). Thư mục đó không theo dõi bởi git
-(`.gitignore`), nên các file PNG và `manifest.json` chỉ nằm trên đĩa máy
-này; file CREDITS này được đặt ở `assets/ui_v3/sprites/` theo đúng yêu cầu
-của kịch bản, là nơi DUY NHẤT trong việc này mà git còn theo dõi.
+`src/ui_album/manifest.py:19`). Danh sách giấy phép của toàn repo nằm ở
+`THIRD_PARTY_NOTICES.md` ở thư mục gốc.
 
 | File | Tác giả | Nguồn | Giấy phép | Ngày |
 |---|---|---|---|---|

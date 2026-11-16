@@ -60,7 +60,7 @@ Everything runs on the CPU. A dedicated GPU is not required.
 ## Install
 
 ```bat
-git clone https://github.com/<your-account>/Protected-M.git
+git clone https://github.com/anhkhoa-ledinh/Protected-M.git
 cd Protected-M
 
 py -3.13 -m venv .venv
@@ -324,6 +324,19 @@ docs/                   Technical documentation (docs/KY_THUAT_HE_THONG.md is in
 - **Depth:** [Depth Anything](https://huggingface.co/LiheYoung/depth-anything-small-hf) V1 Small (Apache-2.0).
 - **Hole filling:** [LaMa](https://github.com/advimman/lama) (Suvorov et al., 2022), ONNX export by [Carve](https://huggingface.co/Carve/LaMa-ONNX) (Apache-2.0).
 - **Projection:** R. Kooima, *Generalized Perspective Projection* (2009).
+- **Bug sprites:** [Top-down Alien Bug Sprites](https://whiteknightstudios.itch.io/top-down-bug-sprites) by W_K_Studio (CC0).
 - **Fonts** in the UI packs are under the SIL Open Font License.
 
 Built as an undergraduate thesis project (HCPD, KLCN164).
+
+---
+
+## License
+
+- **Source code:** MIT. See [LICENSE](LICENSE).
+- **Game art and design:** CC BY-NC 4.0. This covers the UI packs in
+  `assets/ui_v3/` and `assets/ui_album/` and the Protected M story; you may use
+  them for non-commercial purposes with credit. See
+  [LICENSE-ASSETS.md](LICENSE-ASSETS.md).
+- **Third-party files:** the model, fonts and bug sprites keep their own
+  licenses. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
