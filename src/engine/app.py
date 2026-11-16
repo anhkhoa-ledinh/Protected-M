@@ -1408,7 +1408,10 @@ class HcpdApplication:
         self._game = GameState(image="pvp", props=props, tracking_on=True,
                                started_at_s=now, found=found)
         self._game_layers_revision = self._renderer.layers_revision
-        self._renderer.set_props(prop_items(self._game, radius))
+        # TASK_pvp_fix_1116 fix 3: NOT set_props(prop_items(...)) — that is
+        # solo's yellow DEBUG sphere path. PvP draws real bug sprites via
+        # BugPainter (self._bugs), same as _start_album_match does.
+        self._renderer.set_props([])
         if self._bugs is not None:
             self._bugs.reset()
         weapon = state.weapon_name() or F.WEAPONS[0]
