@@ -1087,6 +1087,7 @@ class HcpdApplication:
 
     def _tick_pvp(self, now: float) -> None:
         """Nhịp mỗi khung: rút hộp thư ``PvpClient`` — không bao giờ chặn."""
+        self._album.state.pvp_lobby_message = self._pvp_lobby_message()
         if self._pvp is None:
             return
         if self._pvp_pending is not None and self._pvp.is_connected:
@@ -1206,7 +1207,6 @@ class HcpdApplication:
         self._pvp_active = False
         state.found_at_s = now
         state.go(F.PVP_FOUND)
-        F.say(state, f"{state.pvp_opponent_name} is splitting layers…", 30.0)
         if self._pvp_is_host:
             photo_path = (Path(state.photo) if state.photo
                          else self._content.resolved_media_path(self._root))
@@ -1256,6 +1256,28 @@ class HcpdApplication:
         state.photo = path
         self._try_load_media(path, now)
         self._pvp_photo_ready = True
+
+    def _pvp_lobby_message(self) -> str:
+        """
+        TASK_pvp_fix_1116 fix 2: chuỗi vẽ trên ``PVP_FOUND``, tính lại MỖI
+        KHUNG từ trạng thái thật — không phải ``F.say`` một lần với hẹn giờ
+        30 s cứng, thứ sống sót qua cả màn ``PVP_HUNT``/kết quả vì đồng hồ
+        của nó không biết gì về việc người chơi đã rời màn.
+
+        Rỗng ở MỌI màn khác ``PVP_FOUND`` (gọi ``state.go`` đổi màn là xong,
+        không cần dọn gì thêm), và rỗng ngay khi ``start`` thật đã tới
+        (``state.pvp_started``), đúng yêu cầu "No message may survive into
+        PVP_HUNT, PVP_HIDE or PVP_RESULT."
+        """
+        F = self._album.flow
+        state = self._album.state
+        if state.screen != F.PVP_FOUND:
+            return ""
+        if self._renderer.waiting_for_depth:
+            return "Splitting layers…"
+        if self._pvp_ready_sent and not state.pvp_started:
+            return f"Waiting for {state.pvp_opponent_name or 'Opponent'}…"
+        return ""
 
     def _pvp_tick_lobby(self, now: float) -> None:
         """Trong ``PVP_FOUND``: chờ tách lớp xong, đặt bọ (CHỈ host ở

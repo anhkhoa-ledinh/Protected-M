@@ -152,6 +152,12 @@ class V3Flow:
     #: Hunt & Hide: hạn 20 s để đặt bọ (``PVP_HIDE`` bên hider), đo bằng
     #: ``time.perf_counter()`` cùng đồng hồ với ``found_at_s``.
     pvp_setup_deadline_s: float = 0.0
+    #: TASK_pvp_fix_1116: thay cho ``F.say`` 30 s — tính lại MỖI khung từ
+    #: trạng thái thật (``app._pvp_lobby_message``), nên không bao giờ sống
+    #: lâu hơn chính lý do nó tồn tại. Chỉ ``v3_values._pvp_lobby`` đọc, và
+    #: chỉ vẽ ở ``PVP_FOUND`` — không rò sang ``PVP_HUNT``/``PVP_HIDE``/
+    #: ``PVP_RESULT``.
+    pvp_lobby_message: str = ""
     pipeline_pct: float = 0.0
     #: Số lớp THẬT của ảnh đang mở; bản vẽ in cứng 4, app phải nói số thật.
     layer_count: int = 0

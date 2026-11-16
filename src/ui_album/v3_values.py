@@ -835,6 +835,12 @@ def _pvp_lobby(state, flow, now) -> None:
         opp_name = flow.pvp_opponent_name or "Opponent"
         state.texts["opp_name"] = opp_name
         state.texts["opp_initial"] = _initial(opp_name)
+        # TASK_pvp_fix_1116: tính lại mỗi khung (app._pvp_lobby_message),
+        # không phải một toast F.say 30 s — nếu không thì "đè" lên giá trị
+        # chung ở đầu state_for() cũng không giúp gì, vì chuỗi đã tính SẴN
+        # là rỗng khi không còn gì để nói (xong rồi/chưa bắt đầu).
+        if flow.pvp_lobby_message:
+            state.message = flow.pvp_lobby_message
 
 
 def _pvp_result(state, flow, manifest) -> None:
