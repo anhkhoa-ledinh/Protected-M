@@ -9,16 +9,17 @@ reason when it is missing, instead of letting the test fail or error. A
 test that genuinely needs the resource should request the matching
 fixture; nothing here changes behaviour for a test that does not.
 
-``PM_FORCE_NO_GL=1`` / ``PM_FORCE_NO_WEBCAM=1`` force the ``gl_context`` /
-``webcam`` fixtures to skip even on a machine that actually has the
-resource — used to simulate the CI runner locally (see README/TASK_ci_1116
-P1) without needing a second, resource-less machine to prove the suite
-survives their absence.
+``PM_FORCE_NO_GL=1`` / ``PM_FORCE_NO_WEBCAM=1`` / ``PM_FORCE_NO_MODELS=1``
+force the ``gl_context`` / ``webcam`` / ``model_files`` fixtures to skip
+even on a machine that actually has the resource — used to simulate the
+CI runner locally (see README/TASK_ci_1116 P1) without needing a second,
+resource-less machine to prove the suite survives their absence.
 """
 
 from __future__ import annotations
 
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -36,12 +37,33 @@ LAMA_ONNX_PATH = ROOT / "assets" / "models" / "lama_fp32.onnx"
 DEPTH_ANYTHING_MODEL_ID = "LiheYoung/depth-anything-small-hf"
 
 
+#: Matches the "MAJOR.MINOR" at the start of a GL_VERSION string, e.g.
+#: b"4.6.0 NVIDIA 471.11" or b"3.3.0 Mesa 21.0" or b"OpenGL ES 3.2 ...".
+_GL_VERSION_RE = re.compile(rb"(\d+)\.(\d+)")
+
+
+def _parse_gl_version(raw) -> tuple[int, int] | None:
+    data = raw if isinstance(raw, bytes) else str(raw).encode("utf-8", "replace")
+    match = _GL_VERSION_RE.search(data)
+    return (int(match.group(1)), int(match.group(2))) if match else None
+
+
 @pytest.fixture
 def gl_context():
     """
     A hidden GLFW window with the same context hints
     ``src/renderer/window.py:GlfwWindow.create()`` requests (OpenGL 3.3,
-    core profile) — skip if the runner can't create one.
+    core profile) — skip if the runner can't create a REAL, usable one.
+
+    Creating the window is not enough: a runner with no real GPU/driver
+    (observed on GitHub Actions' ``windows-latest``) can still return a
+    non-``None`` window from ``glfw.create_window()`` — the hints are a
+    *request*, GLFW only warns if the driver can't honour it, it doesn't
+    fail the call — while the context underneath is unusable, and
+    ``glGetString(GL_VERSION)`` raises ``GLError`` 1282 ("invalid
+    operation"). So this fixture also makes the probed context current and
+    calls ``glGetString(GL_VERSION)`` itself, and skips if that raises,
+    returns nothing, or reports a version below 3.3.
     """
     if os.environ.get("PM_FORCE_NO_GL") == "1":
         pytest.skip("PM_FORCE_NO_GL=1 (forced — simulating a runner with no "
@@ -60,6 +82,33 @@ def gl_context():
         pytest.skip("Could not create an OpenGL 3.3 core-profile context "
                     "(no GPU/driver support on this runner)")
     glfw.make_context_current(window)
+
+    skip_reason = None
+    try:
+        from OpenGL import GL
+
+        version_raw = GL.glGetString(GL.GL_VERSION)
+    except Exception as exc:
+        version_raw = None
+        skip_reason = (f"glGetString(GL_VERSION) raised {exc!r} — no real "
+                       "OpenGL driver on this runner")
+
+    if skip_reason is None and version_raw is None:
+        skip_reason = ("glGetString(GL_VERSION) returned nothing — no "
+                       "real OpenGL driver on this runner")
+
+    if skip_reason is None:
+        parsed = _parse_gl_version(version_raw)
+        if parsed is None or parsed < (3, 3):
+            version_text = (version_raw.decode("utf-8", "replace")
+                            if isinstance(version_raw, bytes) else str(version_raw))
+            skip_reason = f"OpenGL version {version_text!r} is below the required 3.3"
+
+    if skip_reason is not None:
+        glfw.destroy_window(window)
+        glfw.terminate()
+        pytest.skip(skip_reason)
+
     try:
         yield window
     finally:
@@ -120,11 +169,18 @@ class ModelFiles:
     ``require_*`` method for whichever one a test actually needs; it
     skips with a clear reason if that one is missing, leaving the other
     resource's presence irrelevant to that test.
+
+    ``PM_FORCE_NO_MODELS=1`` reports both as missing even on a machine
+    that has them, to simulate the CI runner's empty model cache locally.
     """
 
     def __init__(self) -> None:
-        self.lama_onnx = LAMA_ONNX_PATH if LAMA_ONNX_PATH.exists() else None
-        self.depth_anything_cached = _depth_anything_cached()
+        if os.environ.get("PM_FORCE_NO_MODELS") == "1":
+            self.lama_onnx = None
+            self.depth_anything_cached = False
+        else:
+            self.lama_onnx = LAMA_ONNX_PATH if LAMA_ONNX_PATH.exists() else None
+            self.depth_anything_cached = _depth_anything_cached()
 
     def require_depth_anything(self) -> None:
         if not self.depth_anything_cached:

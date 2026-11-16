@@ -214,7 +214,7 @@ class TestLamaSessionLifecycle(unittest.TestCase):
 
 
 class TestSessionIsBuiltOnce(unittest.TestCase):
-    """
+    r"""
     PB-076: nhiều luồng cùng hỏi thì vẫn **chỉ dựng một phiên**.
 
     Thiếu khoá thì luồng nạp nền và luồng GL cùng qua cổng kiểm rồi dựng hai
