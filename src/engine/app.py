@@ -419,6 +419,7 @@ class HcpdApplication:
         self._tick_album_automatch(now)
         self._tick_album_match(now)
         self._tick_pvp(now)
+        self._tick_pvp_auto(now)
         self._tick_shared_album()
         self._log_album_fps(now)
 
@@ -1479,6 +1480,34 @@ class HcpdApplication:
             if is_visible(eye, pos_mm, radius, nearer):
                 visible += 1
         match.exposure_pct = 100.0 * visible / len(alive)
+
+    def _tick_pvp_auto(self, now: float) -> None:
+        """
+        Móc đo ``HCPD_PVP_AUTO=1``: tự đi qua sảnh PvP — y hệt
+        ``HCPD_ALBUM_AUTOMATCH`` nhưng cho PvP (Find match với mode/level
+        hiện tại, không cần bấm gì). Sau khi một trận xong (``PVP_RESULT``),
+        quay lại tìm trận tiếp — để đo G2 "3/3 trận" bằng một lần chạy liên
+        tục, khớp ``pvp_bot.py --matches 3``.
+        """
+        if os.environ.get("HCPD_PVP_AUTO") != "1":
+            return
+        from src.ui_album import v3_routes
+
+        F = self._album.flow
+        state = self._album.state
+        if state.screen in F.LOCKED:
+            state.player = state.player or "guest"
+            state.go(F.MENU)
+        elif state.screen == F.MENU:
+            state.go(F.PVP_MODE)
+        elif state.screen == F.PVP_MODE:
+            # Qua đúng cổng một cú bấm thật đi qua (on_click), không gọi
+            # thẳng _pvp_action: _pvp()'s F.start_search() (đổi màn sang
+            # PVP_SEARCH) phải chạy, không chỉ phần mạng.
+            action = v3_routes.on_click(state, "btn_Find match", now)
+            self._pvp_action(action, now)
+        elif state.screen == F.PVP_RESULT:
+            state.go(F.PVP_MODE)      # khung sau se tu Find match lai
 
     def _start_album_match(self, now: float) -> None:
         """Mở một ván theo cấp đang chọn: số bọ lấy từ bảng cấp."""

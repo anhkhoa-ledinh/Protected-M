@@ -6,6 +6,7 @@ sockets (the real-socket path is covered end to end by
 
 from __future__ import annotations
 
+import os
 import time
 import unittest
 from pathlib import Path
@@ -549,6 +550,50 @@ class AlbumShootSendsHitWhenPvpActiveTest(unittest.TestCase):
 
         self.assertTrue(handled)
         self.assertEqual(app._pvp.sent, [])
+
+
+# ---- G2: HCPD_PVP_AUTO=1 walks the lobby with no clicks --------------------
+
+class PvpAutoHookTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self._old = os.environ.get("HCPD_PVP_AUTO")
+        os.environ["HCPD_PVP_AUTO"] = "1"
+
+    def tearDown(self) -> None:
+        if self._old is None:
+            os.environ.pop("HCPD_PVP_AUTO", None)
+        else:
+            os.environ["HCPD_PVP_AUTO"] = self._old
+
+    def test_disabled_by_default(self) -> None:
+        os.environ.pop("HCPD_PVP_AUTO", None)
+        app = _app()
+        app._album.state.screen = F.SIGN_IN
+        app._tick_pvp_auto(0.0)
+        self.assertEqual(app._album.state.screen, F.SIGN_IN)  # untouched
+
+    def test_walks_sign_in_to_menu_to_pvp_mode_to_queueing(self) -> None:
+        app = _app()
+        app._album.state.screen = F.SIGN_IN
+        app._tick_pvp_auto(0.0)
+        self.assertEqual(app._album.state.screen, F.MENU)
+        self.assertEqual(app._album.state.player, "guest")
+
+        app._tick_pvp_auto(0.0)
+        self.assertEqual(app._album.state.screen, F.PVP_MODE)
+
+        app._tick_pvp_auto(0.0)
+        # ACT_PVP_FIND's F.start_search() moves it to PVP_SEARCH.
+        self.assertEqual(app._album.state.screen, F.PVP_SEARCH)
+        self.assertEqual(app._pvp.sent, [{"t": proto.QUEUE,
+                                          "mode": app._album.state.mode,
+                                          "level": app._album.state.level}])
+
+    def test_result_screen_loops_back_to_find_another_match(self) -> None:
+        app = _app()
+        app._album.state.screen = F.PVP_RESULT
+        app._tick_pvp_auto(0.0)
+        self.assertEqual(app._album.state.screen, F.PVP_MODE)
 
 
 if __name__ == "__main__":
