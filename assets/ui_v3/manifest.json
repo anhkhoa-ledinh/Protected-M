@@ -6413,6 +6413,52 @@
      ],
      "sample": "A",
      "lines": 1
+    },
+    {
+     "key": "opp_name",
+     "rect": [
+      720,
+      386,
+      400,
+      34
+     ],
+     "al": "center",
+     "runs": [
+      {
+       "c": "Player 2",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 28.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Player 2",
+     "lines": 1
+    },
+    {
+     "key": "opp_initial",
+     "rect": [
+      860,
+      254,
+      120,
+      66
+     ],
+     "al": "center",
+     "runs": [
+      {
+       "c": "N",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 55.0,
+       "col": "#FFFFFF",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "N",
+     "lines": 1
     }
    ],
    "bars": [],

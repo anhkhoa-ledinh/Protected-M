@@ -832,6 +832,9 @@ def _pvp_lobby(state, flow, now) -> None:
         state.focus = "field_join" if flow.focus == "field_join" else None
     elif screen == F.PVP_FOUND:
         state.texts["countdown"] = str(max(1, 3 - int(now - flow.found_at_s)))
+        opp_name = flow.pvp_opponent_name or "Opponent"
+        state.texts["opp_name"] = opp_name
+        state.texts["opp_initial"] = _initial(opp_name)
 
 
 def _pvp_result(state, flow, manifest) -> None:
