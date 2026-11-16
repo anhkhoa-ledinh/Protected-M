@@ -10,7 +10,6 @@ của ``routes.py``, nên ``app.py`` dùng lại nguyên bộ hành động cũ.
 from __future__ import annotations
 
 import logging
-import random
 
 from src.content import shared_album
 from src.ui_album import v3_flow as F
@@ -30,6 +29,13 @@ ACT_DISPLAY_FULL = "display_full"
 ACT_DISPLAY_WINDOW = "display_window"
 ACT_SHARE_CONFIRMED = "share_confirmed"
 ACT_RANDOM_FROM_ALBUM = "random_from_album"
+#: TASK_pvp_lan_1116: PvP thật — app.py làm việc mạng, giao diện chỉ hỏi.
+ACT_PVP_FIND = "pvp_find"
+ACT_PVP_CREATE_ROOM = "pvp_create_room"
+ACT_PVP_JOIN_ROOM = "pvp_join_room"
+ACT_PVP_CANCEL = "pvp_cancel"
+ACT_PVP_REMATCH = "pvp_rematch"
+ACT_PVP_RECONNECT = "pvp_reconnect"
 
 #: Nút chính của từng màn — Enter bấm đúng nút này (U2 "Enter = the primary
 #: button"). Màn không có tên trong bảng thì Enter không làm gì.
@@ -233,33 +239,46 @@ def _results(state, name: str) -> str:
 
 
 def _pvp(state, name: str, now: float) -> str:
+    """
+    TASK_pvp_lan_1116: chỉ ĐỔI MÀN và hỏi; việc mạng app.py làm (trả về một
+    ``ACT_PVP_*``). Màn ``PVP_FOUND`` chỉ tới khi server báo ``matched``
+    thật — xem ``app.py`` (hàm xử lý thông điệp mạng gọi ``state.go(F.PVP_FOUND)``
+    trực tiếp), không còn hẹn giờ giả ở đây.
+    """
     if name.startswith("mode_"):
         chosen = name[len("mode_"):]
         if chosen in F.PVP_MODES:
             state.mode = chosen
     elif name == "btn_Find match":
-        F.start_search(state, now)
+        F.start_search(state, now)          # chỉ để "search_time" có mốc
+        return ACT_PVP_FIND
     elif name == "btn_Invite a friend":
-        state.room_code = f"{random.randint(0, 9999):04d}"
+        state.room_code = ""                 # trống tới khi server trả "room"
         state.join_typed = ""
         state.go(F.PVP_INVITE)
+        return ACT_PVP_CREATE_ROOM
     elif name == "btn_Copy code":
         return ACT_COPY_CODE
     elif name == "field_join":
         state.focus = "field_join"
     elif name == "btn_Join room":
-        state.found_at_s = now
-        state.go(F.PVP_FOUND)
+        if len(state.join_typed) != 4:
+            F.say(state, "Enter the 4-digit room code first.")
+            return ""
+        return ACT_PVP_JOIN_ROOM
     elif name == "btn_Close room":
         state.go(F.PVP_MODE)
+        return ACT_PVP_CANCEL
     elif name in ("btn_Cancel", "leave"):
         state.go(F.PVP_MODE)
+        return ACT_PVP_CANCEL
     elif name == "btn_Rematch":
-        F.start_search(state, now)
+        return ACT_PVP_REMATCH
     elif name == "btn_Leaderboard":
         state.go(F.BOARD)
     elif name == "btn_Try again now":
         state.go(F.PVP_MODE)
+        return ACT_PVP_RECONNECT
     elif name == "btn_Back to album":
         state.go(F.MENU)
     return ""

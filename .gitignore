@@ -61,6 +61,11 @@ z_diag.csv
 # Commit `shared_album.example.json` (giá trị rỗng) thay cho nó.
 assets/config/shared_album.json
 
+# TASK_pvp_lan_1116: ghi đè IP:port của server PvP, riêng từng máy/buổi chơi.
+# Thiếu file này = client tự tìm server bằng UDP discovery (đúng thiết kế).
+# Commit `pvp.example.json` thay cho nó.
+assets/config/pvp.json
+
 # ─── IDE và hệ điều hành ──────────────────────────────────────────────────
 .idea/
 .vscode/

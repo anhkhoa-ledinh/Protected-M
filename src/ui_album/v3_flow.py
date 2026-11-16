@@ -139,6 +139,25 @@ class V3Flow:
     search_target_s: float = 4.0
     found_at_s: float = 0.0
     offline_since_s: float = 0.0
+    #: TASK_pvp_lan_1116: trạng thái PHIÊN PvP thật — gán khi ``matched`` tới.
+    #: ``pvp_role``: "host"/"guest" (Competitive) hoặc "hunter"/"hider"
+    #: (Hunt & Hide). ``pvp_started`` bật khi server gửi ``start`` (đếm
+    #: ngược 3 s của ``PVP_FOUND`` chỉ chạy sau mốc này, KHÔNG phải từ lúc
+    #: vào màn — xem ``update()``).
+    pvp_role: str = ""
+    pvp_token: str = ""
+    pvp_match_id: str = ""
+    pvp_started: bool = False
+    pvp_opponent_name: str = ""
+    #: Hunt & Hide: hạn 20 s để đặt bọ (``PVP_HIDE`` bên hider), đo bằng
+    #: ``time.perf_counter()`` cùng đồng hồ với ``found_at_s``.
+    pvp_setup_deadline_s: float = 0.0
+    #: TASK_pvp_fix_1116: thay cho ``F.say`` 30 s — tính lại MỖI khung từ
+    #: trạng thái thật (``app._pvp_lobby_message``), nên không bao giờ sống
+    #: lâu hơn chính lý do nó tồn tại. Chỉ ``v3_values._pvp_lobby`` đọc, và
+    #: chỉ vẽ ở ``PVP_FOUND`` — không rò sang ``PVP_HUNT``/``PVP_HIDE``/
+    #: ``PVP_RESULT``.
+    pvp_lobby_message: str = ""
     pipeline_pct: float = 0.0
     #: Số lớp THẬT của ảnh đang mở; bản vẽ in cứng 4, app phải nói số thật.
     layer_count: int = 0
@@ -293,13 +312,21 @@ def tilt_angle(flow: V3Flow, eye_x: float, eye_z: float) -> float:
 
 
 def update(flow: V3Flow, now: float) -> None:
-    """Nhịp thời gian của các màn mô phỏng (tìm trận, đếm ngược)."""
-    if flow.screen == PVP_SEARCH:
-        if now - flow.search_started_s >= flow.search_target_s:
-            flow.found_at_s = now
-            flow.go(PVP_FOUND)
-    elif flow.screen == PVP_FOUND and now - flow.found_at_s >= 3.0:
-        flow.go(PVP_HUNT if flow.mode == PVP_MODES[0] else PVP_HIDE)
+    """
+    Nhịp thời gian của màn ``PVP_FOUND``: đếm ngược 3 s rồi vào trận.
+
+    TASK_pvp_lan_1116: tìm trận/mời phòng không còn là đồng hồ giả ở đây —
+    ``app.py`` đưa màn sang ``PVP_FOUND`` khi server báo ``matched`` thật,
+    và chỉ bật ``pvp_started`` khi server gửi ``start`` (ảnh đã truyền, cả
+    hai máy đã sẵn sàng). Đếm ngược vì thế tính từ lúc ``start`` tới, không
+    phải từ lúc vào màn — nếu không, hai máy có thể vào trận lệch nhau vài
+    giây tuỳ máy nào bake lớp xong trước.
+    """
+    if flow.screen == PVP_FOUND and flow.pvp_started and now - flow.found_at_s >= 3.0:
+        if flow.mode == PVP_MODES[0] or flow.pvp_role == "hunter":
+            flow.go(PVP_HUNT)
+        else:
+            flow.go(PVP_HIDE)
 
 
 def say(flow: V3Flow, text: str, seconds: float = 4.0) -> None:

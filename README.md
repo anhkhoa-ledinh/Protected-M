@@ -210,6 +210,68 @@ therefore treats everything it downloads as untrusted:
 
 ---
 
+## PvP on a local network
+
+Competitive and Hunt & Hide are real matches over your LAN — no internet,
+no cloud account. One machine runs the server; both games find it
+automatically.
+
+1. **Start the server.** On one machine, on the same Wi-Fi/LAN as the
+   players:
+
+   ```bat
+   run_server.bat
+   ```
+
+   Leave that window open for the whole session (`Ctrl+C` to stop it).
+
+2. **Allow Python through Windows Firewall.** The first time you run
+   `run_server.bat` (or `run_game.bat`), Windows will ask to allow Python
+   through the firewall for private networks — click **Allow access**. If
+   you miss the prompt, other players' games won't be able to reach the
+   server or discover it.
+
+3. **Find a match.** On each player's machine, run `run_game.bat`, open the
+   **PvP** tab, and either:
+   - **Find match** — joins the matchmaking queue for the chosen mode and
+     level; the server pairs the first two players waiting; or
+   - **Invite a friend** — creates a 4-digit room code the other player
+     types into **Join room**.
+
+   Players discover the server automatically over UDP; nothing to type in
+   by default.
+
+4. **`pvp.json` override (optional).** If discovery doesn't find the
+   server (different subnet, UDP broadcast blocked by a router/VPN), copy
+   `assets/config/pvp.example.json` to `assets/config/pvp.json` and fill in
+   the server's IP and port:
+
+   ```json
+   { "server": "192.168.1.42:47821" }
+   ```
+
+   `pvp.json` is ignored by git — it's specific to your machine/session.
+
+### Testing PvP on one machine
+
+- `--no-webcam` runs the game with a simulated head pose instead of
+  opening the real webcam, so you can run two game instances on the same
+  laptop (only one process can open the webcam at a time):
+
+  ```bat
+  run_game.bat --no-webcam
+  ```
+
+- `scripts\pvp_bot.py` is a headless client (no GL, no webcam) that joins
+  a queue or a room code and plays either role — useful to test the server
+  and the other, real game instance without needing two players:
+
+  ```bat
+  .venv\Scripts\python.exe scripts\pvp_bot.py --mode Competitive --level 1
+  ```
+
+---
+
 ## Known issues
 
 This is a demo build. Known problems so far:
@@ -218,9 +280,15 @@ This is a demo build. Known problems so far:
   several bugs standing close together. Right now every shot resolves to a
   single bug.
 - **Bugs have no health.** One hit kills a bug, whichever gun you use.
-- **PvP, accounts and the leaderboard are simulated.** The PvP opponent is a
-  bot, and nothing goes over the network. Accounts live in memory only, and the
-  leaderboard shows sample entries.
+- **PvP is real on a LAN; accounts and the leaderboard are still
+  simulated.** Competitive and Hunt & Hide play over the network against
+  another player (see [PvP on a local network](#pvp-on-a-local-network)
+  above). Accounts live in memory only, and the leaderboard shows sample
+  entries.
+- **Hunt & Hide bug placement is automatic, not click-to-place.** The
+  hider's bugs are placed by the same algorithm solo matches use (hidden
+  from the design rest eye), not by clicking the photo. Relocating one bug
+  during the hunt isn't implemented either.
 - **The first load of a new photo is slow.** Depth estimation, layer splitting
   and LaMa all run on the CPU. On a 2-core laptop this can take a minute or
   more. The same photo loads instantly the second time, from
@@ -239,9 +307,11 @@ report a bug.
 
 ## Roadmap
 
-- Real online PvP instead of the simulated bot.
+- Click-to-place bug hiding for Hunt & Hide's hider, and bug relocation
+  during the hunt.
 - Bug health and per-gun damage, and make the Spread gun hit several bugs.
 - A scope for the Precision gun, and a key to hide the in-match HUD.
+- Real accounts and a real leaderboard instead of in-memory/sample data.
 
 ---
 
@@ -289,6 +359,7 @@ python main.py --demo     :: presentation mode: only G, T, F4, F6, Esc
 | `assets/config/user.json` | Face-scale calibration (written by `--calibrate`) | no |
 | `assets/config/user_prefs.json` | Display mode and window position | no |
 | `assets/config/shared_album.json` | Cloudinary settings | no |
+| `assets/config/pvp.json` | PvP server `IP:port` override (skips discovery) | no |
 
 ---
 
@@ -297,6 +368,7 @@ python main.py --demo     :: presentation mode: only G, T, F4, F6, Esc
 ```
 main.py                 Entry point (--album = game, --demo = no config writes)
 run_game.bat            Launch the game
+run_server.bat          Launch the PvP LAN server
 src/
   engine/               Main loop, worker threads, game wiring (app.py)
   ui_album/             Game UI (v3), screens and flow, bugs, hit testing, guns
@@ -306,12 +378,14 @@ src/
   filters/              One Euro, Kalman, EMA, motion prediction
   math/                 Projection, matrices, quaternions
   camera/ scene/ gui/   Webcam capture, scene graph, calibration wizard
+  net/                  PvP wire protocol, LAN server, UDP discovery, client
 assets/
   ui_v3/                Game UI pack exported from Penpot (in git)
   ui_album/             Legacy UI pack + bug sprites used by the game (in git)
   models/               face_landmarker.task (+ optional lama_fp32.onnx)
   config/ shaders/
 scripts/                Measurement and report tools used for the thesis
+                        (pvp_bot.py — headless PvP test client)
 tests/                  pytest suite
 docs/                   Technical documentation (docs/KY_THUAT_HE_THONG.md is in Vietnamese)
 ```

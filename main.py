@@ -87,6 +87,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Di qua 23 man v3, luu mot PNG moi man roi thoat",
     )
+    # TASK_pvp_lan_1116 P2: khong mo webcam — dau theo dang mo phong ngay tu
+    # dau. De chay HAI tien trinh game tren CUNG mot may khi kiem PvP: chi
+    # mot tien trinh mo duoc webcam that, tien trinh con lai phai dung co nay.
+    parser.add_argument(
+        "--no-webcam",
+        action="store_true",
+        help="Khong mo webcam that, dung dau mo phong "
+             "(chay hai tien trinh PvP tren cung mot may)",
+    )
     args = parser.parse_args(argv)
     if args.ui_shots and args.ui != "v3":
         parser.error("--ui-shots chi co nghia voi --ui v3 (bo cu dung --album-shots)")
@@ -107,6 +116,12 @@ def main(argv: list[str] | None = None) -> int:
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(levelname)s | %(name)s | %(message)s",
     )
+    # TASK_pvp_lan_1116: no free text slot on the Settings screen for this
+    # (checked both texts keys — webcam_name/volume_value, both already
+    # bound), so log it at startup per the task's own fallback.
+    from src import VERSION
+
+    logging.getLogger(__name__).info("Protected M v%s", VERSION)
 
     def _thread_excepthook(args: threading.ExceptHookArgs) -> None:
         logging.getLogger("thread").error(
@@ -124,7 +139,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     app = HcpdApplication(
-        config, PROJECT_ROOT, demo=args.demo,
+        config, PROJECT_ROOT, demo=args.demo, no_webcam=args.no_webcam,
         album=AlbumOptions(enabled=args.album, guest=args.album_guest,
                            shots=args.album_shots,
                            seed_leaderboard=args.album_seed_leaderboard,
