@@ -197,6 +197,8 @@ class HcpdApplication:
         self._pvp_bugs_sent = False
         self._pvp_bugs_attempted = False
         self._pvp_ready_sent = False
+        #: Hunt & Hide: mốc gửi ``eye`` gần nhất của hunter (chặn 10 Hz).
+        self._pvp_last_eye_sent_s = 0.0
         #: Bật khi server gửi ``start`` với bọ thật (khác pha "setup" của
         #: Hunt & Hide) — ``_album_shoot`` chỉ gửi ``hit`` khi cờ này bật.
         self._pvp_active = False
@@ -1084,6 +1086,24 @@ class HcpdApplication:
         for msg in self._pvp.poll():
             self._pvp_handle(msg, now)
         self._pvp_tick_lobby(now)
+        self._pvp_tick_eye(now)
+
+    def _pvp_tick_eye(self, now: float) -> None:
+        """Hunt & Hide: mắt của hunter gửi tới 10 Hz cho hider tính
+        exposure (task: "sends its eye position at 10 Hz")."""
+        F = self._album.flow
+        state = self._album.state
+        if not (self._pvp_active and self._pvp is not None
+                and state.mode == F.PVP_MODES[1] and state.pvp_role == "hunter"):
+            return
+        if now - self._pvp_last_eye_sent_s < 0.1:        # 10 Hz
+            return
+        self._pvp_last_eye_sent_s = now
+        from src.net import protocol as proto
+
+        eye = self._virtual_camera.eye_position_mm
+        self._pvp.send({"t": proto.EYE, "x": float(eye[0]), "y": float(eye[1]),
+                        "z": float(eye[2])})
 
     def _pvp_handle(self, msg: dict, now: float) -> None:
         from src.net import client as pvp_client_mod
@@ -1213,9 +1233,16 @@ class HcpdApplication:
         self._pvp_photo_ready = True
 
     def _pvp_tick_lobby(self, now: float) -> None:
-        """Trong ``PVP_FOUND``: chờ tách lớp xong, đặt bọ (nếu mình là
-        người đặt) rồi báo ``ready``. Chạy mỗi khung tới khi server gửi
-        ``start`` (``state.pvp_started`` bật)."""
+        """Trong ``PVP_FOUND``: chờ tách lớp xong, đặt bọ (CHỈ host ở
+        Competitive — hider ở Hunt & Hide đặt sau, trong pha "setup", xem
+        ``_pvp_handle_start``) rồi báo ``ready``. Chạy mỗi khung tới khi
+        server gửi ``start`` thật (``state.pvp_started`` bật).
+
+        Hider KHÔNG được đặt bọ ở đây: server chỉ coi ``bugs`` là bắt đầu
+        pha săn khi nó tới lúc ``phase == "setup"`` (sau ``ready`` của CẢ
+        hai và ``start{bugs: []}`` đã gửi) — gửi sớm hơn thì server chỉ cất
+        đi, không bao giờ mở trận (xem ``src/net/server.py:_on_bugs``).
+        """
         from src.net import protocol as proto
 
         F = self._album.flow
@@ -1228,25 +1255,34 @@ class HcpdApplication:
             return
         if len(self._renderer.layer_records()) < 2:
             return                       # chua co gi de bake (vd con cho anh)
-        is_placer = ((state.mode == F.PVP_MODES[0] and self._pvp_is_host)
-                    or (state.mode == F.PVP_MODES[1] and state.pvp_role == "hider"))
-        if is_placer and not self._pvp_bugs_attempted:
+        is_host_placer = state.mode == F.PVP_MODES[0] and self._pvp_is_host
+        if is_host_placer and not self._pvp_bugs_attempted:
             self._pvp_bugs_attempted = True
-            if not self._pvp_place_bugs(now):
-                F.say(state, "This photo can't hide any bugs for PvP — "
-                             "pick another one.", 8.0)
-                if self._pvp is not None:
-                    self._pvp.send({"t": proto.CANCEL})
-                self._pvp_leave_match("no_bugs")
-                state.go(F.PVP_MODE)
-                return
-            self._pvp_bugs_sent = True
-        if is_placer and not self._pvp_bugs_sent:
+            self._pvp_bugs_sent = self._pvp_place_bugs_or_bail(now)
+        if is_host_placer and not self._pvp_bugs_sent:
             return                       # dat bo that bai nhung chua roi man (hiem)
         if not self._pvp_ready_sent:
             if self._pvp is not None:
                 self._pvp.send({"t": proto.READY})
             self._pvp_ready_sent = True
+
+    def _pvp_place_bugs_or_bail(self, now: float) -> bool:
+        """``_pvp_place_bugs`` + xử lý thất bại dùng chung cho cả hai
+        người đặt (host ở Competitive trong ``_pvp_tick_lobby``, hider ở
+        Hunt & Hide trong ``_pvp_handle_start``'s pha setup)."""
+        F = self._album.flow
+        state = self._album.state
+        if self._pvp_place_bugs(now):
+            return True
+        F.say(state, "This photo can't hide any bugs for PvP — "
+                     "pick another one.", 8.0)
+        if self._pvp is not None:
+            from src.net import protocol as proto
+
+            self._pvp.send({"t": proto.CANCEL})
+        self._pvp_leave_match("no_bugs")
+        state.go(F.PVP_MODE)
+        return False
 
     def _pvp_place_bugs(self, now: float) -> bool:
         """Đặt bọ (host ở Competitive, hider ở Hunt & Hide): CÙNG thuật
@@ -1301,10 +1337,14 @@ class HcpdApplication:
         self._game_planes = layer_planes(self._renderer.layer_records())
         bugs = msg.get("bugs") or []
         if not bugs:
-            # Hunt & Hide: đây là pha "setup" (bugs rỗng) — chỉ bắt đầu đếm
-            # giờ đặt bọ của hider, chưa vào trận.
+            # Hunt & Hide: đây là pha "setup" — hider đặt bọ NGAY BÂY GIỜ
+            # (không phải trước đó, trong ``_pvp_tick_lobby``: server chỉ
+            # coi ``bugs`` là mở trận săn khi nó tới lúc phase=="setup").
             if state.mode == F.PVP_MODES[1] and state.pvp_role == "hider":
                 state.pvp_setup_deadline_s = now + 20.0  # SETUP_S (src/net/server.py)
+                if not self._pvp_bugs_attempted:
+                    self._pvp_bugs_attempted = True
+                    self._pvp_bugs_sent = self._pvp_place_bugs_or_bail(now)
             return
         radius = float(self._content.game_prop_radius_mm)
         props = pvp_sync.bugs_from_wire(bugs, self._game_planes, radius)

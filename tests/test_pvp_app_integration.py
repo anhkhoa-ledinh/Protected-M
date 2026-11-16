@@ -84,14 +84,18 @@ def _app(**extra) -> HcpdApplication:
     app._game = None
     app._game_planes = ()
     app._game_layers_revision = 0
+    app._rest_eye = None
+    app._tracking_off = False
     app._pvp = _FakePvp()
     app._pvp_pending = None
     app._pvp_my_name = "Alice"
     app._pvp_is_host = False
     app._pvp_photo_sent = False
+    app._pvp_photo_ready = False
     app._pvp_bugs_sent = False
     app._pvp_bugs_attempted = False
     app._pvp_ready_sent = False
+    app._pvp_last_eye_sent_s = 0.0
     app._pvp_active = False
     for key, value in extra.items():
         setattr(app, key, value)
@@ -302,6 +306,116 @@ class PvpHandleStartTest(unittest.TestCase):
                               time.perf_counter())
         self.assertEqual(app._game.found, [True])
         self.assertIsNotNone(app._game.props[0])  # placeholder dict, not None
+
+
+# ---- Hunt & Hide: hider places bugs only after the "setup" start -----------
+
+class HuntAndHidePlacementOrderingTest(unittest.TestCase):
+    """Regression: the hider must NOT place/send bugs before ``ready`` — the
+    server only begins the hunt when ``bugs`` arrives during
+    ``phase == "setup"`` (i.e. after the setup ``start{bugs: []}``), see
+    ``src/net/server.py:_on_bugs``. Sending earlier deadlocks the match
+    until the server's setup-timeout safety net forfeits it to the hunter."""
+
+    def _hider_app(self) -> HcpdApplication:
+        app = _app()
+        records = [_fake_record(-0.60, -0.50), _fake_record(-0.40, -0.30),
+                  _fake_record(-0.10, 0.0)]
+        app._renderer.layer_records = lambda: records
+        app._album.state.screen = F.PVP_FOUND
+        app._album.state.mode = F.PVP_MODES[1]
+        app._album.state.pvp_role = "hider"
+        app._album.state.pvp_match_id = "m1"
+        app._album.state.level = 1
+        app._album.state.weapon = 0
+        app._content.content_path = "photo.jpg"
+        app._pvp_photo_ready = True
+        return app
+
+    def test_lobby_tick_never_places_bugs_for_the_hider(self) -> None:
+        app = self._hider_app()
+        app._pvp_place_bugs = lambda now: (_ for _ in ()).throw(
+            AssertionError("hider must not place bugs before the setup start"))
+        app._pvp_tick_lobby(time.perf_counter())
+        self.assertTrue(app._pvp_ready_sent)
+        self.assertEqual(app._pvp.sent, [{"t": proto.READY}])
+
+    @staticmethod
+    def _stub_place_bugs(app) -> None:
+        """Real geometric placement needs an actually-occluding layer (the
+        fake records here are all-transparent, so nothing can hide
+        anything) — these tests are about ORDERING, not placement
+        geometry, which ``test_pvp_sync.py``/``prop_game`` tests already
+        cover. Fake success the same way ``_pvp_place_bugs`` would: send
+        ``bugs`` and report ok."""
+        def fake(now):
+            app._pvp.send({"t": proto.BUGS, "bugs": [{"id": 0}]})
+            return True
+        app._pvp_place_bugs = fake
+
+    def test_setup_start_triggers_hider_placement_and_sends_bugs(self) -> None:
+        app = self._hider_app()
+        self._stub_place_bugs(app)
+        app._pvp_handle_start({"bugs": [], "duration_s": 20}, time.perf_counter())
+        self.assertTrue(app._pvp_bugs_attempted)
+        self.assertTrue(app._pvp_bugs_sent)
+        bug_msgs = [m for m in app._pvp.sent if m.get("t") == proto.BUGS]
+        self.assertEqual(len(bug_msgs), 1)
+
+    def test_competitive_host_still_places_in_the_lobby_tick(self) -> None:
+        """Sanity check the fix didn't also break Competitive's host path."""
+        app = self._hider_app()
+        self._stub_place_bugs(app)
+        app._album.state.mode = F.PVP_MODES[0]
+        app._pvp_is_host = True
+        app._pvp_tick_lobby(time.perf_counter())
+        self.assertTrue(app._pvp_bugs_sent)
+        bug_msgs = [m for m in app._pvp.sent if m.get("t") == proto.BUGS]
+        self.assertEqual(len(bug_msgs), 1)
+        self.assertEqual(app._pvp.sent[-1], {"t": proto.READY})
+
+
+# ---- Hunt & Hide: hunter's eye at 10 Hz ------------------------------------
+
+class PvpTickEyeTest(unittest.TestCase):
+    def _hunter_app(self):
+        app = _app()
+        app._album.state.mode = F.PVP_MODES[1]
+        app._album.state.pvp_role = "hunter"
+        app._virtual_camera = SimpleNamespace(eye_position_mm=np.array([1.0, 2.0, 300.0]))
+        app._pvp_active = True
+        return app
+
+    def test_sends_eye_when_hunter_and_active(self) -> None:
+        app = self._hunter_app()
+        app._pvp_tick_eye(10.0)
+        self.assertEqual(app._pvp.sent, [{"t": proto.EYE, "x": 1.0, "y": 2.0, "z": 300.0}])
+
+    def test_throttled_to_10hz(self) -> None:
+        app = self._hunter_app()
+        app._pvp_tick_eye(10.0)
+        app._pvp_tick_eye(10.05)   # < 0.1s later — must not send again
+        self.assertEqual(len(app._pvp.sent), 1)
+        app._pvp_tick_eye(10.2)    # >= 0.1s later — sends again
+        self.assertEqual(len(app._pvp.sent), 2)
+
+    def test_hider_never_sends_eye(self) -> None:
+        app = self._hunter_app()
+        app._album.state.pvp_role = "hider"
+        app._pvp_tick_eye(10.0)
+        self.assertEqual(app._pvp.sent, [])
+
+    def test_competitive_never_sends_eye(self) -> None:
+        app = self._hunter_app()
+        app._album.state.mode = F.PVP_MODES[0]
+        app._pvp_tick_eye(10.0)
+        self.assertEqual(app._pvp.sent, [])
+
+    def test_inactive_match_never_sends_eye(self) -> None:
+        app = self._hunter_app()
+        app._pvp_active = False
+        app._pvp_tick_eye(10.0)
+        self.assertEqual(app._pvp.sent, [])
 
 
 # ---- _pvp_send_when_ready / _tick_pvp ---------------------------------------
