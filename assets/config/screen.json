@@ -1,0 +1,11 @@
+{
+  "_comment": "Physical measurements in meters. TODO: measure your specific model with a ruler.",
+  "_screen_width_note": "15.6 inch 16:9 estimate: 344mm. Measure the active display area (not bezel).",
+  "_screen_height_note": "15.6 inch 16:9 estimate: 194mm.",
+  "_camera_offset_note": "Webcam position relative to screen center in HCPD world space (X right, Y up, Z toward viewer). Y = screen_height/2 + bezel_gap (~6mm). Z = forward protrusion of lens (~5mm).",
+  "screen_width": 0.344,
+  "screen_height": 0.194,
+  "screen_center": [0.0, 0.0, 0.0],
+  "camera_offset": [0.0, 0.103, 0.005],
+  "eye_offset": [0.0, 0.0, 0.0]
+}

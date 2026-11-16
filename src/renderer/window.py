@@ -1,0 +1,786 @@
+"""GLFW window and OpenGL context management."""
+
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass
+
+import glfw
+from OpenGL import GL
+
+from src.config.prefs import ASPECT, MIN_WINDOW, default_rect
+from src.config.schema import RendererSettings
+
+logger = logging.getLogger(__name__)
+
+
+def viewport_size(
+    framebuffer_size: tuple[int, int],
+    fallback: tuple[int, int],
+) -> tuple[int, int]:
+    """
+    Kích thước thật để vẽ: framebuffer nếu dùng được, nếu không thì ``fallback``.
+
+    Đây từng là chỗ hỏng. ``width``/``height`` trả thẳng
+    ``settings.window_width/height`` — tức hằng số trong ``default.json`` —
+    nên ``glViewport`` ở ``renderer.py`` chạy theo con số cấu hình chứ không
+    theo vùng vẽ thật. Đo 2026-10-11: client area 1304x744 nhưng cảnh vẽ
+    1280x720 neo góc dưới-trái, chừa dải đen 24 px ở trên và bên phải.
+
+    ``fallback`` dùng cho trường hợp GLFW trả ``(0, 0)`` — xảy ra khi cửa sổ bị
+    thu nhỏ xuống taskbar. Lấy 0 làm bề rộng viewport thì chia cho 0 ở mọi
+    overlay, nên giữ lại số cũ cho tới khi cửa sổ hiện lại.
+    """
+    width, height = framebuffer_size
+    if width > 0 and height > 0:
+        return int(width), int(height)
+    return int(fallback[0]), int(fallback[1])
+
+
+def fullscreen_target(
+    enabled: bool,
+    monitor,
+    video_mode,
+    fallback_size: tuple[int, int],
+) -> tuple[object | None, tuple[int, int], dict[int, int]]:
+    """
+    Chọn màn hình, kích thước và window hint cho lần tạo cửa sổ.
+
+    Trả ``(monitor, (width, height), hints)``. ``monitor`` là ``None`` khi chạy
+    cửa sổ — đúng thứ ``glfw.create_window`` cần ở đối số thứ tư.
+
+    Khi bật toàn màn hình, dùng **đúng chế độ hình đang chạy** của màn chính:
+    đặt ``RED/GREEN/BLUE_BITS`` và ``REFRESH_RATE`` khớp ``video_mode`` rồi tạo
+    cửa sổ đúng kích thước đó. Đây là công thức "borderless fullscreen" của
+    GLFW — vì chế độ yêu cầu trùng chế độ hiện tại nên trình điều khiển **không
+    đổi độ phân giải**, chỉ bỏ viền và phủ kín cả taskbar.
+
+    ``enabled`` nhưng không có màn hoặc không đọc được ``video_mode`` thì rơi
+    về cửa sổ với ``fallback_size``; caller có trách nhiệm log cảnh báo.
+
+    ĐỪNG tắt ``AUTO_ICONIFY`` (PB-051, đã thử 16/10): run13 tắt nó thì cửa sổ
+    mất focus vẫn nằm trên cùng, phím đi vào cửa sổ phía sau, Alt-Tab chỉ đổi
+    các cửa sổ phía sau — không phím nào ăn, kể cả sau khi có lớp. Để mặc định
+    thì mất focus là thu nhỏ, Alt-Tab về được (run12).
+    """
+    if not enabled or monitor is None or video_mode is None:
+        return None, (int(fallback_size[0]), int(fallback_size[1])), {}
+
+    hints = {
+        glfw.RED_BITS: int(video_mode.bits.red),
+        glfw.GREEN_BITS: int(video_mode.bits.green),
+        glfw.BLUE_BITS: int(video_mode.bits.blue),
+        glfw.REFRESH_RATE: int(video_mode.refresh_rate),
+    }
+    size = (int(video_mode.size.width), int(video_mode.size.height))
+    return monitor, size, hints
+
+
+@dataclass(frozen=True)
+class InputState:
+    """Per-frame keyboard input snapshot."""
+
+    move_x: float = 0.0
+    move_y: float = 0.0
+    move_z: float = 0.0
+    toggle_debug: bool = False
+    cycle_filter: bool = False
+    toggle_prediction: bool = False
+    toggle_webcam_preview: bool = False
+    open_content_file: bool = False
+    toggle_atmospheric: bool = False
+    toggle_mist: bool = False
+    toggle_relief: bool = False
+    toggle_disocclusion: bool = False
+    zoom_in: bool = False
+    zoom_out: bool = False
+    # Quét chiều sâu (Phase 2). plane_z là cần gạt CHÍNH, z_far là phụ —
+    # xem ContentPlaneRenderer.nudge_plane_z để biết vì sao.
+    plane_closer: bool = False
+    plane_farther: bool = False
+    far_layer_closer: bool = False
+    far_layer_farther: bool = False
+    overscan_down: bool = False
+    overscan_up: bool = False
+    # Phím sandbox của trò tìm vật ẩn (PB-015 C2): G mở/đặt lại ván,
+    # T tắt tracking để có điều kiện đối chứng.
+    game_toggle: bool = False
+    toggle_tracking: bool = False
+    # TASK_album_ui_1106: F12 chụp màn, C căn lại theo chỗ ngồi.
+    screenshot: bool = False
+    album_centre: bool = False
+    # Ô nhập của màn đăng nhập: xoá lùi, sang ô kế, xác nhận.
+    backspace: bool = False
+    focus_next: bool = False
+    submit: bool = False
+    quit_app: bool = False
+    # TASK_ui_v3_1107. Esc ở giao diện v3 là "lùi một bước", nên nó phải là
+    # **một nhịp bấm** chứ không phải trạng thái phím như ``quit_app``: giữ
+    # Esc mà mỗi khung lùi một màn thì một cú bấm nhảy về tận màn đăng nhập.
+    escape: bool = False
+    display_toggle: bool = False
+    focus_up: bool = False
+    focus_down: bool = False
+    replay: bool = False
+    #: Phím 1–3 chọn ô vật phẩm trên HUD; 0 = không bấm gì.
+    item_slot: int = 0
+    #: TASK_shared_album_1111: U = "Share to album" ở màn chọn ảnh.
+    share_to_album: bool = False
+
+
+#: Phím có tác dụng ở chế độ demo (PB-055; quyết định 11/10: demo không có phím
+#: A/B và F1). Esc và kéo-thả đi đường riêng nên vẫn chạy; WASD/QE bị tắt.
+DEMO_KEYS = frozenset({glfw.KEY_G, glfw.KEY_T, glfw.KEY_F6, glfw.KEY_F4})
+
+#: TASK_album_ui_1106: giao diện album dùng chuột là chính; bàn phím thêm F12
+#: (chụp màn), F9 (diễn cảnh mất kết nối) và C (căn lại theo chỗ ngồi).
+ALBUM_KEYS = DEMO_KEYS | frozenset({glfw.KEY_F9, glfw.KEY_F12, glfw.KEY_C,
+                                    glfw.KEY_BACKSPACE, glfw.KEY_ENTER,
+                                    glfw.KEY_KP_ENTER, glfw.KEY_TAB})
+
+#: TASK_ui_v3_1107: giao diện v3 thêm F11 (đổi chế độ hiển thị), Esc (lùi một
+#: bước), ↑/↓ (vòng focus của màn chính), R (chơi lại) và 1–3 (ô vật phẩm).
+#:
+#: Phím giao diện v3 nhận — khai THẲNG, không trừ dần từ ``ALBUM_KEYS``.
+#:
+#: Cách cũ (``ALBUM_KEYS - {T, F4, G}``) đã sót: ``F6`` (mở file) và ``F9``
+#: (bật/tắt lấp khe) vẫn lọt vào vì chúng nằm sẵn trong ``ALBUM_KEYS``, và
+#: người dùng gặp lại chúng trong lúc chơi. Danh sách cho phép thì đọc một
+#: cái là biết v3 ăn đúng những phím nào, và thêm phím vào bộ cũ sau này
+#: không âm thầm mở cửa cho v3 nữa.
+#:
+#: Mọi đồ nghề sandbox của lõi HCPD đều KHÔNG có mặt: ``F1``–``F3`` (HUD gỡ
+#: lỗi, đổi bộ lọc, dự đoán), ``F4`` (ô webcam PiP), ``F6`` (mở file — v3 đã
+#: có nút "Choose from computer"), ``F7``–``F10`` (A/B sương mù, khí quyển,
+#: lấp khe, nổi khối), ``G`` (đo mắt nghỉ + rải lại vật ẩn — v3 dùng nút
+#: "Recalibrate" và phím ``C``), ``T`` (tắt tracking), và các phím nhích
+#: ``+ - [ ] , . ; '``. Đây là bản cho người chơi, không phải bàn thí nghiệm.
+V3_KEYS = frozenset({
+    glfw.KEY_F11,                      # đổi toàn màn hình ↔ cửa sổ
+    glfw.KEY_F12,                      # chụp màn
+    glfw.KEY_ESCAPE,                   # lùi một bước
+    glfw.KEY_ENTER, glfw.KEY_KP_ENTER,  # nút chính của màn
+    glfw.KEY_TAB, glfw.KEY_BACKSPACE,  # ô nhập
+    glfw.KEY_C,                        # căn lại chỗ ngồi
+    glfw.KEY_UP, glfw.KEY_DOWN,        # vòng focus của màn chính
+    glfw.KEY_R,                        # chơi lại ở màn kết quả
+    glfw.KEY_1, glfw.KEY_2, glfw.KEY_3,  # ô vật phẩm
+    glfw.KEY_U,                        # TASK_shared_album_1111: Share to album
+})
+
+
+class GlfwWindow:
+    """Application window with modern OpenGL context."""
+
+    #: Mặc định ở mức class để bản dựng bằng ``__new__`` (test) vẫn là sandbox.
+    _demo = False
+    _album = False
+    _ui_v3 = False
+
+    def __init__(self, settings: RendererSettings, *, demo: bool = False,
+                 album: bool = False, ui_v3: bool = False,
+                 prefs: dict | None = None) -> None:
+        self._settings = settings
+        self._demo = bool(demo)
+        self._album = bool(album)
+        #: TASK_ui_v3_1107: giao diện v3 nhận thêm phím, và Esc đổi nghĩa.
+        self._ui_v3 = bool(ui_v3)
+        prefs = prefs or {}
+        #: D1: "fullscreen" | "window", nhớ qua ``assets/config/user_prefs.json``.
+        self._display = str(prefs.get("display") or "fullscreen")
+        self._window_rect = (list(prefs.get("window_rect"))
+                             if prefs.get("window_rect") else None)
+        #: D2: ai cần biết khi cửa sổ dời chỗ / đổi cỡ (mặt phẳng Kooima).
+        self._geometry_listener = None
+        self._logged_dpi = False
+        self._window = None
+        # Kích thước vùng vẽ thật. Khởi tạo bằng số cấu hình vì cửa sổ chưa tồn
+        # tại; create() thay ngay bằng số GLFW báo về.
+        self._fb_size = (settings.window_width, settings.window_height)
+        self._input = InputState()
+        self._debug_requested = False
+        self._filter_cycle_requested = False
+        self._prediction_toggle_requested = False
+        self._preview_toggle_requested = False
+        self._open_file_requested = False
+        self._atmospheric_toggle_requested = False
+        self._mist_toggle_requested = False
+        self._relief_toggle_requested = False
+        self._disocclusion_toggle_requested = False
+        self._zoom_in_requested = False
+        self._zoom_out_requested = False
+        self._plane_closer_requested = False
+        self._plane_farther_requested = False
+        self._far_closer_requested = False
+        self._far_farther_requested = False
+        self._overscan_down_requested = False
+        self._overscan_up_requested = False
+        self._game_toggle_requested = False
+        self._tracking_toggle_requested = False
+        self._screenshot_requested = False
+        self._album_centre_requested = False
+        self._backspace_requested = False
+        self._focus_next_requested = False
+        self._submit_requested = False
+        self._escape_requested = False
+        self._display_toggle_requested = False
+        self._focus_up_requested = False
+        self._focus_down_requested = False
+        self._replay_requested = False
+        self._item_slot_requested = 0
+        self._share_to_album_requested = False
+        self._dropped_paths: list[str] = []
+        #: TASK_album_ui_1106: chuột và chữ, chỉ giao diện album đọc tới.
+        self._clicks: list[tuple[float, float]] = []
+        self._typed = ""
+
+    @property
+    def width(self) -> int:
+        return self._fb_size[0]
+
+    @property
+    def height(self) -> int:
+        return self._fb_size[1]
+
+    def _set_framebuffer_size(self, width: int, height: int) -> tuple[int, int]:
+        """Ghi lại kích thước vùng vẽ. Tách riêng để test được, không đụng GL."""
+        self._fb_size = viewport_size(
+            (width, height),
+            (self._settings.window_width, self._settings.window_height),
+        )
+        return self._fb_size
+
+    def _on_framebuffer_size(self, _window, width: int, height: int) -> None:
+        """Callback của GLFW khi vùng vẽ đổi kích thước."""
+        vw, vh = self._set_framebuffer_size(width, height)
+        # renderer.render() cũng gọi glViewport mỗi khung theo width/height nên
+        # dòng này là thừa về lâu dài; giữ để khung đang vẽ dở lúc resize không
+        # dùng viewport cũ.
+        GL.glViewport(0, 0, vw, vh)
+        logger.info("Framebuffer resized to %dx%d — viewport %dx%d", width, height, vw, vh)
+
+    @property
+    def should_close(self) -> bool:
+        return bool(glfw.window_should_close(self._window))
+
+    def create(self) -> None:
+        """Initialize GLFW and create the OpenGL context."""
+        if not glfw.init():
+            raise RuntimeError("Failed to initialize GLFW")
+
+        glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 3)
+        glfw.window_hint(glfw.CONTEXT_VERSION_MINOR, 3)
+        glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
+        glfw.window_hint(glfw.SAMPLES, self._settings.msaa_samples)
+
+        # D1: ở giao diện v3, chế độ hiển thị do ``user_prefs.json`` quyết —
+        # người dùng chọn lần trước thì lần này mở lại đúng thế. Giao diện cũ
+        # giữ nguyên ``renderer.fullscreen`` của config.
+        wanted = ((self._display == "fullscreen") if self._ui_v3
+                  else self._settings.fullscreen)
+        monitor = glfw.get_primary_monitor() if wanted else None
+        video_mode = glfw.get_video_mode(monitor) if monitor is not None else None
+        monitor, (win_w, win_h), hints = fullscreen_target(
+            wanted,
+            monitor,
+            video_mode,
+            (self._settings.window_width, self._settings.window_height),
+        )
+        if wanted and monitor is None:
+            logger.warning(
+                "fullscreen requested but no usable primary monitor — "
+                "falling back to a %dx%d window",
+                win_w, win_h,
+            )
+        for hint, value in hints.items():
+            glfw.window_hint(hint, value)
+        logger.info(
+            "Window mode: %s %dx%d",
+            "FULLSCREEN (primary monitor, current video mode)" if monitor else "windowed",
+            win_w, win_h,
+        )
+
+        self._window = glfw.create_window(
+            win_w,
+            win_h,
+            self._settings.window_title,
+            monitor,
+            None,
+        )
+        if self._window is None:
+            glfw.terminate()
+            raise RuntimeError("Failed to create GLFW window")
+
+        glfw.make_context_current(self._window)
+        glfw.swap_interval(1 if self._settings.vsync else 0)
+        glfw.set_key_callback(self._window, self._on_key)
+        glfw.set_drop_callback(self._window, self._on_drop)
+        glfw.set_framebuffer_size_callback(self._window, self._on_framebuffer_size)
+        if self._ui_v3:
+            self._display = "fullscreen" if monitor else "window"
+            if monitor is None:
+                self._apply_window_style()
+                # D1.4: mở lại đúng khung cửa sổ lần trước. Không khôi phục
+                # thì cửa sổ nhảy về chỗ hệ điều hành chọn, và người dùng
+                # phải kê lại mỗi lần chạy.
+                mon_pos, mon_size, _hz = self.monitor_geometry()
+                rect = self._window_rect or default_rect(mon_pos, mon_size)
+                glfw.set_window_size(self._window, int(rect[2]), int(rect[3]))
+                glfw.set_window_pos(self._window, int(rect[0]), int(rect[1]))
+                self._window_rect = list(rect)
+            # D2: mặt phẳng Kooima là hình chữ nhật VẬT LÝ của cửa sổ, nên nó
+            # phải đổi theo cả chỗ đứng lẫn kích thước.
+            glfw.set_window_pos_callback(self._window, self._on_window_pos)
+            glfw.set_window_size_callback(self._window, self._on_window_size)
+        # TASK_album_ui_1106: chuột và chữ gõ vào. Hai callback này chỉ GOM sự
+        # kiện; không ai đọc thì không đổi hành vi nào của bản hôm nay.
+        glfw.set_mouse_button_callback(self._window, self._on_mouse_button)
+        glfw.set_char_callback(self._window, self._on_char)
+
+        requested = (win_w, win_h)
+        fb = glfw.get_framebuffer_size(self._window)
+        vw, vh = self._set_framebuffer_size(fb[0], fb[1])
+        # Cặp số này là bằng chứng của PB-038: trước bản sửa, viewport luôn lấy
+        # `requested` bất kể framebuffer thật rộng bao nhiêu.
+        logger.info(
+            "Framebuffer %dx%d — viewport %dx%d (requested %dx%d)",
+            fb[0], fb[1], vw, vh, requested[0], requested[1],
+        )
+
+        GL.glEnable(GL.GL_DEPTH_TEST)
+        GL.glEnable(GL.GL_CULL_FACE)
+        GL.glCullFace(GL.GL_BACK)
+        if self._settings.msaa_samples > 0:
+            GL.glEnable(GL.GL_MULTISAMPLE)
+
+    def pump_events(self) -> None:
+        """
+        Lấy message Windows giữa các bước khởi động (PB-051), chưa đọc phím.
+
+        Từ ``create()`` tới khung đầu là dựng renderer, nạp ảnh, mở tracking.
+        Luồng này quá ~5 s không lấy message thì dwm thay cửa sổ bằng bản ma
+        "Not Responding" và app mất focus (run12, 16/10). Cờ phím callback đặt
+        ở đây vẫn được ``poll_input`` đọc ở khung đầu.
+        """
+        glfw.poll_events()
+
+    def poll_input(self) -> InputState:
+        """Poll events and return movement input for dev/testing."""
+        glfw.poll_events()
+        move_x = move_y = move_z = 0.0
+
+        # Demo (PB-055): không dịch pose bằng tay — bỏ qua WASD/QE.
+        if not self._demo:
+            if glfw.get_key(self._window, glfw.KEY_A) == glfw.PRESS:
+                move_x -= 1.0
+            if glfw.get_key(self._window, glfw.KEY_D) == glfw.PRESS:
+                move_x += 1.0
+            if glfw.get_key(self._window, glfw.KEY_W) == glfw.PRESS:
+                move_y += 1.0
+            if glfw.get_key(self._window, glfw.KEY_S) == glfw.PRESS:
+                move_y -= 1.0
+            if glfw.get_key(self._window, glfw.KEY_Q) == glfw.PRESS:
+                move_z += 1.0
+            if glfw.get_key(self._window, glfw.KEY_E) == glfw.PRESS:
+                move_z -= 1.0
+
+        result = InputState(
+            move_x=move_x,
+            move_y=move_y,
+            move_z=move_z,
+            toggle_debug=self._debug_requested,
+            cycle_filter=self._filter_cycle_requested,
+            toggle_prediction=self._prediction_toggle_requested,
+            toggle_webcam_preview=self._preview_toggle_requested,
+            open_content_file=self._open_file_requested,
+            toggle_atmospheric=self._atmospheric_toggle_requested,
+            toggle_mist=self._mist_toggle_requested,
+            toggle_relief=self._relief_toggle_requested,
+            toggle_disocclusion=self._disocclusion_toggle_requested,
+            zoom_in=self._zoom_in_requested,
+            zoom_out=self._zoom_out_requested,
+            plane_closer=self._plane_closer_requested,
+            plane_farther=self._plane_farther_requested,
+            far_layer_closer=self._far_closer_requested,
+            far_layer_farther=self._far_farther_requested,
+            overscan_down=self._overscan_down_requested,
+            overscan_up=self._overscan_up_requested,
+            game_toggle=self._game_toggle_requested,
+            toggle_tracking=self._tracking_toggle_requested,
+            screenshot=self._screenshot_requested,
+            album_centre=self._album_centre_requested,
+            backspace=self._backspace_requested,
+            focus_next=self._focus_next_requested,
+            submit=self._submit_requested,
+            escape=self._escape_requested,
+            display_toggle=self._display_toggle_requested,
+            focus_up=self._focus_up_requested,
+            focus_down=self._focus_down_requested,
+            replay=self._replay_requested,
+            item_slot=self._item_slot_requested,
+            share_to_album=self._share_to_album_requested,
+            # Giao diện v3: Esc là "lùi một bước", và app tự quyết khi nào cú
+            # lùi ấy nghĩa là thoát (``v3_routes.on_back``).
+            quit_app=(False if self._ui_v3 else
+                      glfw.get_key(self._window, glfw.KEY_ESCAPE) == glfw.PRESS),
+        )
+        self._debug_requested = False
+        self._filter_cycle_requested = False
+        self._prediction_toggle_requested = False
+        self._preview_toggle_requested = False
+        self._open_file_requested = False
+        self._atmospheric_toggle_requested = False
+        self._mist_toggle_requested = False
+        self._relief_toggle_requested = False
+        self._disocclusion_toggle_requested = False
+        self._zoom_in_requested = False
+        self._zoom_out_requested = False
+        self._plane_closer_requested = False
+        self._plane_farther_requested = False
+        self._far_closer_requested = False
+        self._far_farther_requested = False
+        self._overscan_down_requested = False
+        self._overscan_up_requested = False
+        self._game_toggle_requested = False
+        self._tracking_toggle_requested = False
+        self._screenshot_requested = False
+        self._album_centre_requested = False
+        self._backspace_requested = False
+        self._focus_next_requested = False
+        self._submit_requested = False
+        self._escape_requested = False
+        self._display_toggle_requested = False
+        self._focus_up_requested = False
+        self._focus_down_requested = False
+        self._replay_requested = False
+        self._item_slot_requested = 0
+        self._share_to_album_requested = False
+        return result
+
+    # ---- D1: chế độ hiển thị -------------------------------------------
+    @property
+    def display_mode(self) -> str:
+        return self._display
+
+    def _apply_window_style(self) -> None:
+        """
+        Cửa sổ thường: có viền, kéo được, khoá 16:9, không nhỏ hơn 960×540.
+
+        Khoá tỉ lệ ở tầng GLFW chứ không tự sửa lại cỡ trong callback: trình
+        quản lý cửa sổ của Windows kẹp ngay lúc người dùng kéo, nên không có
+        khung nào vẽ ở tỉ lệ sai rồi nhảy về.
+        """
+        glfw.set_window_attrib(self._window, glfw.DECORATED, glfw.TRUE)
+        glfw.set_window_attrib(self._window, glfw.RESIZABLE, glfw.TRUE)
+        glfw.set_window_aspect_ratio(self._window, ASPECT[0], ASPECT[1])
+        glfw.set_window_size_limits(self._window, MIN_WINDOW[0], MIN_WINDOW[1],
+                                    glfw.DONT_CARE, glfw.DONT_CARE)
+
+    def monitor_geometry(self, monitor=None):
+        """``((mx, my), (W, H), refresh)`` của một màn hình."""
+        monitor = monitor or glfw.get_primary_monitor()
+        if monitor is None:
+            return ((0, 0), (self.width, self.height), glfw.DONT_CARE)
+        mode = glfw.get_video_mode(monitor)
+        pos = glfw.get_monitor_pos(monitor)
+        if mode is None:
+            return ((int(pos[0]), int(pos[1])), (self.width, self.height),
+                    glfw.DONT_CARE)
+        return ((int(pos[0]), int(pos[1])),
+                (int(mode.size.width), int(mode.size.height)),
+                int(mode.refresh_rate))
+
+    def window_rect(self) -> list[int]:
+        """``[x, y, w, h]`` vùng khách của cửa sổ, hỏi GLFW ngay lúc này."""
+        if self._window is None:
+            return [0, 0, self.width, self.height]
+        pos = glfw.get_window_pos(self._window)
+        size = glfw.get_window_size(self._window)
+        return [int(pos[0]), int(pos[1]), int(size[0]), int(size[1])]
+
+    def remembered_rect(self) -> list[int] | None:
+        """Khung cửa sổ để ghi vào prefs: khung hiện tại nếu đang ở chế độ cửa sổ."""
+        if self._display == "window" and self._window is not None:
+            return self.window_rect()
+        return self._window_rect
+
+    def set_display_mode(self, mode: str) -> bool:
+        """
+        Đổi chế độ hiển thị **ngay trong lúc chạy**, không dựng lại context.
+
+        ``glfw.set_window_monitor`` giữ nguyên cửa sổ và context, nên mọi
+        texture đã nạp vẫn còn — chỉ framebuffer đổi cỡ, và callback
+        ``framebuffer_size`` lo phần đó. Trả ``True`` nếu đã đổi.
+        """
+        mode = "fullscreen" if str(mode) == "fullscreen" else "window"
+        if self._window is None or mode == self._display:
+            return False
+        if mode == "window":
+            rect = self._window_rect
+            if not rect:
+                pos, size, _refresh = self.monitor_geometry()
+                rect = default_rect(pos, size)
+            self._apply_window_style()
+            glfw.set_window_monitor(self._window, None, int(rect[0]),
+                                    int(rect[1]), int(rect[2]), int(rect[3]),
+                                    glfw.DONT_CARE)
+        else:
+            # Ghi lại khung ĐANG dùng trước khi phủ kín màn: không nhớ thì lần
+            # quay về cửa sổ sẽ nhảy ra giữa màn, mất chỗ người dùng đã kê.
+            self._window_rect = self.window_rect()
+            monitor = glfw.get_primary_monitor()
+            pos, size, refresh = self.monitor_geometry(monitor)
+            glfw.set_window_monitor(self._window, monitor, int(pos[0]),
+                                    int(pos[1]), int(size[0]), int(size[1]),
+                                    refresh)
+        self._display = mode
+        glfw.swap_interval(1 if self._settings.vsync else 0)
+        glfw.poll_events()
+        fb = glfw.get_framebuffer_size(self._window)
+        self._set_framebuffer_size(fb[0], fb[1])
+        logger.info("Display mode: %s — cua so %s, framebuffer %dx%d",
+                    mode, self.window_rect(), fb[0], fb[1])
+        self._notify_geometry()
+        return True
+
+    def resize_window(self, width: int, height: int) -> None:
+        """Đặt cỡ vùng khách rồi canh giữa màn (chỉ ở chế độ cửa sổ)."""
+        if self._window is None or self._display != "window":
+            return
+        pos, size, _refresh = self.monitor_geometry()
+        width = min(int(width), int(size[0]))
+        height = min(int(height), int(size[1]))
+        glfw.set_window_size(self._window, width, height)
+        glfw.set_window_pos(self._window, pos[0] + (size[0] - width) // 2,
+                            pos[1] + (size[1] - height) // 2)
+        glfw.poll_events()
+
+    def toggle_display(self) -> str:
+        """F11: đổi qua lại hai chế độ. Trả chế độ sau khi đổi."""
+        self.set_display_mode("window" if self._display == "fullscreen"
+                              else "fullscreen")
+        return self._display
+
+    def set_clipboard(self, text: str) -> None:
+        if self._window is not None:
+            glfw.set_clipboard_string(self._window, str(text))
+
+    def is_mouse_down(self) -> bool:
+        """Chuột trái đang giữ — màn cài đặt cần để KÉO thanh âm lượng."""
+        if self._window is None:
+            return False
+        return glfw.get_mouse_button(self._window,
+                                     glfw.MOUSE_BUTTON_LEFT) == glfw.PRESS
+
+    # ---- D2: hình chữ nhật vật lý của cửa sổ ---------------------------
+    def set_geometry_listener(self, listener) -> None:
+        """Gọi ``listener()`` mỗi khi cửa sổ dời chỗ hoặc đổi cỡ."""
+        self._geometry_listener = listener
+        self._notify_geometry()
+
+    def _notify_geometry(self) -> None:
+        if self._geometry_listener is not None:
+            self._geometry_listener()
+
+    def _on_window_pos(self, _window, x: int, y: int) -> None:
+        _ = (x, y)
+        self._notify_geometry()
+
+    def _on_window_size(self, _window, width: int, height: int) -> None:
+        _ = (width, height)
+        self._notify_geometry()
+
+    def framebuffer_ratio(self) -> tuple[float, float]:
+        """
+        ``framebuffer / window`` — hệ số DPI scaling, thường là 1,0.
+
+        Khác 1 thì mọi phép tính tính bằng pixel cửa sổ phải nhân lại; in
+        **một lần** để lượt chạy tự nói nó đang ở hệ số nào (D2).
+        """
+        if self._window is None:
+            return (1.0, 1.0)
+        win = glfw.get_window_size(self._window)
+        fb = glfw.get_framebuffer_size(self._window)
+        ratio = (fb[0] / max(1, win[0]), fb[1] / max(1, win[1]))
+        if not self._logged_dpi:
+            self._logged_dpi = True
+            logger.info("Framebuffer %dx%d vs window %dx%d — ty le %.3f x %.3f",
+                        fb[0], fb[1], win[0], win[1], ratio[0], ratio[1])
+        return ratio
+
+    def window_centre_monitor(self):
+        """Màn hình chứa **tâm** cửa sổ, và nó có phải màn chính không."""
+        if self._window is None:
+            return (None, True)
+        rect = self.window_rect()
+        centre = (rect[0] + rect[2] * 0.5, rect[1] + rect[3] * 0.5)
+        primary = glfw.get_primary_monitor()
+        for monitor in glfw.get_monitors() or ():
+            pos, size, _refresh = self.monitor_geometry(monitor)
+            if (pos[0] <= centre[0] < pos[0] + size[0]
+                    and pos[1] <= centre[1] < pos[1] + size[1]):
+                return (monitor, monitor == primary)
+        return (primary, True)
+
+    def cursor_pos(self) -> tuple[float, float]:
+        """Vị trí con trỏ trong pixel cửa sổ (TASK_album_ui_1106)."""
+        if self._window is None:
+            return (0.0, 0.0)
+        x, y = glfw.get_cursor_pos(self._window)
+        return (float(x), float(y))
+
+    def pop_clicks(self) -> list:
+        """Các cú bấm chuột trái kể từ lần hỏi trước."""
+        clicks, self._clicks = self._clicks, []
+        return clicks
+
+    def pop_typed(self) -> str:
+        """Chuỗi ký tự đã gõ kể từ lần hỏi trước."""
+        typed, self._typed = self._typed, ""
+        return typed
+
+    def _on_mouse_button(self, window, button, action, mods) -> None:
+        _ = (window, mods)
+        if button == glfw.MOUSE_BUTTON_LEFT and action == glfw.PRESS:
+            self._clicks.append(self.cursor_pos())
+
+    def _on_char(self, window, codepoint) -> None:
+        _ = window
+        self._typed += chr(int(codepoint))
+
+    def pop_dropped_path(self) -> str | None:
+        """Return the next drag-and-dropped file path, if any."""
+        if not self._dropped_paths:
+            return None
+        return self._dropped_paths.pop(0)
+
+    def framebuffer_size(self) -> tuple[int, int]:
+        """Cỡ framebuffer **hỏi GLFW ngay lúc này**, không qua bộ nhớ đệm.
+
+        ``width``/``height`` rơi về số trong config khi cửa sổ bị thu nhỏ
+        (``viewport_size``), nên đọc pixel theo chúng sẽ ra khung 1280×720 đen
+        — đúng 18 ảnh hỏng của lượt chụp đầu.
+        """
+        if self._window is None:
+            return (0, 0)
+        return tuple(int(v) for v in glfw.get_framebuffer_size(self._window))
+
+    def is_iconified(self) -> bool:
+        """Cửa sổ đang thu nhỏ: đọc framebuffer lúc này chỉ ra màu đen."""
+        if self._window is None:
+            return False
+        return bool(glfw.get_window_attrib(self._window, glfw.ICONIFIED))
+
+    def restore_and_focus(self) -> None:
+        """
+        Kéo cửa sổ trở lại sau khi một hộp thoại khác chiếm màn hình.
+
+        Hộp thoại chọn file (tkinter) làm cửa sổ toàn màn hình bị **thu nhỏ**:
+        log 07/11 00:54 có đúng dòng ``Framebuffer resized to 0x0`` ngay lúc
+        mở hộp thoại, và sau đó Alt-Tab cũng không đưa cửa sổ về được (bẫy
+        AUTO_ICONIFY đã ghi ở ``fullscreen_target``). Không gọi hàm này thì
+        app vẫn chạy nhưng người dùng chỉ thấy desktop.
+        """
+        if self._window is None:
+            return
+        if glfw.get_window_attrib(self._window, glfw.ICONIFIED):
+            glfw.restore_window(self._window)
+        glfw.show_window(self._window)
+        glfw.focus_window(self._window)
+
+    def request_close(self) -> None:
+        """Yêu cầu đóng cửa sổ (--album-shots dùng khi chụp xong)."""
+        if self._window is not None:
+            glfw.set_window_should_close(self._window, True)
+
+    def swap_buffers(self) -> None:
+        """Present the back buffer."""
+        glfw.swap_buffers(self._window)
+
+    def destroy(self) -> None:
+        """Destroy window and terminate GLFW."""
+        if self._window is not None:
+            glfw.destroy_window(self._window)
+            self._window = None
+        glfw.terminate()
+
+    def _on_key(self, window, key, scancode, action, mods) -> None:
+        _ = (window, scancode, mods)
+        if action != glfw.PRESS:
+            return
+        if self._ui_v3 and key not in V3_KEYS:
+            return                       # v3: chuột là chính
+        if self._album and not self._ui_v3 and key not in ALBUM_KEYS:
+            return                       # album: chuột là chính
+        if self._demo and not self._album and key not in DEMO_KEYS:
+            return                       # PB-055: demo không có phím A/B, F1
+        if key == glfw.KEY_F1:
+            self._debug_requested = True
+        elif key == glfw.KEY_F2:
+            self._filter_cycle_requested = True
+        elif key == glfw.KEY_F3:
+            self._prediction_toggle_requested = True
+        elif key == glfw.KEY_F4:
+            self._preview_toggle_requested = True
+        elif key == glfw.KEY_F6:
+            self._open_file_requested = True
+        elif key == glfw.KEY_F7:
+            self._mist_toggle_requested = True
+        elif key == glfw.KEY_F8:
+            self._atmospheric_toggle_requested = True
+        elif key == glfw.KEY_F9:
+            self._disocclusion_toggle_requested = True
+        elif key == glfw.KEY_F10:
+            self._relief_toggle_requested = True
+        elif key == glfw.KEY_G:
+            self._game_toggle_requested = True
+        elif key == glfw.KEY_T:
+            self._tracking_toggle_requested = True
+        elif key in (glfw.KEY_EQUAL, glfw.KEY_KP_ADD):
+            self._zoom_in_requested = True
+        elif key in (glfw.KEY_MINUS, glfw.KEY_KP_SUBTRACT):
+            self._zoom_out_requested = True
+        elif key == glfw.KEY_LEFT_BRACKET:
+            self._plane_closer_requested = True
+        elif key == glfw.KEY_RIGHT_BRACKET:
+            self._plane_farther_requested = True
+        elif key == glfw.KEY_COMMA:
+            self._far_closer_requested = True
+        elif key == glfw.KEY_PERIOD:
+            self._far_farther_requested = True
+        elif key == glfw.KEY_SEMICOLON:
+            self._overscan_down_requested = True
+        elif key == glfw.KEY_APOSTROPHE:
+            self._overscan_up_requested = True
+        elif key == glfw.KEY_F12:
+            self._screenshot_requested = True
+        elif key == glfw.KEY_C:
+            self._album_centre_requested = True
+        elif key == glfw.KEY_BACKSPACE:
+            self._backspace_requested = True
+        elif key == glfw.KEY_TAB:
+            self._focus_next_requested = True
+        elif key in (glfw.KEY_ENTER, glfw.KEY_KP_ENTER):
+            self._submit_requested = True
+        elif key == glfw.KEY_ESCAPE:
+            self._escape_requested = True
+        elif key == glfw.KEY_F11:
+            self._display_toggle_requested = True
+        elif key == glfw.KEY_UP:
+            self._focus_up_requested = True
+        elif key == glfw.KEY_DOWN:
+            self._focus_down_requested = True
+        elif key == glfw.KEY_R:
+            self._replay_requested = True
+        elif key in (glfw.KEY_1, glfw.KEY_2, glfw.KEY_3):
+            self._item_slot_requested = key - glfw.KEY_1 + 1
+        elif key == glfw.KEY_U:
+            self._share_to_album_requested = True
+
+    def _on_drop(self, window, paths) -> None:
+        _ = window
+        for raw in paths:
+            if isinstance(raw, bytes):
+                self._dropped_paths.append(raw.decode("utf-8", errors="replace"))
+            else:
+                self._dropped_paths.append(str(raw))

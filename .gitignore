@@ -1,0 +1,94 @@
+# ─── Python ───────────────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ─── Dữ liệu lớn ──────────────────────────────────────────────────────────
+# nyu_depth_v2_labeled.mat nặng 2.8 GB. GitHub CHẶN mọi file trên 100 MB,
+# nên đây không phải lựa chọn — bắt buộc phải loại. Tải riêng, hoặc lấy từ
+# máy trưởng nhóm.
+*.mat
+nyu_all/
+nyu_test/
+
+# ─── Kết quả sinh ra được ─────────────────────────────────────────────────
+# artifacts/ nặng 29 MB toàn ảnh PNG, và MỌI lần chạy lại script đều tạo bản
+# mới — git lưu nguyên si từng bản, lịch sử phình rất nhanh. Tất cả đều sinh
+# lại được bằng scripts/.
+#
+# Hình nào dùng cho luận văn thì copy sang docs/figures/ (thư mục đó ĐƯỢC
+# theo dõi), chọn lọc vài tấm thay vì đẩy cả 29 MB.
+artifacts/
+
+# TASK_game_1110 L1: cache bộ lớp đã nướng (assets/cache/maps/<sha1>/ — PNG
+# lớp + depth.npy + meta.json). Sinh lại được bằng một lượt mở ảnh, và nặng
+# vài chục MB mỗi ảnh. Xoá cả thư mục là cách duy nhất để "nướng lại từ đầu".
+assets/cache/
+
+# ─── Cách ly, chờ xoá ─────────────────────────────────────────────────────
+_trash/
+Promt_for_Cursor/
+docs/HCPD_FOR_CLAUDE.md
+*.png
+
+# TASK_ui_v3_1107: bộ asset giao diện v3 thì NGƯỢC LẠI — đề bài yêu cầu commit
+# nó (~15 MB) để bản vẽ đi kèm mã nguồn. Luật `*.png` ngay trên loại sạch 110
+# file PNG của bộ này, nên phải mở ngoại lệ hẳn ra đây.
+!assets/ui_v3/**/*.png
+
+# ─── Cấu hình riêng từng máy / từng người ─────────────────────────────────
+# user.json chứa face_scale đo riêng cho khuôn mặt của một người. Commit lên
+# thì người khác clone về sẽ chạy với hiệu chỉnh của người kia, và Z sai mà
+# không ai biết vì con số vẫn trông hợp lý.
+assets/config/user.json
+
+# D1 (TASK_ui_v3_1107): che do hien thi + khung cua so lan truoc. Commit len
+# thi nguoi khac clone ve se mo cua so o toa do cua may nay, co khi lot han ra
+# ngoai man hinh cua ho — dung ly do user.json bi loai.
+assets/config/user_prefs.json
+
+# Chẩn đoán trục Z, sinh ra khi bật debug.z_diagnostics
+z_diag.csv
+
+# TASK_shared_album_1111: cloud_name/upload_preset/tag của Cloudinary, riêng
+# từng máy. Thiếu file này = tính năng album chung tắt (đúng như thiết kế).
+# Commit `shared_album.example.json` (giá trị rỗng) thay cho nó.
+assets/config/shared_album.json
+
+# ─── IDE và hệ điều hành ──────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+# PB-074: model lấp khe LaMa, 208 MB — KHÔNG commit (repo không chứa nhị phân
+# cỡ này). Tải lama_fp32.onnx ở https://huggingface.co/Carve/LaMa-ONNX (xem
+# README.md). Thiếu nó thì fill_method "lama" tự rơi về "telea", app vẫn chạy.
+assets/models/lama_fp32.onnx
+
+# ─── KHÔNG loại — cố ý theo dõi ───────────────────────────────────────────
+# assets/models/face_landmarker.task  (3.5 MB) — thiếu nó app không tracking
+#                                      được; README nói nó đi kèm repo
+# assets/config/screen.json           — kích thước màn hình tham chiếu. Nhỏ,
+#                                      và là tài liệu sống cho biết định dạng.
+#                                      Mỗi máy nên sửa lại theo màn hình mình.
+# assets/config/content.json          — cấu hình mặc định của pipeline
+
+# Log phiên chạy app (main.py > logs/runN.log, UTF-16) và CSV kết quả trò chơi
+# (results/prop_game.csv) — riêng từng máy, không commit (16/10).
+logs/
+results/
+
+# assets/ui_album/: bộ giao diện cũ + hình bọ (sprites/b*_wk_topdown.png) mà
+# giao diện v3 vẫn dùng để vẽ bọ. Thiếu nó thì vào trận không có con bọ nào,
+# nên commit kèm repo giống ui_v3 — mở ngoại lệ cho luật `*.png` ở trên.
+!assets/ui_album/**/*.png

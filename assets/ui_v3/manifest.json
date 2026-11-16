@@ -1,0 +1,7203 @@
+{
+ "version": 3,
+ "design_size": [
+  1280,
+  720
+ ],
+ "image_scale": 1.5,
+ "screens": {
+  "v3_01a_sign_in": {
+   "base": "v3_01a_sign_in/base.png",
+   "top": null,
+   "source_board": "v3_01a_sign_in",
+   "photos": [],
+   "texts": [
+    {
+     "key": "user",
+     "rect": [
+      510,
+      297,
+      65,
+      20
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "anhkhoa",
+       "ff": "Nunito",
+       "fw": 800,
+       "fs": 16.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "anhkhoa",
+     "lines": 1
+    },
+    {
+     "key": "pass",
+     "rect": [
+      510,
+      353,
+      84,
+      20
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "••••••••",
+       "ff": "Nunito",
+       "fw": 800,
+       "fs": 16.0,
+       "col": "#24415F",
+       "ls": 2.0,
+       "upper": false
+      }
+     ],
+     "sample": "••••••••",
+     "lines": 1
+    }
+   ],
+   "bars": [],
+   "pips": [],
+   "pills": [],
+   "hotspots": [
+    {
+     "n": "field_user",
+     "rect": [
+      462,
+      272.0,
+      356,
+      56.0
+     ]
+    },
+    {
+     "n": "field_pass",
+     "rect": [
+      462,
+      328.0,
+      356,
+      56.0
+     ]
+    },
+    {
+     "n": "switch_remember",
+     "rect": [
+      462,
+      400,
+      46,
+      28
+     ]
+    },
+    {
+     "n": "link_forgot",
+     "rect": [
+      618,
+      404,
+      200,
+      17
+     ]
+    },
+    {
+     "n": "btn_Sign in",
+     "rect": [
+      462,
+      450,
+      356,
+      54
+     ]
+    },
+    {
+     "n": "btn_Create album",
+     "rect": [
+      462,
+      558,
+      356,
+      54
+     ]
+    },
+    {
+     "n": "link_guest",
+     "rect": [
+      430,
+      626,
+      420,
+      16
+     ]
+    },
+    {
+     "n": "icon_show_password",
+     "rect": [
+      782,
+      346,
+      20,
+      20
+     ]
+    }
+   ],
+   "sprites": [],
+   "notes": [
+    "caret of the focused field: 2x20 px #3B72B4, 2 px after the end of the field text"
+   ]
+  },
+  "v3_01b_sign_up": {
+   "base": "v3_01b_sign_up/base.png",
+   "top": null,
+   "source_board": "v3_01b_sign_up",
+   "photos": [],
+   "texts": [
+    {
+     "key": "user",
+     "rect": [
+      510,
+      315,
+      65,
+      20
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "anhkhoa",
+       "ff": "Nunito",
+       "fw": 800,
+       "fs": 16.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "anhkhoa",
+     "lines": 1
+    },
+    {
+     "key": "pass",
+     "rect": [
+      510,
+      371,
+      84,
+      20
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "••••••••",
+       "ff": "Nunito",
+       "fw": 800,
+       "fs": 16.0,
+       "col": "#24415F",
+       "ls": 2.0,
+       "upper": false
+      }
+     ],
+     "sample": "••••••••",
+     "lines": 1
+    },
+    {
+     "key": "pass2",
+     "rect": [
+      510,
+      427,
+      84,
+      20
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "••••••••",
+       "ff": "Nunito",
+       "fw": 800,
+       "fs": 16.0,
+       "col": "#24415F",
+       "ls": 2.0,
+       "upper": false
+      }
+     ],
+     "sample": "••••••••",
+     "lines": 1
+    }
+   ],
+   "bars": [],
+   "pips": [],
+   "pills": [],
+   "hotspots": [
+    {
+     "n": "field_user",
+     "rect": [
+      462,
+      290.0,
+      356,
+      56.0
+     ]
+    },
+    {
+     "n": "field_pass",
+     "rect": [
+      462,
+      346.0,
+      356,
+      56.0
+     ]
+    },
+    {
+     "n": "field_pass2",
+     "rect": [
+      462,
+      402.0,
+      356,
+      56.0
+     ]
+    },
+    {
+     "n": "btn_Create album",
+     "rect": [
+      462,
+      506,
+      356,
+      54
+     ]
+    },
+    {
+     "n": "footer_link",
+     "rect": [
+      430,
+      578,
+      420,
+      16
+     ]
+    },
+    {
+     "n": "icon_show_password",
+     "rect": [
+      782,
+      364,
+      20,
+      20
+     ]
+    }
+   ],
+   "sprites": [
+    {
+     "key": "valid_user",
+     "file": "sprites/v3_01b_sign_up__valid_user.png",
+     "rect": [
+      774.0,
+      298.0,
+      40.0,
+      40.0
+     ],
+     "anchor": [
+      784,
+      308,
+      20,
+      20
+     ],
+     "default": true
+    },
+    {
+     "key": "valid_pass2",
+     "file": "sprites/v3_01b_sign_up__valid_pass2.png",
+     "rect": [
+      774.0,
+      410.0,
+      40.0,
+      40.0
+     ],
+     "anchor": [
+      784,
+      420,
+      20,
+      20
+     ],
+     "default": true
+    },
+    {
+     "key": "hint_ok",
+     "file": "sprites/v3_01b_sign_up__hint_ok.png",
+     "rect": [
+      452.0,
+      462.0,
+      286.7,
+      38.0
+     ],
+     "anchor": [
+      462,
+      472,
+      18,
+      18
+     ],
+     "default": true
+    }
+   ],
+   "notes": [
+    "caret of the focused field: 2x20 px #3B72B4, 2 px after the end of the field text"
+   ]
+  },
+  "v3_01c_sign_in_error": {
+   "base": "v3_01c_sign_in_error/base.png",
+   "top": null,
+   "source_board": "v3_01c_sign_in_error",
+   "photos": [],
+   "texts": [
+    {
+     "key": "user",
+     "rect": [
+      510,
+      267,
+      65,
+      20
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "anhkhoa",
+       "ff": "Nunito",
+       "fw": 800,
+       "fs": 16.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "anhkhoa",
+     "lines": 1
+    },
+    {
+     "key": "pass",
+     "rect": [
+      510,
+      323,
+      63,
+      20
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "••••••",
+       "ff": "Nunito",
+       "fw": 800,
+       "fs": 16.0,
+       "col": "#24415F",
+       "ls": 2.0,
+       "upper": false
+      }
+     ],
+     "sample": "••••••",
+     "lines": 1
+    }
+   ],
+   "bars": [],
+   "pips": [],
+   "pills": [],
+   "hotspots": [
+    {
+     "n": "field_user",
+     "rect": [
+      462,
+      242.0,
+      356,
+      56.0
+     ]
+    },
+    {
+     "n": "field_pass",
+     "rect": [
+      462,
+      298.0,
+      356,
+      56.0
+     ]
+    },
+    {
+     "n": "switch_remember",
+     "rect": [
+      462,
+      400,
+      46,
+      28
+     ]
+    },
+    {
+     "n": "link_forgot",
+     "rect": [
+      618,
+      404,
+      200,
+      17
+     ]
+    },
+    {
+     "n": "btn_Sign in",
+     "rect": [
+      462,
+      448,
+      356,
+      54
+     ]
+    },
+    {
+     "n": "btn_Create a new album",
+     "rect": [
+      462,
+      554,
+      356,
+      54
+     ]
+    },
+    {
+     "n": "footer_link",
+     "rect": [
+      430,
+      626,
+      420,
+      16
+     ]
+    },
+    {
+     "n": "icon_show_password",
+     "rect": [
+      782,
+      316,
+      20,
+      20
+     ]
+    }
+   ],
+   "sprites": [],
+   "notes": [
+    "caret of the focused field: 2x20 px #3B72B4, 2 px after the end of the field text"
+   ]
+  },
+  "v3_02a_menu": {
+   "base": "v3_02a_menu/base.png",
+   "top": "v3_02a_menu/top.png",
+   "source_board": "v3_02a_menu",
+   "photos": [
+    {
+     "key": "last_photo",
+     "kind": "photo",
+     "rect": [
+      616,
+      136,
+      552,
+      352
+     ],
+     "radius": 12
+    }
+   ],
+   "texts": [
+    {
+     "key": "photo_caption",
+     "rect": [
+      624,
+      504,
+      199,
+      20
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "Memory #01 · Living room",
+       "ff": "Nunito",
+       "fw": 800,
+       "fs": 16.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Memory #01 · Living room",
+     "lines": 1
+    },
+    {
+     "key": "photo_damage",
+     "rect": [
+      624,
+      526,
+      162,
+      23
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "06/11/2026 · 18% eaten",
+       "ff": "Patrick Hand",
+       "fw": 400,
+       "fs": 19.0,
+       "col": "#D2557A",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "06/11/2026 · 18% eaten",
+     "lines": 1
+    },
+    {
+     "key": "player_name",
+     "rect": [
+      1064,
+      40,
+      61,
+      18
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "anhkhoa",
+       "ff": "Nunito",
+       "fw": 800,
+       "fs": 15.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "anhkhoa",
+     "lines": 1
+    },
+    {
+     "key": "player_initial",
+     "rect": [
+      1018,
+      44,
+      36,
+      22
+     ],
+     "al": "center",
+     "runs": [
+      {
+       "c": "A",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 18.0,
+       "col": "#3B72B4",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "A",
+     "lines": 1
+    }
+   ],
+   "bars": [],
+   "pips": [],
+   "pills": [],
+   "hotspots": [
+    {
+     "n": "btn_Solo",
+     "rect": [
+      96,
+      300,
+      400,
+      62
+     ]
+    },
+    {
+     "n": "btn_PvP",
+     "rect": [
+      96,
+      376,
+      400,
+      62
+     ]
+    },
+    {
+     "n": "btn_Leaderboard",
+     "rect": [
+      96,
+      452,
+      400,
+      62
+     ]
+    },
+    {
+     "n": "btn_Settings",
+     "rect": [
+      96,
+      528,
+      400,
+      62
+     ]
+    },
+    {
+     "n": "sign_out",
+     "rect": [
+      1174,
+      49,
+      48,
+      15
+     ]
+    }
+   ],
+   "sprites": [],
+   "notes": []
+  },
+  "v3_02b_settings": {
+   "base": "v3_02b_settings/base.png",
+   "top": "v3_02b_settings/top.png",
+   "source_board": "v3_02b_settings",
+   "photos": [
+    {
+     "key": "camera",
+     "kind": "camera",
+     "rect": [
+      812,
+      200,
+      380,
+      294
+     ],
+     "radius": 18
+    }
+   ],
+   "texts": [
+    {
+     "key": "webcam_name",
+     "rect": [
+      534,
+      372,
+      109,
+      17
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "Built-in webcam",
+       "ff": "Nunito",
+       "fw": 800,
+       "fs": 14.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Built-in webcam",
+     "lines": 1
+    },
+    {
+     "key": "volume_value",
+     "rect": [
+      700,
+      552,
+      40,
+      22
+     ],
+     "al": "right",
+     "runs": [
+      {
+       "c": "70%",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 18.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "70%",
+     "lines": 1
+    }
+   ],
+   "bars": [
+    {
+     "key": "volume",
+     "rect": [
+      520,
+      563,
+      170,
+      6
+     ],
+     "col": "#3B72B4",
+     "radius": 3,
+     "sample_frac": 0.7
+    }
+   ],
+   "pips": [],
+   "pills": [],
+   "hotspots": [
+    {
+     "n": "theme_day",
+     "rect": [
+      520,
+      181,
+      110.0,
+      38
+     ]
+    },
+    {
+     "n": "theme_night",
+     "rect": [
+      630.0,
+      181,
+      110.0,
+      38
+     ]
+    },
+    {
+     "n": "display_full",
+     "rect": [
+      520,
+      273,
+      110.0,
+      38
+     ]
+    },
+    {
+     "n": "display_window",
+     "rect": [
+      630.0,
+      273,
+      110.0,
+      38
+     ]
+    },
+    {
+     "n": "dropdown_webcam",
+     "rect": [
+      520,
+      362,
+      220,
+      40
+     ]
+    },
+    {
+     "n": "btn_recalibrate",
+     "rect": [
+      520,
+      454,
+      220,
+      40
+     ]
+    },
+    {
+     "n": "slider",
+     "rect": [
+      508,
+      551,
+      194,
+      30
+     ]
+    },
+    {
+     "n": "btn_Sign out",
+     "rect": [
+      812,
+      546,
+      380,
+      48
+     ]
+    },
+    {
+     "n": "tab_Solo",
+     "rect": [
+      806,
+      34,
+      88,
+      36
+     ]
+    },
+    {
+     "n": "tab_PvP",
+     "rect": [
+      894,
+      34,
+      86,
+      36
+     ]
+    },
+    {
+     "n": "tab_Leaderboard",
+     "rect": [
+      980,
+      34,
+      140,
+      36
+     ]
+    },
+    {
+     "n": "tab_Settings",
+     "rect": [
+      1120,
+      34,
+      114,
+      36
+     ]
+    }
+   ],
+   "sprites": [
+    {
+     "key": "seg_theme:day",
+     "file": "sprites/v3_02b_settings__seg_theme_day.png",
+     "rect": [
+      510.0,
+      170.7,
+      240.0,
+      58.7
+     ],
+     "anchor": [
+      520,
+      181,
+      220,
+      38
+     ],
+     "group": "seg_theme",
+     "default": true
+    },
+    {
+     "key": "seg_theme:night",
+     "file": "sprites/v3_02b_settings__seg_theme_night.png",
+     "rect": [
+      510.0,
+      171.0,
+      240.0,
+      58.0
+     ],
+     "anchor": [
+      520,
+      181,
+      220,
+      38
+     ],
+     "group": "seg_theme",
+     "default": false
+    },
+    {
+     "key": "seg_display:full",
+     "file": "sprites/v3_02b_settings__seg_display_full.png",
+     "rect": [
+      510.0,
+      262.7,
+      240.0,
+      58.7
+     ],
+     "anchor": [
+      520,
+      273,
+      220,
+      38
+     ],
+     "group": "seg_display",
+     "default": true
+    },
+    {
+     "key": "seg_display:window",
+     "file": "sprites/v3_02b_settings__seg_display_window.png",
+     "rect": [
+      510.0,
+      263.0,
+      240.0,
+      58.0
+     ],
+     "anchor": [
+      520,
+      273,
+      220,
+      38
+     ],
+     "group": "seg_display",
+     "default": false
+    },
+    {
+     "key": "volume_knob",
+     "file": "sprites/v3_02b_settings__volume_knob.png",
+     "rect": [
+      617.3,
+      544.0,
+      44.0,
+      44.0
+     ],
+     "anchor": [
+      627,
+      554,
+      24,
+      24
+     ],
+     "default": true
+    },
+    {
+     "key": "face:ok",
+     "file": "sprites/v3_02b_settings__face_ok.png",
+     "rect": [
+      920.0,
+      446.0,
+      164.0,
+      48.0
+     ],
+     "anchor": [
+      930,
+      456,
+      144,
+      28
+     ],
+     "group": "face",
+     "default": true
+    },
+    {
+     "key": "face:none",
+     "file": "sprites/v3_02b_settings__face_none.png",
+     "rect": [
+      920.0,
+      446.0,
+      164.0,
+      48.0
+     ],
+     "anchor": [
+      930,
+      456,
+      144,
+      28
+     ],
+     "group": "face",
+     "default": false
+    }
+   ],
+   "notes": []
+  },
+  "v3_02c_disconnected": {
+   "base": "v3_02c_disconnected/base.png",
+   "top": null,
+   "source_board": "v3_02c_disconnected",
+   "photos": [],
+   "texts": [
+    {
+     "key": "reconnect_left",
+     "rect": [
+      608,
+      400,
+      94,
+      16
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "12 seconds left",
+       "ff": "Nunito",
+       "fw": 800,
+       "fs": 13.0,
+       "col": "#9A6410",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "12 seconds left",
+     "lines": 1
+    }
+   ],
+   "bars": [],
+   "pips": [],
+   "pills": [],
+   "hotspots": [
+    {
+     "n": "btn_Try again now",
+     "rect": [
+      450,
+      458,
+      186,
+      52
+     ]
+    },
+    {
+     "n": "btn_Back to album",
+     "rect": [
+      644,
+      458,
+      186,
+      52
+     ]
+    }
+   ],
+   "sprites": [],
+   "notes": []
+  },
+  "v3_03_level_select": {
+   "base": "v3_03_level_select/base.png",
+   "top": null,
+   "source_board": "v3_03_level_select",
+   "photos": [],
+   "texts": [
+    {
+     "key": "level_name",
+     "rect": [
+      92,
+      448,
+      84,
+      46
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "Hard",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 38.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Hard",
+     "lines": 1
+    },
+    {
+     "key": "level_desc",
+     "rect": [
+      92,
+      500,
+      504,
+      20
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "Bugs hide better and start fighting back.",
+       "ff": "Nunito",
+       "fw": 600,
+       "fs": 16.0,
+       "col": "#5D7894",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Bugs hide better and start fighting back.",
+     "lines": 1
+    },
+    {
+     "key": "stat_bugs",
+     "rect": [
+      140,
+      544,
+      22,
+      27
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "10",
+       "ff": "Baloo 2",
+       "fw": 700,
+       "fs": 22.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "10",
+     "lines": 1
+    },
+    {
+     "key": "stat_time",
+     "rect": [
+      311,
+      544,
+      55,
+      27
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "02:30",
+       "ff": "Baloo 2",
+       "fw": 700,
+       "fs": 22.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "02:30",
+     "lines": 1
+    },
+    {
+     "key": "stat_slots",
+     "rect": [
+      482,
+      544,
+      12,
+      27
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "3",
+       "ff": "Baloo 2",
+       "fw": 700,
+       "fs": 22.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "3",
+     "lines": 1
+    },
+    {
+     "key": "level_tag",
+     "rect": [
+      96,
+      189,
+      84,
+      15
+     ],
+     "al": "center",
+     "runs": [
+      {
+       "c": "LEVEL 3",
+       "ff": "Nunito",
+       "fw": 900,
+       "fs": 12.0,
+       "col": "#FFFFFF",
+       "ls": 1.5,
+       "upper": false
+      }
+     ],
+     "sample": "LEVEL 3",
+     "lines": 1
+    },
+    {
+     "key": "new_bug_name",
+     "rect": [
+      472,
+      380,
+      91,
+      22
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "Acid beetle",
+       "ff": "Baloo 2",
+       "fw": 700,
+       "fs": 18.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Acid beetle",
+     "lines": 1
+    }
+   ],
+   "bars": [],
+   "pips": [
+    {
+     "key": "stat_slots_pips",
+     "rects": [
+      [
+       448,
+       552,
+       11,
+       11
+      ],
+      [
+       448,
+       565,
+       11,
+       11
+      ],
+      [
+       461,
+       552,
+       11,
+       11
+      ],
+      [
+       461,
+       565,
+       11,
+       11
+      ]
+     ],
+     "radius": 3,
+     "sample_on": [
+      true,
+      true,
+      true,
+      false
+     ],
+     "shape": "rect",
+     "on": {
+      "fill": "#3B72B4"
+     },
+     "off": {
+      "stroke": "#3B72B4",
+      "sw": 1.5
+     }
+    },
+    {
+     "key": "difficulty",
+     "rects": [
+      [
+       516,
+       480,
+       11,
+       11
+      ],
+      [
+       533,
+       480,
+       11,
+       11
+      ],
+      [
+       550,
+       480,
+       11,
+       11
+      ],
+      [
+       567,
+       480,
+       11,
+       11
+      ],
+      [
+       584,
+       480,
+       11,
+       11
+      ]
+     ],
+     "radius": 0,
+     "sample_on": [
+      true,
+      true,
+      true,
+      false,
+      false
+     ],
+     "shape": "ellipse",
+     "on": {
+      "fill": "#D2557A"
+     },
+     "off": {
+      "fill": "#E1ECF7"
+     }
+    }
+   ],
+   "pills": [],
+   "hotspots": [
+    {
+     "n": "level_row_1",
+     "rect": [
+      648,
+      150,
+      568,
+      84
+     ]
+    },
+    {
+     "n": "level_row_2",
+     "rect": [
+      648,
+      244,
+      568,
+      84
+     ]
+    },
+    {
+     "n": "level_row_3",
+     "rect": [
+      648,
+      338,
+      568,
+      84
+     ]
+    },
+    {
+     "n": "level_row_4",
+     "rect": [
+      648,
+      432,
+      568,
+      84
+     ]
+    },
+    {
+     "n": "level_row_5",
+     "rect": [
+      648,
+      526,
+      568,
+      84
+     ]
+    },
+    {
+     "n": "btn_Back",
+     "rect": [
+      824,
+      640,
+      132,
+      52
+     ]
+    },
+    {
+     "n": "btn_Next: choose a photo",
+     "rect": [
+      968,
+      640,
+      248,
+      52
+     ]
+    },
+    {
+     "n": "tab_Solo",
+     "rect": [
+      806,
+      34,
+      88,
+      36
+     ]
+    },
+    {
+     "n": "tab_PvP",
+     "rect": [
+      894,
+      34,
+      86,
+      36
+     ]
+    },
+    {
+     "n": "tab_Leaderboard",
+     "rect": [
+      980,
+      34,
+      140,
+      36
+     ]
+    },
+    {
+     "n": "tab_Settings",
+     "rect": [
+      1120,
+      34,
+      114,
+      36
+     ]
+    }
+   ],
+   "sprites": [
+    {
+     "key": "sel:level",
+     "file": "sprites/v3_03_level_select__sel_level.png",
+     "rect": [
+      642.0,
+      332.0,
+      580.0,
+      96.0
+     ],
+     "anchor": [
+      648,
+      338,
+      568,
+      84
+     ],
+     "default": true,
+     "targets": {
+      "level_row_1": [
+       648,
+       150,
+       568,
+       84
+      ],
+      "level_row_2": [
+       648,
+       244,
+       568,
+       84
+      ],
+      "level_row_3": [
+       648,
+       338,
+       568,
+       84
+      ],
+      "level_row_4": [
+       648,
+       432,
+       568,
+       84
+      ],
+      "level_row_5": [
+       648,
+       526,
+       568,
+       84
+      ]
+     }
+    },
+    {
+     "key": "new_bug",
+     "file": "sprites/v3_03_level_select__new_bug.png",
+     "rect": [
+      402.0,
+      348.0,
+      196.0,
+      78.0
+     ],
+     "anchor": [
+      412,
+      358,
+      176,
+      58
+     ],
+     "default": true
+    }
+   ],
+   "notes": []
+  },
+  "v3_04_choose_photo": {
+   "base": "v3_04_choose_photo/base.png",
+   "top": "v3_04_choose_photo/top.png",
+   "source_board": "v3_04_choose_photo",
+   "photos": [
+    {
+     "key": "chosen_photo",
+     "kind": "photo",
+     "rect": [
+      740,
+      188,
+      464,
+      194
+     ],
+     "radius": 12
+    }
+   ],
+   "texts": [
+    {
+     "key": "eyebrow",
+     "rect": [
+      64,
+      40,
+      294,
+      15
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "SOLO · STEP 2 OF 3 · LEVEL 3 HARD",
+       "ff": "Nunito",
+       "fw": 800,
+       "fs": 12.0,
+       "col": "#3B72B4",
+       "ls": 2.5,
+       "upper": false
+      }
+     ],
+     "sample": "SOLO · STEP 2 OF 3 · LEVEL 3 HARD",
+     "lines": 1
+    },
+    {
+     "key": "damage_text",
+     "rect": [
+      1080,
+      205,
+      112,
+      14
+     ],
+     "al": "center",
+     "runs": [
+      {
+       "c": "60% eaten",
+       "ff": "Nunito",
+       "fw": 900,
+       "fs": 11.5,
+       "col": "#FFFFFF",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "60% eaten",
+     "lines": 1
+    },
+    {
+     "key": "photo_caption",
+     "rect": [
+      744,
+      390,
+      186,
+      18
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "Memory #01 · Living room",
+       "ff": "Nunito",
+       "fw": 800,
+       "fs": 15.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Memory #01 · Living room",
+     "lines": 1
+    },
+    {
+     "key": "photo_date",
+     "rect": [
+      744,
+      410,
+      96,
+      15
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "last played 06/11",
+       "ff": "Nunito",
+       "fw": 600,
+       "fs": 12.0,
+       "col": "#8DA3BA",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "last played 06/11",
+     "lines": 1
+    }
+   ],
+   "bars": [],
+   "pips": [],
+   "pills": [],
+   "hotspots": [
+    {
+     "n": "tab_Solo",
+     "rect": [
+      806,
+      34,
+      88,
+      36
+     ]
+    },
+    {
+     "n": "tab_PvP",
+     "rect": [
+      894,
+      34,
+      86,
+      36
+     ]
+    },
+    {
+     "n": "tab_Leaderboard",
+     "rect": [
+      980,
+      34,
+      140,
+      36
+     ]
+    },
+    {
+     "n": "tab_Settings",
+     "rect": [
+      1120,
+      34,
+      114,
+      36
+     ]
+    },
+    {
+     "n": "btn_Choose from computer",
+     "rect": [
+      264,
+      414,
+      240,
+      50
+     ]
+    },
+    {
+     "n": "btn_Back",
+     "rect": [
+      764,
+      624,
+      132,
+      52
+     ]
+    },
+    {
+     "n": "btn_Split layers & continue",
+     "rect": [
+      908,
+      624,
+      308,
+      52
+     ]
+    },
+    {
+     "n": "btn_Share to album",
+     "rect": [
+      944,
+      384,
+      228,
+      30
+     ]
+    },
+    {
+     "n": "btn_Random from album",
+     "rect": [
+      264,
+      478,
+      240,
+      52
+     ]
+    },
+    {
+     "n": "dropzone",
+     "rect": [84, 172, 600, 400]
+    },
+    {
+     "n": "recent_memory",
+     "rect": [728, 176, 488, 262]
+    }
+   ],
+   "sprites": [
+    {
+     "key": "damage_badge",
+     "file": "sprites/v3_04_choose_photo__damage_badge.png",
+     "rect": [
+      1070.0,
+      190.0,
+      132.0,
+      46.0
+     ],
+     "anchor": [
+      1080,
+      200,
+      112,
+      26
+     ],
+     "default": true
+    }
+   ],
+   "notes": [
+    "Album buttons are drawn in code with white fills and blue outlines: Share on the memory caption row (944,384,228,30), Random below Choose from computer (264,478,240,52). Button hotspots precede their containing cards for hit testing."
+   ]
+  },
+  "v3_05_loadout": {
+   "base": "v3_05_loadout/base.png",
+   "top": null,
+   "source_board": "v3_05b_loadout_empty",
+   "photos": [],
+   "texts": [
+    {
+     "key": "note",
+     "rect": [
+      64,
+      110,
+      246,
+      24
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "Level 3 · bugs spit acid and poison.",
+       "ff": "Patrick Hand",
+       "fw": 400,
+       "fs": 20.0,
+       "col": "#5D7894",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Level 3 · bugs spit acid and poison.",
+     "lines": 1
+    },
+    {
+     "key": "sticker_placed_label",
+     "rect": [
+      388,
+      236,
+      116,
+      21
+     ],
+     "al": "center",
+     "runs": [
+      {
+       "c": "In slot 2",
+       "ff": "Patrick Hand",
+       "fw": 400,
+       "fs": 17.0,
+       "col": "#3B72B4",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "In slot 2",
+     "lines": 1
+    },
+    {
+     "key": "slot_key",
+     "rect": [
+      928,
+      213,
+      28,
+      16
+     ],
+     "al": "center",
+     "runs": [
+      {
+       "c": "1",
+       "ff": "Nunito",
+       "fw": 900,
+       "fs": 13.0,
+       "col": "#FFFFFF",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "1",
+     "lines": 1
+    },
+    {
+     "key": "slot_name",
+     "rect": [
+      1030,
+      200,
+      67,
+      20
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "Antidote",
+       "ff": "Nunito",
+       "fw": 800,
+       "fs": 16.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Antidote",
+     "lines": 1
+    },
+    {
+     "key": "slot_sub",
+     "rect": [
+      1030,
+      224,
+      88,
+      15
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "key 1 · weight 5",
+       "ff": "Nunito",
+       "fw": 700,
+       "fs": 12.0,
+       "col": "#5D7894",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "key 1 · weight 5",
+     "lines": 1
+    },
+    {
+     "key": "weight_total",
+     "rect": [
+      1112,
+      477,
+      88,
+      27
+     ],
+     "al": "right",
+     "runs": [
+      {
+       "c": "0",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 22.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "0",
+     "lines": 1
+    },
+    {
+     "key": "slots_label",
+     "rect": [
+      912,
+      156,
+      125,
+      14
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "ITEM SLOTS · 0/3",
+       "ff": "Nunito",
+       "fw": 900,
+       "fs": 11.0,
+       "col": "#8DA3BA",
+       "ls": 2.0,
+       "upper": false
+      }
+     ],
+     "sample": "ITEM SLOTS · 0/3",
+     "lines": 1
+    },
+    {
+     "key": "tip_text",
+     "rect": [
+      438,
+      496,
+      430,
+      33
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "Bugs at this level spit acid and poison. Bring an Antidote or an Acid ",
+       "ff": "Nunito",
+       "fw": 700,
+       "fs": 13.5,
+       "col": "#9A5A1E",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Bugs at this level spit acid and poison. Bring an Antidote or an Acid shield.",
+     "lines": 2,
+     "wrap": true,
+     "line_h": 16.5
+    }
+   ],
+   "bars": [],
+   "pips": [],
+   "pills": [],
+   "hotspots": [
+    {
+     "n": "tab_Solo",
+     "rect": [
+      806,
+      34,
+      88,
+      36
+     ]
+    },
+    {
+     "n": "tab_PvP",
+     "rect": [
+      894,
+      34,
+      86,
+      36
+     ]
+    },
+    {
+     "n": "tab_Leaderboard",
+     "rect": [
+      980,
+      34,
+      140,
+      36
+     ]
+    },
+    {
+     "n": "tab_Settings",
+     "rect": [
+      1120,
+      34,
+      114,
+      36
+     ]
+    },
+    {
+     "n": "weapon_Precision gun",
+     "rect": [
+      64,
+      180,
+      300,
+      112
+     ]
+    },
+    {
+     "n": "weapon_Spread gun",
+     "rect": [
+      64,
+      304,
+      300,
+      112
+     ]
+    },
+    {
+     "n": "weapon_Heavy-mag gun",
+     "rect": [
+      64,
+      428,
+      300,
+      112
+     ]
+    },
+    {
+     "n": "sticker_Flare",
+     "rect": [
+      388,
+      180,
+      116,
+      132
+     ]
+    },
+    {
+     "n": "sticker_Antidote",
+     "rect": [
+      516,
+      180,
+      116,
+      132
+     ]
+    },
+    {
+     "n": "sticker_Acid shield",
+     "rect": [
+      644,
+      180,
+      116,
+      132
+     ]
+    },
+    {
+     "n": "sticker_Filter lens",
+     "rect": [
+      772,
+      180,
+      116,
+      132
+     ]
+    },
+    {
+     "n": "sticker_Compass",
+     "rect": [
+      388,
+      324,
+      116,
+      132
+     ]
+    },
+    {
+     "n": "sticker_Thermal scan",
+     "rect": [
+      516,
+      324,
+      116,
+      132
+     ]
+    },
+    {
+     "n": "sticker_Energy drink",
+     "rect": [
+      644,
+      324,
+      116,
+      132
+     ]
+    },
+    {
+     "n": "sticker_Smoke bomb",
+     "rect": [
+      772,
+      324,
+      116,
+      132
+     ]
+    },
+    {
+     "n": "slot_empty_1",
+     "rect": [
+      912,
+      180,
+      304,
+      84
+     ]
+    },
+    {
+     "n": "slot_empty_2",
+     "rect": [
+      912,
+      276,
+      304,
+      84
+     ]
+    },
+    {
+     "n": "slot_empty_3",
+     "rect": [
+      912,
+      372,
+      304,
+      84
+     ]
+    },
+    {
+     "n": "btn_Back",
+     "rect": [
+      912,
+      624,
+      120,
+      52
+     ]
+    },
+    {
+     "n": "btn_Start",
+     "rect": [
+      1044,
+      624,
+      172,
+      52
+     ]
+    }
+   ],
+   "sprites": [
+    {
+     "key": "sel:weapon",
+     "file": "sprites/v3_05_loadout__sel_weapon.png",
+     "rect": [
+      58.0,
+      174.0,
+      312.0,
+      124.0
+     ],
+     "anchor": [
+      64,
+      180,
+      300,
+      112
+     ],
+     "default": true,
+     "targets": {
+      "weapon_Precision gun": [
+       64,
+       180,
+       300,
+       112
+      ],
+      "weapon_Spread gun": [
+       64,
+       304,
+       300,
+       112
+      ],
+      "weapon_Heavy-mag gun": [
+       64,
+       428,
+       300,
+       112
+      ]
+     }
+    },
+    {
+     "key": "sticker:Flare",
+     "file": "sprites/v3_05_loadout__sticker_Flare.png",
+     "rect": [
+      378.0,
+      170.0,
+      136.0,
+      152.0
+     ],
+     "anchor": [
+      388,
+      180,
+      116,
+      132
+     ],
+     "default": true
+    },
+    {
+     "key": "item_tile:Flare",
+     "file": "sprites/v3_05_loadout__item_tile_Flare.png",
+     "rect": [
+      400.0,
+      192.0,
+      40.0,
+      40.0
+     ],
+     "anchor": [
+      400,
+      192,
+      40,
+      40
+     ],
+     "default": false
+    },
+    {
+     "key": "sticker:Antidote",
+     "file": "sprites/v3_05_loadout__sticker_Antidote.png",
+     "rect": [
+      506.0,
+      170.0,
+      136.0,
+      152.0
+     ],
+     "anchor": [
+      516,
+      180,
+      116,
+      132
+     ],
+     "default": true
+    },
+    {
+     "key": "item_tile:Antidote",
+     "file": "sprites/v3_05_loadout__item_tile_Antidote.png",
+     "rect": [
+      528.0,
+      192.0,
+      40.0,
+      40.0
+     ],
+     "anchor": [
+      528,
+      192,
+      40,
+      40
+     ],
+     "default": false
+    },
+    {
+     "key": "sticker:Acid shield",
+     "file": "sprites/v3_05_loadout__sticker_Acid_shield.png",
+     "rect": [
+      634.0,
+      170.0,
+      136.0,
+      152.0
+     ],
+     "anchor": [
+      644,
+      180,
+      116,
+      132
+     ],
+     "default": true
+    },
+    {
+     "key": "item_tile:Acid shield",
+     "file": "sprites/v3_05_loadout__item_tile_Acid_shield.png",
+     "rect": [
+      656.0,
+      192.0,
+      40.0,
+      40.0
+     ],
+     "anchor": [
+      656,
+      192,
+      40,
+      40
+     ],
+     "default": false
+    },
+    {
+     "key": "sticker:Filter lens",
+     "file": "sprites/v3_05_loadout__sticker_Filter_lens.png",
+     "rect": [
+      762.0,
+      170.0,
+      136.0,
+      152.0
+     ],
+     "anchor": [
+      772,
+      180,
+      116,
+      132
+     ],
+     "default": true
+    },
+    {
+     "key": "item_tile:Filter lens",
+     "file": "sprites/v3_05_loadout__item_tile_Filter_lens.png",
+     "rect": [
+      784.0,
+      192.0,
+      40.0,
+      40.0
+     ],
+     "anchor": [
+      784,
+      192,
+      40,
+      40
+     ],
+     "default": false
+    },
+    {
+     "key": "sticker:Compass",
+     "file": "sprites/v3_05_loadout__sticker_Compass.png",
+     "rect": [
+      378.0,
+      314.0,
+      136.0,
+      152.0
+     ],
+     "anchor": [
+      388,
+      324,
+      116,
+      132
+     ],
+     "default": true
+    },
+    {
+     "key": "item_tile:Compass",
+     "file": "sprites/v3_05_loadout__item_tile_Compass.png",
+     "rect": [
+      400.0,
+      336.0,
+      40.0,
+      40.0
+     ],
+     "anchor": [
+      400,
+      336,
+      40,
+      40
+     ],
+     "default": false
+    },
+    {
+     "key": "sticker:Thermal scan",
+     "file": "sprites/v3_05_loadout__sticker_Thermal_scan.png",
+     "rect": [
+      506.0,
+      314.0,
+      136.0,
+      152.0
+     ],
+     "anchor": [
+      516,
+      324,
+      116,
+      132
+     ],
+     "default": true
+    },
+    {
+     "key": "item_tile:Thermal scan",
+     "file": "sprites/v3_05_loadout__item_tile_Thermal_scan.png",
+     "rect": [
+      528.0,
+      336.0,
+      40.0,
+      40.0
+     ],
+     "anchor": [
+      528,
+      336,
+      40,
+      40
+     ],
+     "default": false
+    },
+    {
+     "key": "sticker:Energy drink",
+     "file": "sprites/v3_05_loadout__sticker_Energy_drink.png",
+     "rect": [
+      634.0,
+      314.0,
+      136.0,
+      152.0
+     ],
+     "anchor": [
+      644,
+      324,
+      116,
+      132
+     ],
+     "default": true
+    },
+    {
+     "key": "item_tile:Energy drink",
+     "file": "sprites/v3_05_loadout__item_tile_Energy_drink.png",
+     "rect": [
+      656.0,
+      336.0,
+      40.0,
+      40.0
+     ],
+     "anchor": [
+      656,
+      336,
+      40,
+      40
+     ],
+     "default": false
+    },
+    {
+     "key": "sticker:Smoke bomb",
+     "file": "sprites/v3_05_loadout__sticker_Smoke_bomb.png",
+     "rect": [
+      762.0,
+      314.0,
+      136.0,
+      152.0
+     ],
+     "anchor": [
+      772,
+      324,
+      116,
+      132
+     ],
+     "default": true
+    },
+    {
+     "key": "item_tile:Smoke bomb",
+     "file": "sprites/v3_05_loadout__item_tile_Smoke_bomb.png",
+     "rect": [
+      784.0,
+      336.0,
+      40.0,
+      40.0
+     ],
+     "anchor": [
+      784,
+      336,
+      40,
+      40
+     ],
+     "default": false
+    },
+    {
+     "key": "weapon_tile:Precision gun",
+     "file": "sprites/v3_05_loadout__weapon_tile_Precision_gun.png",
+     "rect": [
+      80.0,
+      196.0,
+      56.0,
+      56.0
+     ],
+     "anchor": [
+      80,
+      196,
+      56,
+      56
+     ],
+     "default": false
+    },
+    {
+     "key": "weapon_tile:Spread gun",
+     "file": "sprites/v3_05_loadout__weapon_tile_Spread_gun.png",
+     "rect": [
+      80.0,
+      320.0,
+      56.0,
+      56.0
+     ],
+     "anchor": [
+      80,
+      320,
+      56,
+      56
+     ],
+     "default": false
+    },
+    {
+     "key": "weapon_tile:Heavy-mag gun",
+     "file": "sprites/v3_05_loadout__weapon_tile_Heavy-mag_gun.png",
+     "rect": [
+      80.0,
+      444.0,
+      56.0,
+      56.0
+     ],
+     "anchor": [
+      80,
+      444,
+      56,
+      56
+     ],
+     "default": false
+    },
+    {
+     "key": "sticker_placed",
+     "file": "sprites/v3_05_loadout__sticker_placed.png",
+     "rect": [
+      378.0,
+      170.0,
+      136.0,
+      152.0
+     ],
+     "anchor": [
+      388,
+      180,
+      116,
+      132
+     ],
+     "default": false
+    },
+    {
+     "key": "slot_empty:1",
+     "file": "sprites/v3_05_loadout__slot_empty_1.png",
+     "rect": [
+      902.0,
+      170.0,
+      324.0,
+      104.0
+     ],
+     "anchor": [
+      912,
+      180,
+      304,
+      84
+     ],
+     "default": true
+    },
+    {
+     "key": "slot_empty:2",
+     "file": "sprites/v3_05_loadout__slot_empty_2.png",
+     "rect": [
+      902.0,
+      266.0,
+      324.0,
+      104.0
+     ],
+     "anchor": [
+      912,
+      276,
+      304,
+      84
+     ],
+     "default": true
+    },
+    {
+     "key": "slot_empty:3",
+     "file": "sprites/v3_05_loadout__slot_empty_3.png",
+     "rect": [
+      902.0,
+      362.0,
+      324.0,
+      104.0
+     ],
+     "anchor": [
+      912,
+      372,
+      304,
+      84
+     ],
+     "default": true
+    },
+    {
+     "key": "slot_filled",
+     "file": "sprites/v3_05_loadout__slot_filled.png",
+     "rect": [
+      902.0,
+      170.0,
+      324.0,
+      104.0
+     ],
+     "anchor": [
+      912,
+      180,
+      304,
+      84
+     ],
+     "default": false
+    },
+    {
+     "key": "tip:need_weapon",
+     "file": "sprites/v3_05_loadout__tip_need_weapon.png",
+     "rect": [
+      378.0,
+      470.0,
+      520.0,
+      92.0
+     ],
+     "anchor": [
+      388,
+      480,
+      500,
+      72
+     ],
+     "group": "tip",
+     "default": true
+    },
+    {
+     "key": "tip:level",
+     "file": "sprites/v3_05_loadout__tip_level.png",
+     "rect": [
+      378.0,
+      470.0,
+      520.0,
+      92.0
+     ],
+     "anchor": [
+      388,
+      480,
+      500,
+      72
+     ],
+     "group": "tip",
+     "default": false
+    },
+    {
+     "key": "btn_start:off",
+     "file": "sprites/v3_05_loadout__btn_start_off.png",
+     "rect": [
+      1034.0,
+      614.0,
+      192.0,
+      72.0
+     ],
+     "anchor": [
+      1044,
+      624,
+      172,
+      52
+     ],
+     "group": "btn_start",
+     "default": true
+    },
+    {
+     "key": "btn_start:on",
+     "file": "sprites/v3_05_loadout__btn_start_on.png",
+     "rect": [
+      1034.0,
+      614.0,
+      192.0,
+      72.0
+     ],
+     "anchor": [
+      1044,
+      624,
+      172,
+      52
+     ],
+     "group": "btn_start",
+     "default": false
+    }
+   ],
+   "notes": [
+    "slot_filled: draw item_tile:<name> at slot rect offset (56,18,48,48); remove icon hotspot at offset (270,30,20,20)"
+   ],
+   "slot_rects": [
+    [
+     912,
+     180,
+     304,
+     84
+    ],
+    [
+     912,
+     276,
+     304,
+     84
+    ],
+    [
+     912,
+     372,
+     304,
+     84
+    ]
+   ],
+   "sticker_rects": {
+    "Flare": [
+     388,
+     180,
+     116,
+     132
+    ],
+    "Antidote": [
+     516,
+     180,
+     116,
+     132
+    ],
+    "Acid shield": [
+     644,
+     180,
+     116,
+     132
+    ],
+    "Filter lens": [
+     772,
+     180,
+     116,
+     132
+    ],
+    "Compass": [
+     388,
+     324,
+     116,
+     132
+    ],
+    "Thermal scan": [
+     516,
+     324,
+     116,
+     132
+    ],
+    "Energy drink": [
+     644,
+     324,
+     116,
+     132
+    ],
+    "Smoke bomb": [
+     772,
+     324,
+     116,
+     132
+    ]
+   },
+   "slot_layout": {
+    "size": [
+     304,
+     84
+    ],
+    "key": [
+     16,
+     28,
+     28,
+     28
+    ],
+    "icon": [
+     56,
+     18,
+     48,
+     48
+    ],
+    "name": [
+     118,
+     20
+    ],
+    "sub": [
+     118,
+     44
+    ],
+    "remove": [
+     270,
+     30,
+     20,
+     20
+    ]
+   }
+  },
+  "v3_06_head_tilt_check": {
+   "base": "v3_06_head_tilt_check/base.png",
+   "top": "v3_06_head_tilt_check/top.png",
+   "source_board": "v3_06_head_tilt_check",
+   "photos": [
+    {
+     "key": "tilt_view",
+     "kind": "viewport",
+     "rect": [
+      78,
+      166,
+      632,
+      380
+     ],
+     "radius": 12
+    },
+    {
+     "key": "camera",
+     "kind": "camera",
+     "rect": [
+      772,
+      198,
+      420,
+      230
+     ],
+     "radius": 18
+    }
+   ],
+   "texts": [
+    {
+     "key": "tilt_value",
+     "rect": [
+      830,
+      224,
+      50,
+      15
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "Tilt −14°",
+       "ff": "Nunito",
+       "fw": 800,
+       "fs": 12.0,
+       "col": "#2A8763",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Tilt −14°",
+     "lines": 1
+    },
+    {
+     "key": "check_face",
+     "rect": [
+      806,
+      487,
+      99,
+      18
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "Face detected",
+       "ff": "Nunito",
+       "fw": 800,
+       "fs": 15.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Face detected",
+     "lines": 1
+    },
+    {
+     "key": "check_left",
+     "rect": [
+      806,
+      519,
+      54,
+      18
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "Tilt left",
+       "ff": "Nunito",
+       "fw": 800,
+       "fs": 15.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Tilt left",
+     "lines": 1
+    },
+    {
+     "key": "check_right",
+     "rect": [
+      806,
+      551,
+      66,
+      18
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "Tilt right",
+       "ff": "Nunito",
+       "fw": 900,
+       "fs": 15.0,
+       "col": "#3B72B4",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Tilt right",
+     "lines": 1
+    },
+    {
+     "key": "check_hint",
+     "rect": [
+      968,
+      549,
+      158,
+      21
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "tilt your head to the right",
+       "ff": "Patrick Hand",
+       "fw": 400,
+       "fs": 17.0,
+       "col": "#3B72B4",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "tilt your head to the right",
+     "lines": 1
+    }
+   ],
+   "bars": [],
+   "pips": [],
+   "pills": [],
+   "hotspots": [
+    {
+     "n": "tab_Solo",
+     "rect": [
+      806,
+      34,
+      88,
+      36
+     ]
+    },
+    {
+     "n": "tab_PvP",
+     "rect": [
+      894,
+      34,
+      86,
+      36
+     ]
+    },
+    {
+     "n": "tab_Leaderboard",
+     "rect": [
+      980,
+      34,
+      140,
+      36
+     ]
+    },
+    {
+     "n": "tab_Settings",
+     "rect": [
+      1120,
+      34,
+      114,
+      36
+     ]
+    },
+    {
+     "n": "btn_Recalibrate",
+     "rect": [
+      748,
+      624,
+      180,
+      52
+     ]
+    },
+    {
+     "n": "btn_Enter match",
+     "rect": [
+      940,
+      624,
+      276,
+      52
+     ]
+    }
+   ],
+   "sprites": [
+    {
+     "key": "glare",
+     "file": "sprites/v3_06_head_tilt_check__glare.png",
+     "rect": [
+      78.0,
+      166.0,
+      632.0,
+      380.0
+     ],
+     "anchor": [
+      78,
+      166,
+      632,
+      380
+     ],
+     "default": true
+    },
+    {
+     "key": "tilt_indicator",
+     "file": "sprites/v3_06_head_tilt_check__tilt_indicator.png",
+     "rect": [
+      786.0,
+      208.0,
+      132.0,
+      48.0
+     ],
+     "anchor": [
+      796,
+      218,
+      112,
+      28
+     ],
+     "default": true
+    },
+    {
+     "key": "check:done",
+     "file": "sprites/v3_06_head_tilt_check__check_done.png",
+     "rect": [
+      762.0,
+      476.0,
+      42.0,
+      42.0
+     ],
+     "anchor": [
+      772,
+      486,
+      22,
+      22
+     ],
+     "group": "check",
+     "default": true
+    },
+    {
+     "key": "check:current",
+     "file": "sprites/v3_06_head_tilt_check__check_current.png",
+     "rect": [
+      762.0,
+      540.0,
+      42.0,
+      42.0
+     ],
+     "anchor": [
+      772,
+      550,
+      22,
+      22
+     ],
+     "group": "check",
+     "default": false
+    },
+    {
+     "key": "check:todo",
+     "file": "sprites/v3_06_head_tilt_check__check_todo.png",
+     "rect": [
+      762.0,
+      540.0,
+      42.0,
+      42.0
+     ],
+     "anchor": [
+      772,
+      550,
+      22,
+      22
+     ],
+     "group": "check",
+     "default": false
+    },
+    {
+     "key": "btn_enter:off",
+     "file": "sprites/v3_06_head_tilt_check__btn_enter_off.png",
+     "rect": [
+      930.0,
+      614.0,
+      296.0,
+      72.0
+     ],
+     "anchor": [
+      940,
+      624,
+      276,
+      52
+     ],
+     "group": "btn_enter",
+     "default": true
+    },
+    {
+     "key": "btn_enter:on",
+     "file": "sprites/v3_06_head_tilt_check__btn_enter_on.png",
+     "rect": [
+      930.0,
+      614.0,
+      296.0,
+      72.0
+     ],
+     "anchor": [
+      940,
+      624,
+      276,
+      52
+     ],
+     "group": "btn_enter",
+     "default": false
+    }
+   ],
+   "notes": [
+    "check rows y = 486, 518, 550 (marker 22x22 at x=772); label x=806"
+   ]
+  },
+  "v3_07_loading": {
+   "base": "v3_07_loading/base.png",
+   "top": "v3_07_loading/top.png",
+   "source_board": "v3_07a_loading_0",
+   "photos": [
+    {
+     "key": "photo",
+     "kind": "photo",
+     "rect": [
+      350,
+      260,
+      460,
+      250
+     ],
+     "radius": 4
+    }
+   ],
+   "texts": [
+    {
+     "key": "step_title",
+     "rect": [
+      0,
+      532,
+      1280,
+      34
+     ],
+     "al": "center",
+     "runs": [
+      {
+       "c": "Analyzing photo…",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 28.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Analyzing photo…",
+     "lines": 1
+    },
+    {
+     "key": "step_note",
+     "rect": [
+      0,
+      574,
+      1280,
+      23
+     ],
+     "al": "center",
+     "runs": [
+      {
+       "c": "Keep your eyes on the photo.",
+       "ff": "Patrick Hand",
+       "fw": 400,
+       "fs": 19.0,
+       "col": "#5D7894",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Keep your eyes on the photo.",
+     "lines": 1
+    },
+    {
+     "key": "progress_value",
+     "rect": [
+      48,
+      620,
+      34,
+      29
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "0%",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 24.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "0%",
+     "lines": 1
+    },
+    {
+     "key": "progress_step",
+     "rect": [
+      632,
+      630,
+      600,
+      16
+     ],
+     "al": "right",
+     "runs": [
+      {
+       "c": "Step 1 of 4 · Reading photo",
+       "ff": "Nunito",
+       "fw": 700,
+       "fs": 13.0,
+       "col": "#5D7894",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Step 1 of 4 · Reading photo",
+     "lines": 1
+    },
+    {
+     "key": "step_1",
+     "rect": [
+      64,
+      679,
+      66,
+      15
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "Read photo",
+       "ff": "Nunito",
+       "fw": 800,
+       "fs": 12.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Read photo",
+     "lines": 1
+    },
+    {
+     "key": "step_2",
+     "rect": [
+      360,
+      679,
+      85,
+      15
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "Estimate depth",
+       "ff": "Nunito",
+       "fw": 700,
+       "fs": 12.0,
+       "col": "#8DA3BA",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Estimate depth",
+     "lines": 1
+    },
+    {
+     "key": "step_3",
+     "rect": [
+      656,
+      679,
+      99,
+      15
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "Split into 4 layers",
+       "ff": "Nunito",
+       "fw": 700,
+       "fs": 12.0,
+       "col": "#8DA3BA",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Split into 4 layers",
+     "lines": 1
+    },
+    {
+     "key": "step_4",
+     "rect": [
+      952,
+      679,
+      93,
+      15
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "Fill hidden areas",
+       "ff": "Nunito",
+       "fw": 700,
+       "fs": 12.0,
+       "col": "#8DA3BA",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Fill hidden areas",
+     "lines": 1
+    }
+   ],
+   "bars": [
+    {
+     "key": "progress",
+     "rect": [
+      48,
+      660,
+      1184,
+      10
+     ],
+     "col": "#3B72B4",
+     "radius": 5,
+     "sample_frac": 0.012
+    }
+   ],
+   "pips": [
+    {
+     "key": "step_dots",
+     "rects": [
+      [
+       48,
+       682,
+       10,
+       10
+      ],
+      [
+       344,
+       682,
+       10,
+       10
+      ],
+      [
+       640,
+       682,
+       10,
+       10
+      ],
+      [
+       936,
+       682,
+       10,
+       10
+      ]
+     ],
+     "radius": 0,
+     "sample_on": [
+      true,
+      false,
+      false,
+      false
+     ],
+     "shape": "ellipse",
+     "on": {
+      "fill": "#3B72B4"
+     },
+     "off": {
+      "stroke": "#8DA3BA",
+      "sw": 1.5
+     }
+    }
+   ],
+   "pills": [],
+   "hotspots": [],
+   "sprites": [],
+   "notes": [
+    "step states: done = dot fill #3AA17A + label #3AA17A w700; current = dot fill #3B72B4 + label #24415F w800; todo = ring #8DA3BA + label #8DA3BA w700"
+   ]
+  },
+  "v3_07_loading_ready": {
+   "base": "v3_07_loading_ready/base.png",
+   "top": null,
+   "source_board": "v3_07b_loading_100",
+   "photos": [],
+   "texts": [],
+   "bars": [],
+   "pips": [],
+   "pills": [],
+   "hotspots": [
+    {
+     "n": "continue",
+     "rect": [
+      0,
+      0,
+      1280,
+      720
+     ]
+    }
+   ],
+   "sprites": [],
+   "notes": []
+  },
+  "v3_08_gameplay_hud": {
+   "base": "v3_08_gameplay_hud/base.png",
+   "top": "v3_08_gameplay_hud/top.png",
+   "source_board": "v3_08_gameplay_hud",
+   "photos": [
+    {
+     "key": "view",
+     "kind": "viewport",
+     "rect": [
+      28,
+      28,
+      1224,
+      664
+     ],
+     "radius": 20
+    }
+   ],
+   "texts": [
+    {
+     "key": "level_tab",
+     "rect": [
+      52,
+      59,
+      196,
+      15
+     ],
+     "al": "center",
+     "runs": [
+      {
+       "c": "LEVEL 5 · ASIAN MODE",
+       "ff": "Nunito",
+       "fw": 900,
+       "fs": 12.0,
+       "col": "#FFFFFF",
+       "ls": 1.2,
+       "upper": false
+      }
+     ],
+     "sample": "LEVEL 5 · ASIAN MODE",
+     "lines": 1
+    },
+    {
+     "key": "layer",
+     "rect": [
+      308,
+      59,
+      69,
+      15
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "LAYER 2/4",
+       "ff": "Nunito",
+       "fw": 900,
+       "fs": 12.0,
+       "col": "#24415F",
+       "ls": 0.8,
+       "upper": false
+      }
+     ],
+     "sample": "LAYER 2/4",
+     "lines": 1
+    },
+    {
+     "key": "timer",
+     "rect": [
+      570,
+      50,
+      140,
+      46
+     ],
+     "al": "center",
+     "runs": [
+      {
+       "c": "01:12",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 38.0,
+       "col": "#E08A1E",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "01:12",
+     "lines": 1
+    },
+    {
+     "key": "eaten",
+     "rect": [
+      754,
+      144,
+      74,
+      18
+     ],
+     "al": "center",
+     "runs": [
+      {
+       "c": "18% eaten",
+       "ff": "Patrick Hand",
+       "fw": 400,
+       "fs": 15.0,
+       "col": "#D2557A",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "18% eaten",
+     "lines": 1
+    },
+    {
+     "key": "hit",
+     "rect": [
+      912,
+      321.6,
+      62,
+      32
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "Miss!",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 26.0,
+       "col": "#E8676B",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Miss!",
+     "lines": 1
+    },
+    {
+     "key": "hit_sub",
+     "rect": [
+      918.1,
+      360,
+      78,
+      18
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "-5 stamina",
+       "ff": "Nunito",
+       "fw": 900,
+       "fs": 15.0,
+       "col": "#D9901C",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "-5 stamina",
+     "lines": 1
+    },
+    {
+     "key": "hp_value",
+     "rect": [
+      264,
+      579,
+      76,
+      24
+     ],
+     "al": "right",
+     "runs": [
+      {
+       "c": "72",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 20.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "72",
+     "lines": 1
+    },
+    {
+     "key": "st_value",
+     "rect": [
+      264,
+      619,
+      76,
+      24
+     ],
+     "al": "right",
+     "runs": [
+      {
+       "c": "48%",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 20.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "48%",
+     "lines": 1
+    },
+    {
+     "key": "weapon_name",
+     "rect": [
+      1012,
+      588,
+      102,
+      14
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "PRECISION GUN",
+       "ff": "Nunito",
+       "fw": 900,
+       "fs": 11.0,
+       "col": "#5D7894",
+       "ls": 1.0,
+       "upper": false
+      }
+     ],
+     "sample": "PRECISION GUN",
+     "lines": 1
+    },
+    {
+     "key": "ammo",
+     "rect": [
+      1011,
+      602,
+      48,
+      44
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "9",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 36.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      },
+      {
+       "c": "/10",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 20.0,
+       "col": "#8DA3BA",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "9/10",
+     "lines": 1
+    },
+    {
+     "key": "islot_key",
+     "rect": [
+      605,
+      598,
+      20,
+      14
+     ],
+     "al": "center",
+     "runs": [
+      {
+       "c": "2",
+       "ff": "Nunito",
+       "fw": 900,
+       "fs": 11.0,
+       "col": "#3B72B4",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "2",
+     "lines": 1
+    },
+    {
+     "key": "islot_key_sel",
+     "rect": [
+      507,
+      598,
+      20,
+      14
+     ],
+     "al": "center",
+     "runs": [
+      {
+       "c": "1",
+       "ff": "Nunito",
+       "fw": 900,
+       "fs": 11.0,
+       "col": "#FFFFFF",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "1",
+     "lines": 1
+    },
+    {
+     "key": "islot_name",
+     "rect": [
+      598,
+      644,
+      88,
+      14
+     ],
+     "al": "center",
+     "runs": [
+      {
+       "c": "Compass",
+       "ff": "Nunito",
+       "fw": 800,
+       "fs": 11.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Compass",
+     "lines": 1
+    },
+    {
+     "key": "islot_name_used",
+     "rect": [
+      696,
+      644,
+      88,
+      14
+     ],
+     "al": "center",
+     "runs": [
+      {
+       "c": "Energy drink",
+       "ff": "Nunito",
+       "fw": 800,
+       "fs": 11.0,
+       "col": "#8DA3BA",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Energy drink",
+     "lines": 1
+    },
+    {
+     "key": "islot_count",
+     "rect": [
+      662,
+      593,
+      13,
+      17
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "×1",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 14.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "×1",
+     "lines": 1
+    },
+    {
+     "key": "islot_count_used",
+     "rect": [
+      760,
+      593,
+      16,
+      17
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "×0",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 14.0,
+       "col": "#8DA3BA",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "×0",
+     "lines": 1
+    },
+    {
+     "key": "effect_poison_left",
+     "rect": [
+      172,
+      533,
+      17,
+      20
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "6s",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 16.0,
+       "col": "#7253B8",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "6s",
+     "lines": 1
+    },
+    {
+     "key": "effect_disoriented_left",
+     "rect": [
+      348,
+      533,
+      17,
+      20
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "3s",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 16.0,
+       "col": "#B86A12",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "3s",
+     "lines": 1
+    },
+    {
+     "key": "kills",
+     "rect": [
+      469,
+      68,
+      42,
+      39
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "7",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 32.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      },
+      {
+       "c": "/12",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 20.0,
+       "col": "#8DA3BA",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "7/12",
+     "lines": 1
+    },
+    {
+     "key": "intact_value",
+     "rect": [
+      725,
+      68,
+      51,
+      39
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "82",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 32.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      },
+      {
+       "c": "%",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 20.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "82%",
+     "lines": 1
+    }
+   ],
+   "bars": [
+    {
+     "key": "intact",
+     "rect": [
+      452,
+      128,
+      376,
+      8
+     ],
+     "col": "#3B72B4",
+     "radius": 4,
+     "sample_frac": 0.819,
+     "rest_col": "#D2557A"
+    },
+    {
+     "key": "hp",
+     "rect": [
+      94,
+      608,
+      246,
+      9
+     ],
+     "col": "#E8676B",
+     "radius": 4.5,
+     "sample_frac": 0.72
+    },
+    {
+     "key": "st",
+     "rect": [
+      94,
+      648,
+      246,
+      9
+     ],
+     "col": "#F2B544",
+     "radius": 4.5,
+     "sample_frac": 0.48
+    }
+   ],
+   "pips": [
+    {
+     "key": "layer_pips",
+     "rects": [
+      [
+       270,
+       59,
+       12,
+       16
+      ],
+      [
+       276,
+       59,
+       12,
+       16
+      ],
+      [
+       282,
+       59,
+       12,
+       16
+      ],
+      [
+       288,
+       59,
+       12,
+       16
+      ]
+     ],
+     "radius": 3,
+     "sample_on": [
+      true,
+      true,
+      false,
+      false
+     ],
+     "shape": "rect",
+     "on": {
+      "fill": "#3B72B4",
+      "stroke": "#FFFFFF",
+      "sw": 1
+     },
+     "off": {
+      "fill": "#3B72B4",
+      "fill_op": 0.22,
+      "stroke": "#FFFFFF",
+      "sw": 1
+     }
+    },
+    {
+     "key": "ammo_pips",
+     "rects": [
+      [
+       1086,
+       620,
+       7,
+       22
+      ],
+      [
+       1099,
+       620,
+       7,
+       22
+      ],
+      [
+       1112,
+       620,
+       7,
+       22
+      ],
+      [
+       1125,
+       620,
+       7,
+       22
+      ],
+      [
+       1138,
+       620,
+       7,
+       22
+      ],
+      [
+       1151,
+       620,
+       7,
+       22
+      ],
+      [
+       1164,
+       620,
+       7,
+       22
+      ],
+      [
+       1177,
+       620,
+       7,
+       22
+      ],
+      [
+       1190,
+       620,
+       7,
+       22
+      ],
+      [
+       1203,
+       620,
+       7,
+       22
+      ]
+     ],
+     "radius": 3.5,
+     "sample_on": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false
+     ],
+     "shape": "rect",
+     "on": {
+      "fill": "#3B72B4"
+     },
+     "off": {
+      "stroke": "#8DA3BA",
+      "sw": 1.2
+     }
+    }
+   ],
+   "pills": [],
+   "hotspots": [],
+   "sprites": [
+    {
+     "key": "bite",
+     "file": "sprites/v3_08_gameplay_hud__bite.png",
+     "rect": [
+      0.0,
+      229.3,
+      139.3,
+      204.0
+     ],
+     "anchor": [
+      -54,
+      233,
+      120,
+      196
+     ],
+     "default": true
+    },
+    {
+     "key": "crosshair",
+     "file": "sprites/v3_08_gameplay_hud__crosshair.png",
+     "rect": [
+      828.0,
+      348.0,
+      92.0,
+      92.0
+     ],
+     "anchor": [
+      832.1,
+      352,
+      84,
+      84
+     ],
+     "default": true
+    },
+    {
+     "key": "head:good",
+     "file": "sprites/v3_08_gameplay_hud__head_good.png",
+     "rect": [
+      1026.0,
+      522.0,
+      212.0,
+      50.0
+     ],
+     "anchor": [
+      1036,
+      532,
+      192,
+      30
+     ],
+     "group": "head",
+     "default": true
+    },
+    {
+     "key": "head:lost",
+     "file": "sprites/v3_08_gameplay_hud__head_lost.png",
+     "rect": [
+      1026.0,
+      522.0,
+      212.0,
+      50.0
+     ],
+     "anchor": [
+      1036,
+      532,
+      192,
+      30
+     ],
+     "group": "head",
+     "default": false
+    },
+    {
+     "key": "st_block",
+     "file": "sprites/v3_08_gameplay_hud__st_block.png",
+     "rect": [
+      66.0,
+      622.0,
+      276.0,
+      36.7
+     ],
+     "anchor": [
+      94,
+      626,
+      59,
+      14
+     ],
+     "default": true
+    },
+    {
+     "key": "weapon_icon:Precision gun",
+     "file": "sprites/v3_08_gameplay_hud__weapon_icon_Precision_gun.png",
+     "rect": [
+      938.0,
+      590.0,
+      60.0,
+      60.0
+     ],
+     "anchor": [
+      938,
+      590,
+      60,
+      60
+     ],
+     "default": true
+    },
+    {
+     "key": "islot:selected",
+     "file": "sprites/v3_08_gameplay_hud__islot_selected.png",
+     "rect": [
+      490.0,
+      578.0,
+      108.0,
+      100.0
+     ],
+     "anchor": [
+      500,
+      588,
+      88,
+      80
+     ],
+     "group": "islot",
+     "default": true
+    },
+    {
+     "key": "islot:normal",
+     "file": "sprites/v3_08_gameplay_hud__islot_normal.png",
+     "rect": [
+      588.0,
+      578.0,
+      108.0,
+      100.0
+     ],
+     "anchor": [
+      598,
+      588,
+      88,
+      80
+     ],
+     "group": "islot",
+     "default": false
+    },
+    {
+     "key": "ikey:selected",
+     "file": "sprites/v3_08_gameplay_hud__ikey_selected.png",
+     "rect": [
+      506.7,
+      594.7,
+      20.0,
+      20.0
+     ],
+     "anchor": [
+      507,
+      595,
+      20,
+      20
+     ],
+     "group": "ikey",
+     "default": true
+    },
+    {
+     "key": "ikey:normal",
+     "file": "sprites/v3_08_gameplay_hud__ikey_normal.png",
+     "rect": [
+      605.3,
+      594.7,
+      20.0,
+      20.0
+     ],
+     "anchor": [
+      605,
+      595,
+      20,
+      20
+     ],
+     "group": "ikey",
+     "default": false
+    },
+    {
+     "key": "iused",
+     "file": "sprites/v3_08_gameplay_hud__iused.png",
+     "rect": [
+      718.0,
+      614.0,
+      44.0,
+      18.0
+     ],
+     "anchor": [
+      718,
+      614,
+      44,
+      18
+     ],
+     "default": false
+    },
+    {
+     "key": "effect:poison",
+     "file": "sprites/v3_08_gameplay_hud__effect_poison.png",
+     "rect": [
+      42.0,
+      518.0,
+      168.0,
+      54.0
+     ],
+     "anchor": [
+      52,
+      528,
+      148,
+      34
+     ],
+     "default": true
+    },
+    {
+     "key": "effect:disoriented",
+     "file": "sprites/v3_08_gameplay_hud__effect_disoriented.png",
+     "rect": [
+      198.0,
+      518.0,
+      190.0,
+      54.0
+     ],
+     "anchor": [
+      208,
+      528,
+      170,
+      34
+     ],
+     "default": true
+    }
+   ],
+   "notes": [
+    "item slot layout relative to slot rect: key (7,7,20,20); icon tile (26,12,36,36); name (0,56,88,14) centred; count right-aligned to x+80 at y+5; USED badge (22,26,44,18)"
+   ],
+   "item_slots": [
+    [
+     500,
+     588,
+     88,
+     80
+    ],
+    [
+     598,
+     588,
+     88,
+     80
+    ],
+    [
+     696,
+     588,
+     88,
+     80
+    ]
+   ],
+   "item_slot_layout": {
+    "size": [
+     88,
+     80
+    ],
+    "key": [
+     7,
+     7,
+     20,
+     20
+    ],
+    "icon": [
+     26,
+     12,
+     36,
+     36
+    ],
+    "name": [
+     0,
+     56,
+     88,
+     14
+    ],
+    "count_right": [
+     77,
+     5,
+     17
+    ],
+    "used_badge": [
+     22,
+     26,
+     44,
+     18
+    ],
+    "sprites_from": "v3_08_gameplay_hud",
+    "icon_sprite": "v3_05_loadout item_tile:<item>"
+   }
+  },
+  "v3_12a_pvp_hunter_hud": {
+   "base": "v3_12a_pvp_hunter_hud/base.png",
+   "top": "v3_12a_pvp_hunter_hud/top.png",
+   "source_board": "v3_12a_pvp_hunter_hud",
+   "photos": [
+    {
+     "key": "view",
+     "kind": "viewport",
+     "rect": [
+      28,
+      28,
+      1224,
+      664
+     ],
+     "radius": 20
+    }
+   ],
+   "texts": [
+    {
+     "key": "level_tab",
+     "rect": [
+      52,
+      59,
+      196,
+      15
+     ],
+     "al": "center",
+     "runs": [
+      {
+       "c": "PVP · COMPETITIVE",
+       "ff": "Nunito",
+       "fw": 900,
+       "fs": 12.0,
+       "col": "#FFFFFF",
+       "ls": 1.2,
+       "upper": false
+      }
+     ],
+     "sample": "PVP · COMPETITIVE",
+     "lines": 1
+    },
+    {
+     "key": "layer",
+     "rect": [
+      308,
+      59,
+      69,
+      15
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "LAYER 2/4",
+       "ff": "Nunito",
+       "fw": 900,
+       "fs": 12.0,
+       "col": "#24415F",
+       "ls": 0.8,
+       "upper": false
+      }
+     ],
+     "sample": "LAYER 2/4",
+     "lines": 1
+    },
+    {
+     "key": "timer",
+     "rect": [
+      570,
+      50,
+      140,
+      44
+     ],
+     "al": "center",
+     "runs": [
+      {
+       "c": "01:48",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 36.0,
+       "col": "#E08A1E",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "01:48",
+     "lines": 1
+    },
+    {
+     "key": "eaten",
+     "rect": [
+      754,
+      144,
+      74,
+      18
+     ],
+     "al": "center",
+     "runs": [
+      {
+       "c": "18% eaten",
+       "ff": "Patrick Hand",
+       "fw": 400,
+       "fs": 15.0,
+       "col": "#D2557A",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "18% eaten",
+     "lines": 1
+    },
+    {
+     "key": "hit",
+     "rect": [
+      912,
+      321.6,
+      62,
+      32
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "Miss!",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 26.0,
+       "col": "#E8676B",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Miss!",
+     "lines": 1
+    },
+    {
+     "key": "hit_sub",
+     "rect": [
+      918.1,
+      360,
+      78,
+      18
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "-5 stamina",
+       "ff": "Nunito",
+       "fw": 900,
+       "fs": 15.0,
+       "col": "#D9901C",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "-5 stamina",
+     "lines": 1
+    },
+    {
+     "key": "hp_value",
+     "rect": [
+      264,
+      579,
+      76,
+      24
+     ],
+     "al": "right",
+     "runs": [
+      {
+       "c": "72",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 20.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "72",
+     "lines": 1
+    },
+    {
+     "key": "st_value",
+     "rect": [
+      264,
+      619,
+      76,
+      24
+     ],
+     "al": "right",
+     "runs": [
+      {
+       "c": "48%",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 20.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "48%",
+     "lines": 1
+    },
+    {
+     "key": "weapon_name",
+     "rect": [
+      1012,
+      588,
+      102,
+      14
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "PRECISION GUN",
+       "ff": "Nunito",
+       "fw": 900,
+       "fs": 11.0,
+       "col": "#5D7894",
+       "ls": 1.0,
+       "upper": false
+      }
+     ],
+     "sample": "PRECISION GUN",
+     "lines": 1
+    },
+    {
+     "key": "ammo",
+     "rect": [
+      1011,
+      602,
+      48,
+      44
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "9",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 36.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      },
+      {
+       "c": "/10",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 20.0,
+       "col": "#8DA3BA",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "9/10",
+     "lines": 1
+    },
+    {
+     "key": "kills_you",
+     "rect": [
+      469,
+      68,
+      40,
+      36
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "7",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 30.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      },
+      {
+       "c": "/12",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 19.0,
+       "col": "#8DA3BA",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "7/12",
+     "lines": 1
+    },
+    {
+     "key": "kills_opp",
+     "rect": [
+      725,
+      68,
+      41,
+      36
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "5",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 30.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      },
+      {
+       "c": "/12",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 19.0,
+       "col": "#8DA3BA",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "5/12",
+     "lines": 1
+    },
+    {
+     "key": "opponent_activity",
+     "rect": [
+      1074,
+      104,
+      112,
+      14
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "Player 2 used 1 item",
+       "ff": "Nunito",
+       "fw": 800,
+       "fs": 11.5,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Player 2 used 1 item",
+     "lines": 1
+    }
+   ],
+   "bars": [
+    {
+     "key": "intact",
+     "rect": [
+      452,
+      128,
+      376,
+      8
+     ],
+     "col": "#3B72B4",
+     "radius": 4,
+     "sample_frac": 0.819,
+     "rest_col": "#D2557A"
+    },
+    {
+     "key": "hp",
+     "rect": [
+      94,
+      608,
+      246,
+      9
+     ],
+     "col": "#E8676B",
+     "radius": 4.5,
+     "sample_frac": 0.72
+    },
+    {
+     "key": "st",
+     "rect": [
+      94,
+      648,
+      246,
+      9
+     ],
+     "col": "#F2B544",
+     "radius": 4.5,
+     "sample_frac": 0.48
+    },
+    {
+     "key": "progress_you",
+     "rect": [
+      470,
+      106,
+      84,
+      5
+     ],
+     "col": "#3B72B4",
+     "radius": 2.5,
+     "sample_frac": 0.583
+    },
+    {
+     "key": "progress_opp",
+     "rect": [
+      726,
+      106,
+      84,
+      5
+     ],
+     "col": "#E8676B",
+     "radius": 2.5,
+     "sample_frac": 0.417
+    }
+   ],
+   "pips": [
+    {
+     "key": "layer_pips",
+     "rects": [
+      [
+       270,
+       59,
+       12,
+       16
+      ],
+      [
+       276,
+       59,
+       12,
+       16
+      ],
+      [
+       282,
+       59,
+       12,
+       16
+      ],
+      [
+       288,
+       59,
+       12,
+       16
+      ]
+     ],
+     "radius": 3,
+     "sample_on": [
+      true,
+      true,
+      false,
+      false
+     ],
+     "shape": "rect",
+     "on": {
+      "fill": "#3B72B4",
+      "stroke": "#FFFFFF",
+      "sw": 1
+     },
+     "off": {
+      "fill": "#3B72B4",
+      "fill_op": 0.22,
+      "stroke": "#FFFFFF",
+      "sw": 1
+     }
+    },
+    {
+     "key": "ammo_pips",
+     "rects": [
+      [
+       1086,
+       620,
+       7,
+       22
+      ],
+      [
+       1099,
+       620,
+       7,
+       22
+      ],
+      [
+       1112,
+       620,
+       7,
+       22
+      ],
+      [
+       1125,
+       620,
+       7,
+       22
+      ],
+      [
+       1138,
+       620,
+       7,
+       22
+      ],
+      [
+       1151,
+       620,
+       7,
+       22
+      ],
+      [
+       1164,
+       620,
+       7,
+       22
+      ],
+      [
+       1177,
+       620,
+       7,
+       22
+      ],
+      [
+       1190,
+       620,
+       7,
+       22
+      ],
+      [
+       1203,
+       620,
+       7,
+       22
+      ]
+     ],
+     "radius": 3.5,
+     "sample_on": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false
+     ],
+     "shape": "rect",
+     "on": {
+      "fill": "#3B72B4"
+     },
+     "off": {
+      "stroke": "#8DA3BA",
+      "sw": 1.2
+     }
+    }
+   ],
+   "pills": [],
+   "hotspots": [],
+   "sprites": [
+    {
+     "key": "bite",
+     "file": "sprites/v3_12a_pvp_hunter_hud__bite.png",
+     "rect": [
+      0.0,
+      229.3,
+      139.3,
+      204.0
+     ],
+     "anchor": [
+      -54,
+      233,
+      120,
+      196
+     ],
+     "default": true
+    },
+    {
+     "key": "crosshair",
+     "file": "sprites/v3_12a_pvp_hunter_hud__crosshair.png",
+     "rect": [
+      828.0,
+      348.0,
+      92.0,
+      92.0
+     ],
+     "anchor": [
+      832.1,
+      352,
+      84,
+      84
+     ],
+     "default": true
+    },
+    {
+     "key": "head:good",
+     "file": "sprites/v3_12a_pvp_hunter_hud__head_good.png",
+     "rect": [
+      1026.0,
+      522.0,
+      212.0,
+      50.0
+     ],
+     "anchor": [
+      1036,
+      532,
+      192,
+      30
+     ],
+     "group": "head",
+     "default": true
+    },
+    {
+     "key": "head:lost",
+     "file": "sprites/v3_12a_pvp_hunter_hud__head_lost.png",
+     "rect": [
+      1026.0,
+      522.0,
+      212.0,
+      50.0
+     ],
+     "anchor": [
+      1036,
+      532,
+      192,
+      30
+     ],
+     "group": "head",
+     "default": false
+    },
+    {
+     "key": "st_block",
+     "file": "sprites/v3_12a_pvp_hunter_hud__st_block.png",
+     "rect": [
+      66.0,
+      622.0,
+      276.0,
+      36.7
+     ],
+     "anchor": [
+      94,
+      626,
+      59,
+      14
+     ],
+     "default": true
+    },
+    {
+     "key": "weapon_icon:Precision gun",
+     "file": "sprites/v3_12a_pvp_hunter_hud__weapon_icon_Precision_gun.png",
+     "rect": [
+      938.0,
+      590.0,
+      60.0,
+      60.0
+     ],
+     "anchor": [
+      938,
+      590,
+      60,
+      60
+     ],
+     "default": true
+    }
+   ],
+   "notes": [
+    "item slot layout relative to slot rect: key (7,7,20,20); icon tile (26,12,36,36); name (0,56,88,14) centred; count right-aligned to x+80 at y+5; USED badge (22,26,44,18)"
+   ],
+   "item_slots": [
+    [
+     500,
+     588,
+     88,
+     80
+    ],
+    [
+     598,
+     588,
+     88,
+     80
+    ],
+    [
+     696,
+     588,
+     88,
+     80
+    ]
+   ],
+   "item_slot_layout": {
+    "size": [
+     88,
+     80
+    ],
+    "key": [
+     7,
+     7,
+     20,
+     20
+    ],
+    "icon": [
+     26,
+     12,
+     36,
+     36
+    ],
+    "name": [
+     0,
+     56,
+     88,
+     14
+    ],
+    "count_right": [
+     77,
+     5,
+     17
+    ],
+    "used_badge": [
+     22,
+     26,
+     44,
+     18
+    ],
+    "sprites_from": "v3_08_gameplay_hud",
+    "icon_sprite": "v3_05_loadout item_tile:<item>"
+   }
+  },
+  "v3_12b_pvp_bug_hud": {
+   "base": "v3_12b_pvp_bug_hud/base.png",
+   "top": "v3_12b_pvp_bug_hud/top.png",
+   "source_board": "v3_12b_pvp_bug_hud",
+   "photos": [
+    {
+     "key": "view",
+     "kind": "viewport",
+     "rect": [
+      28,
+      28,
+      1224,
+      664
+     ],
+     "radius": 20
+    }
+   ],
+   "texts": [
+    {
+     "key": "level_tab",
+     "rect": [
+      52,
+      59,
+      300,
+      15
+     ],
+     "al": "center",
+     "runs": [
+      {
+       "c": "PVP · HUNT & HIDE · YOU ARE THE BUG",
+       "ff": "Nunito",
+       "fw": 900,
+       "fs": 12.0,
+       "col": "#FFFFFF",
+       "ls": 1.2,
+       "upper": false
+      }
+     ],
+     "sample": "PVP · HUNT & HIDE · YOU ARE THE BUG",
+     "lines": 1
+    },
+    {
+     "key": "layer",
+     "rect": [
+      104,
+      101,
+      69,
+      15
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "LAYER 2/4",
+       "ff": "Nunito",
+       "fw": 900,
+       "fs": 12.0,
+       "col": "#24415F",
+       "ls": 0.8,
+       "upper": false
+      }
+     ],
+     "sample": "LAYER 2/4",
+     "lines": 1
+    },
+    {
+     "key": "timer",
+     "rect": [
+      466,
+      50,
+      150,
+      44
+     ],
+     "al": "center",
+     "runs": [
+      {
+       "c": "02:05",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 36.0,
+       "col": "#3AA17A",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "02:05",
+     "lines": 1
+    },
+    {
+     "key": "eaten",
+     "rect": [
+      754,
+      144,
+      74,
+      18
+     ],
+     "al": "center",
+     "runs": [
+      {
+       "c": "18% eaten",
+       "ff": "Patrick Hand",
+       "fw": 400,
+       "fs": 15.0,
+       "col": "#D2557A",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "18% eaten",
+     "lines": 1
+    },
+    {
+     "key": "hunter_progress",
+     "rect": [
+      1028,
+      104,
+      152,
+      14
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "Hunter has killed 6/10 bugs",
+       "ff": "Nunito",
+       "fw": 800,
+       "fs": 11.5,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Hunter has killed 6/10 bugs",
+     "lines": 1
+    },
+    {
+     "key": "exposure_value",
+     "rect": [
+      752,
+      48,
+      58,
+      27
+     ],
+     "al": "right",
+     "runs": [
+      {
+       "c": "35%",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 22.0,
+       "col": "#8E74C9",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "35%",
+     "lines": 1
+    }
+   ],
+   "bars": [
+    {
+     "key": "intact",
+     "rect": [
+      452,
+      128,
+      376,
+      8
+     ],
+     "col": "#3B72B4",
+     "radius": 4,
+     "sample_frac": 0.819,
+     "rest_col": "#D2557A"
+    },
+    {
+     "key": "exposure",
+     "rect": [
+      640,
+      80,
+      170,
+      8
+     ],
+     "col": "#8E74C9",
+     "radius": 4,
+     "sample_frac": 0.353
+    }
+   ],
+   "pips": [
+    {
+     "key": "layer_pips",
+     "rects": [
+      [
+       66,
+       101,
+       12,
+       16
+      ],
+      [
+       72,
+       101,
+       12,
+       16
+      ],
+      [
+       78,
+       101,
+       12,
+       16
+      ],
+      [
+       84,
+       101,
+       12,
+       16
+      ]
+     ],
+     "radius": 3,
+     "sample_on": [
+      true,
+      true,
+      false,
+      false
+     ],
+     "shape": "rect",
+     "on": {
+      "fill": "#3B72B4",
+      "stroke": "#FFFFFF",
+      "sw": 1
+     },
+     "off": {
+      "fill": "#3B72B4",
+      "fill_op": 0.22,
+      "stroke": "#FFFFFF",
+      "sw": 1
+     }
+    }
+   ],
+   "pills": [],
+   "hotspots": [],
+   "sprites": [
+    {
+     "key": "bite",
+     "file": "sprites/v3_12b_pvp_bug_hud__bite.png",
+     "rect": [
+      0.0,
+      229.3,
+      139.3,
+      204.0
+     ],
+     "anchor": [
+      -54,
+      233,
+      120,
+      196
+     ],
+     "default": true
+    },
+    {
+     "key": "head:good",
+     "file": "sprites/v3_12b_pvp_bug_hud__head_good.png",
+     "rect": [
+      1026.0,
+      422.0,
+      212.0,
+      50.0
+     ],
+     "anchor": [
+      1036,
+      432,
+      192,
+      30
+     ],
+     "group": "head",
+     "default": true
+    },
+    {
+     "key": "head:lost",
+     "file": "sprites/v3_12b_pvp_bug_hud__head_lost.png",
+     "rect": [
+      1026.0,
+      422.0,
+      212.0,
+      50.0
+     ],
+     "anchor": [
+      1036,
+      432,
+      192,
+      30
+     ],
+     "group": "head",
+     "default": false
+    }
+   ],
+   "notes": []
+  },
+  "v3_09a_result_win": {
+   "base": "v3_09a_result_win/base.png",
+   "top": "v3_09a_result_win/top.png",
+   "source_board": "v3_09a_result_win",
+   "photos": [
+    {
+     "key": "photo",
+     "kind": "photo",
+     "rect": [
+      80,
+      88,
+      588,
+      392
+     ],
+     "radius": 12
+    }
+   ],
+   "texts": [
+    {
+     "key": "stamp_line",
+     "rect": [
+      99.3,
+      141.2,
+      268,
+      12
+     ],
+     "al": "center",
+     "runs": [
+      {
+       "c": "LEVEL 3 · HARD · 06.11.2026",
+       "ff": "Nunito",
+       "fw": 900,
+       "fs": 10.0,
+       "col": "#3AA17A",
+       "ls": 1.5,
+       "upper": false
+      }
+     ],
+     "sample": "LEVEL 3 · HARD · 06.11.2026",
+     "lines": 1
+    },
+    {
+     "key": "caption",
+     "rect": [
+      88,
+      492,
+      223,
+      29
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "12/12 bugs turned to dust",
+       "ff": "Patrick Hand",
+       "fw": 400,
+       "fs": 24.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "12/12 bugs turned to dust",
+     "lines": 1
+    },
+    {
+     "key": "row_label#0",
+     "rect": [
+      752,
+      232,
+      68,
+      20
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "Time left",
+       "ff": "Nunito",
+       "fw": 700,
+       "fs": 16.0,
+       "col": "#5D7894",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Time left",
+     "lines": 1
+    },
+    {
+     "key": "row_label#1",
+     "rect": [
+      752,
+      280,
+      167,
+      20
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "Antidote ×1 · weight 5",
+       "ff": "Nunito",
+       "fw": 700,
+       "fs": 16.0,
+       "col": "#5D7894",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Antidote ×1 · weight 5",
+     "lines": 1
+    },
+    {
+     "key": "row_value#0",
+     "rect": [
+      1052,
+      229,
+      132,
+      24
+     ],
+     "al": "right",
+     "runs": [
+      {
+       "c": "+42",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 20.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "+42",
+     "lines": 1
+    },
+    {
+     "key": "row_value#1",
+     "rect": [
+      1052,
+      277,
+      132,
+      24
+     ],
+     "al": "right",
+     "runs": [
+      {
+       "c": "-5",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 20.0,
+       "col": "#E8676B",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "-5",
+     "lines": 1
+    },
+    {
+     "key": "score",
+     "rect": [
+      984,
+      308,
+      200,
+      125
+     ],
+     "al": "right",
+     "runs": [
+      {
+       "c": "37",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 104.0,
+       "col": "#3AA17A",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "37",
+     "lines": 1
+    },
+    {
+     "key": "rank_up_text",
+     "rect": [
+      812,
+      485,
+      198,
+      16
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "You're now #4 on the Solo board",
+       "ff": "Nunito",
+       "fw": 700,
+       "fs": 13.0,
+       "col": "#2A8763",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "You're now #4 on the Solo board",
+     "lines": 1
+    }
+   ],
+   "bars": [],
+   "pips": [],
+   "pills": [
+    {
+     "key": "level_pill",
+     "rect": [
+      752,
+      178,
+      118,
+      26
+     ],
+     "radius": 13,
+     "pad": 12,
+     "font": {
+      "ff": "Nunito",
+      "fw": 900,
+      "fs": 11.0,
+      "ls": 1.0
+     },
+     "styles": {
+      "normal": {
+       "bg": "#DCE9F7",
+       "fg": "#3B72B4"
+      },
+      "asian": {
+       "bg": "#FBE3CC",
+       "fg": "#9A5A1E"
+      }
+     },
+     "sample": "LEVEL 3 · HARD"
+    }
+   ],
+   "hotspots": [
+    {
+     "n": "btn_Next level",
+     "rect": [
+      720,
+      566,
+      496,
+      58
+     ]
+    },
+    {
+     "n": "btn_Back to album",
+     "rect": [
+      720,
+      638,
+      242,
+      52
+     ]
+    },
+    {
+     "n": "btn_Play again",
+     "rect": [
+      974,
+      638,
+      242,
+      52
+     ]
+    }
+   ],
+   "sprites": [
+    {
+     "key": "rank_up",
+     "file": "sprites/v3_09a_result_win__rank_up.png",
+     "rect": [
+      742.0,
+      446.0,
+      452.0,
+      78.0
+     ],
+     "anchor": [
+      752,
+      456,
+      432,
+      58
+     ],
+     "default": true
+    }
+   ],
+   "notes": []
+  },
+  "v3_09b_result_lose": {
+   "base": "v3_09b_result_lose/base.png",
+   "top": "v3_09b_result_lose/top.png",
+   "source_board": "v3_09b_result_lose",
+   "photos": [
+    {
+     "key": "photo",
+     "kind": "photo",
+     "rect": [
+      80,
+      88,
+      588,
+      392
+     ],
+     "radius": 16,
+     "clip": [
+      [
+       80,
+       88,
+       104,
+       80
+      ],
+      [
+       564,
+       88,
+       104,
+       80
+      ],
+      [
+       80,
+       400,
+       104,
+       80
+      ],
+      [
+       564,
+       400,
+       104,
+       80
+      ]
+     ],
+     "clip_radius": 0
+    }
+   ],
+   "texts": [
+    {
+     "key": "row_label#0",
+     "rect": [
+      752,
+      224,
+      68,
+      20
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "Bugs left",
+       "ff": "Nunito",
+       "fw": 700,
+       "fs": 16.0,
+       "col": "#5D7894",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Bugs left",
+     "lines": 1
+    },
+    {
+     "key": "row_label#1",
+     "rect": [
+      752,
+      268,
+      68,
+      20
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "Time left",
+       "ff": "Nunito",
+       "fw": 700,
+       "fs": 16.0,
+       "col": "#5D7894",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Time left",
+     "lines": 1
+    },
+    {
+     "key": "row_label#2",
+     "rect": [
+      752,
+      312,
+      185,
+      20
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "Overtime 00:07 · penalty",
+       "ff": "Nunito",
+       "fw": 700,
+       "fs": 16.0,
+       "col": "#5D7894",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Overtime 00:07 · penalty",
+     "lines": 1
+    },
+    {
+     "key": "row_label#3",
+     "rect": [
+      752,
+      356,
+      196,
+      20
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "Energy drink ×1 · weight 3",
+       "ff": "Nunito",
+       "fw": 700,
+       "fs": 16.0,
+       "col": "#5D7894",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Energy drink ×1 · weight 3",
+     "lines": 1
+    },
+    {
+     "key": "row_value#0",
+     "rect": [
+      1020,
+      221,
+      164,
+      24
+     ],
+     "al": "right",
+     "runs": [
+      {
+       "c": "3 / 12",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 20.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "3 / 12",
+     "lines": 1
+    },
+    {
+     "key": "row_value#1",
+     "rect": [
+      1020,
+      265,
+      164,
+      24
+     ],
+     "al": "right",
+     "runs": [
+      {
+       "c": "0",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 20.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "0",
+     "lines": 1
+    },
+    {
+     "key": "row_value#2",
+     "rect": [
+      1020,
+      309,
+      164,
+      24
+     ],
+     "al": "right",
+     "runs": [
+      {
+       "c": "-35",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 20.0,
+       "col": "#E8676B",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "-35",
+     "lines": 1
+    },
+    {
+     "key": "row_value#3",
+     "rect": [
+      1020,
+      353,
+      164,
+      24
+     ],
+     "al": "right",
+     "runs": [
+      {
+       "c": "-3",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 20.0,
+       "col": "#E8676B",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "-3",
+     "lines": 1
+    },
+    {
+     "key": "score",
+     "rect": [
+      964,
+      390,
+      220,
+      106
+     ],
+     "al": "right",
+     "runs": [
+      {
+       "c": "-38",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 88.0,
+       "col": "#E8676B",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "-38",
+     "lines": 1
+    }
+   ],
+   "bars": [],
+   "pips": [],
+   "pills": [
+    {
+     "key": "level_pill",
+     "rect": [
+      752,
+      176,
+      168,
+      26
+     ],
+     "radius": 13,
+     "pad": 12,
+     "font": {
+      "ff": "Nunito",
+      "fw": 900,
+      "fs": 11.0,
+      "ls": 1.0
+     },
+     "styles": {
+      "normal": {
+       "bg": "#DCE9F7",
+       "fg": "#3B72B4"
+      },
+      "asian": {
+       "bg": "#FBE3CC",
+       "fg": "#9A5A1E"
+      }
+     },
+     "sample": "LEVEL 5 · ASIAN MODE"
+    }
+   ],
+   "hotspots": [
+    {
+     "n": "btn_Try again",
+     "rect": [
+      720,
+      566,
+      496,
+      58
+     ]
+    },
+    {
+     "n": "btn_Choose another photo",
+     "rect": [
+      720,
+      638,
+      242,
+      52
+     ]
+    },
+    {
+     "n": "btn_Back to album",
+     "rect": [
+      974,
+      638,
+      242,
+      52
+     ]
+    }
+   ],
+   "sprites": [],
+   "notes": []
+  },
+  "v3_10_pvp_mode": {
+   "base": "v3_10_pvp_mode/base.png",
+   "top": null,
+   "source_board": "v3_10_pvp_mode",
+   "photos": [],
+   "texts": [],
+   "bars": [],
+   "pips": [],
+   "pills": [],
+   "hotspots": [
+    {
+     "n": "tab_Solo",
+     "rect": [
+      806,
+      34,
+      88,
+      36
+     ]
+    },
+    {
+     "n": "tab_PvP",
+     "rect": [
+      894,
+      34,
+      86,
+      36
+     ]
+    },
+    {
+     "n": "tab_Leaderboard",
+     "rect": [
+      980,
+      34,
+      140,
+      36
+     ]
+    },
+    {
+     "n": "tab_Settings",
+     "rect": [
+      1120,
+      34,
+      114,
+      36
+     ]
+    },
+    {
+     "n": "mode_Competitive",
+     "rect": [
+      64,
+      150,
+      560,
+      450
+     ]
+    },
+    {
+     "n": "mode_Hunt & Hide",
+     "rect": [
+      656,
+      150,
+      560,
+      450
+     ]
+    },
+    {
+     "n": "btn_Back",
+     "rect": [
+      656,
+      624,
+      120,
+      52
+     ]
+    },
+    {
+     "n": "btn_Invite a friend",
+     "rect": [
+      788,
+      624,
+      200,
+      52
+     ]
+    },
+    {
+     "n": "btn_Find match",
+     "rect": [
+      1000,
+      624,
+      216,
+      52
+     ]
+    }
+   ],
+   "sprites": [
+    {
+     "key": "sel:mode",
+     "file": "sprites/v3_10_pvp_mode__sel_mode.png",
+     "rect": [
+      58.0,
+      144.0,
+      572.0,
+      462.0
+     ],
+     "anchor": [
+      64,
+      150,
+      560,
+      450
+     ],
+     "default": true,
+     "targets": {
+      "mode_Competitive": [
+       64,
+       150,
+       560,
+       450
+      ],
+      "mode_Hunt & Hide": [
+       656,
+       150,
+       560,
+       450
+      ]
+     }
+    }
+   ],
+   "notes": []
+  },
+  "v3_11a_pvp_searching": {
+   "base": "v3_11a_pvp_searching/base.png",
+   "top": null,
+   "source_board": "v3_11a_pvp_searching",
+   "photos": [],
+   "texts": [
+    {
+     "key": "eyebrow",
+     "rect": [
+      64,
+      40,
+      241,
+      15
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "PVP · COMPETITIVE · LEVEL 3",
+       "ff": "Nunito",
+       "fw": 800,
+       "fs": 12.0,
+       "col": "#3B72B4",
+       "ls": 2.5,
+       "upper": false
+      }
+     ],
+     "sample": "PVP · COMPETITIVE · LEVEL 3",
+     "lines": 1
+    },
+    {
+     "key": "search_time",
+     "rect": [
+      906,
+      437,
+      39,
+      20
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "00:12",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 16.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "00:12",
+     "lines": 1
+    },
+    {
+     "key": "you_name",
+     "rect": [
+      160,
+      386,
+      400,
+      34
+     ],
+     "al": "center",
+     "runs": [
+      {
+       "c": "anhkhoa",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 28.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "anhkhoa",
+     "lines": 1
+    },
+    {
+     "key": "you_initial",
+     "rect": [
+      300,
+      254,
+      120,
+      66
+     ],
+     "al": "center",
+     "runs": [
+      {
+       "c": "A",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 55.0,
+       "col": "#FFFFFF",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "A",
+     "lines": 1
+    },
+    {
+     "key": "you_sub",
+     "rect": [
+      160,
+      500,
+      400,
+      16
+     ],
+     "al": "center",
+     "runs": [
+      {
+       "c": "Solo rank #4 · Antidote, Flare",
+       "ff": "Nunito",
+       "fw": 700,
+       "fs": 13.0,
+       "col": "#8DA3BA",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Solo rank #4 · Antidote, Flare",
+     "lines": 1
+    }
+   ],
+   "bars": [],
+   "pips": [],
+   "pills": [],
+   "hotspots": [
+    {
+     "n": "btn_Cancel",
+     "rect": [
+      1016,
+      624,
+      200,
+      52
+     ]
+    }
+   ],
+   "sprites": [],
+   "notes": []
+  },
+  "v3_11b_pvp_invite": {
+   "base": "v3_11b_pvp_invite/base.png",
+   "top": null,
+   "source_board": "v3_11b_pvp_invite",
+   "photos": [],
+   "texts": [
+    {
+     "key": "eyebrow",
+     "rect": [
+      64,
+      40,
+      159,
+      15
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "PVP · COMPETITIVE",
+       "ff": "Nunito",
+       "fw": 800,
+       "fs": 12.0,
+       "col": "#3B72B4",
+       "ls": 2.5,
+       "upper": false
+      }
+     ],
+     "sample": "PVP · COMPETITIVE",
+     "lines": 1
+    },
+    {
+     "key": "room_code",
+     "rect": [
+      96,
+      220,
+      496,
+      77
+     ],
+     "al": "center",
+     "runs": [
+      {
+       "c": "PM-4821",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 64.0,
+       "col": "#24415F",
+       "ls": 6.0,
+       "upper": false
+      }
+     ],
+     "sample": "PM-4821",
+     "lines": 1
+    },
+    {
+     "key": "host_name",
+     "rect": [
+      160,
+      506,
+      61,
+      18
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "anhkhoa",
+       "ff": "Nunito",
+       "fw": 800,
+       "fs": 15.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "anhkhoa",
+     "lines": 1
+    },
+    {
+     "key": "host_initial",
+     "rect": [
+      96,
+      510,
+      52,
+      29
+     ],
+     "al": "center",
+     "runs": [
+      {
+       "c": "A",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 24.0,
+       "col": "#FFFFFF",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "A",
+     "lines": 1
+    },
+    {
+     "key": "join_typed",
+     "rect": [
+      784,
+      299,
+      44,
+      22
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "____",
+       "ff": "Nunito",
+       "fw": 800,
+       "fs": 18.0,
+       "col": "#8DA3BA",
+       "ls": 2.0,
+       "upper": false
+      }
+     ],
+     "sample": "____",
+     "lines": 1
+    }
+   ],
+   "bars": [],
+   "pips": [],
+   "pills": [],
+   "hotspots": [
+    {
+     "n": "field_join",
+     "rect": [
+      688,
+      270,
+      496,
+      64
+     ]
+    },
+    {
+     "n": "btn_Copy code",
+     "rect": [
+      96,
+      370,
+      496,
+      54
+     ]
+    },
+    {
+     "n": "btn_Join room",
+     "rect": [
+      688,
+      354,
+      496,
+      54
+     ]
+    },
+    {
+     "n": "btn_Close room",
+     "rect": [
+      1016,
+      624,
+      200,
+      52
+     ]
+    }
+   ],
+   "sprites": [],
+   "notes": []
+  },
+  "v3_11c_pvp_found": {
+   "base": "v3_11c_pvp_found/base.png",
+   "top": null,
+   "source_board": "v3_11c_pvp_found",
+   "photos": [],
+   "texts": [
+    {
+     "key": "eyebrow",
+     "rect": [
+      64,
+      40,
+      241,
+      15
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "PVP · COMPETITIVE · LEVEL 3",
+       "ff": "Nunito",
+       "fw": 800,
+       "fs": 12.0,
+       "col": "#3B72B4",
+       "ls": 2.5,
+       "upper": false
+      }
+     ],
+     "sample": "PVP · COMPETITIVE · LEVEL 3",
+     "lines": 1
+    },
+    {
+     "key": "countdown",
+     "rect": [
+      580,
+      320,
+      120,
+      68
+     ],
+     "al": "center",
+     "runs": [
+      {
+       "c": "3",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 56.0,
+       "col": "#3B72B4",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "3",
+     "lines": 1
+    },
+    {
+     "key": "you_name",
+     "rect": [
+      160,
+      386,
+      400,
+      34
+     ],
+     "al": "center",
+     "runs": [
+      {
+       "c": "anhkhoa",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 28.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "anhkhoa",
+     "lines": 1
+    },
+    {
+     "key": "you_initial",
+     "rect": [
+      300,
+      254,
+      120,
+      66
+     ],
+     "al": "center",
+     "runs": [
+      {
+       "c": "A",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 55.0,
+       "col": "#FFFFFF",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "A",
+     "lines": 1
+    }
+   ],
+   "bars": [],
+   "pips": [],
+   "pills": [],
+   "hotspots": [
+    {
+     "n": "leave",
+     "rect": [
+      1060,
+      630,
+      160,
+      40
+     ]
+    }
+   ],
+   "sprites": [
+    {
+     "key": "countdown_arc",
+     "file": "sprites/v3_11c_pvp_found__countdown_arc.png",
+     "rect": [
+      585.3,
+      305.3,
+      109.3,
+      109.3
+     ],
+     "anchor": [
+      587,
+      307,
+      106,
+      106
+     ],
+     "default": true
+    }
+   ],
+   "notes": []
+  },
+  "v3_13_pvp_result": {
+   "base": "v3_13_pvp_result/base.png",
+   "top": null,
+   "source_board": "v3_13_pvp_result",
+   "photos": [],
+   "texts": [
+    {
+     "key": "title",
+     "rect": [
+      0,
+      74,
+      1280,
+      63
+     ],
+     "al": "center",
+     "runs": [
+      {
+       "c": "Victory!",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 52.0,
+       "col": "#3AA17A",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Victory!",
+     "lines": 1
+    },
+    {
+     "key": "eyebrow",
+     "rect": [
+      0,
+      138,
+      1280,
+      15
+     ],
+     "al": "center",
+     "runs": [
+      {
+       "c": "PVP · COMPETITIVE · LEVEL 3",
+       "ff": "Nunito",
+       "fw": 800,
+       "fs": 12.0,
+       "col": "#5D7894",
+       "ls": 2.5,
+       "upper": false
+      }
+     ],
+     "sample": "PVP · COMPETITIVE · LEVEL 3",
+     "lines": 1
+    },
+    {
+     "key": "you_name",
+     "rect": [
+      194,
+      196,
+      96,
+      29
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "anhkhoa",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 24.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "anhkhoa",
+     "lines": 1
+    },
+    {
+     "key": "you_initial",
+     "rect": [
+      124,
+      209,
+      56,
+      32
+     ],
+     "al": "center",
+     "runs": [
+      {
+       "c": "A",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 26.0,
+       "col": "#FFFFFF",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "A",
+     "lines": 1
+    },
+    {
+     "key": "you_score",
+     "rect": [
+      388,
+      412,
+      200,
+      101
+     ],
+     "al": "right",
+     "runs": [
+      {
+       "c": "31",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 84.0,
+       "col": "#3AA17A",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "31",
+     "lines": 1
+    },
+    {
+     "key": "you_row_label#0",
+     "rect": [
+      124,
+      280,
+      68,
+      20
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "Time left",
+       "ff": "Nunito",
+       "fw": 700,
+       "fs": 16.0,
+       "col": "#5D7894",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Time left",
+     "lines": 1
+    },
+    {
+     "key": "you_row_label#1",
+     "rect": [
+      124,
+      320,
+      107,
+      20
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "Antidote 1 × 5",
+       "ff": "Nunito",
+       "fw": 700,
+       "fs": 16.0,
+       "col": "#5D7894",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Antidote 1 × 5",
+     "lines": 1
+    },
+    {
+     "key": "you_row_label#2",
+     "rect": [
+      124,
+      360,
+      81,
+      20
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "Flare 2 × 3",
+       "ff": "Nunito",
+       "fw": 700,
+       "fs": 16.0,
+       "col": "#5D7894",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Flare 2 × 3",
+     "lines": 1
+    },
+    {
+     "key": "you_row_value#0",
+     "rect": [
+      456,
+      277,
+      132,
+      24
+     ],
+     "al": "right",
+     "runs": [
+      {
+       "c": "42",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 20.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "42",
+     "lines": 1
+    },
+    {
+     "key": "you_row_value#1",
+     "rect": [
+      456,
+      317,
+      132,
+      24
+     ],
+     "al": "right",
+     "runs": [
+      {
+       "c": "-5",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 20.0,
+       "col": "#E8676B",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "-5",
+     "lines": 1
+    },
+    {
+     "key": "you_row_value#2",
+     "rect": [
+      456,
+      357,
+      132,
+      24
+     ],
+     "al": "right",
+     "runs": [
+      {
+       "c": "-6",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 20.0,
+       "col": "#E8676B",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "-6",
+     "lines": 1
+    },
+    {
+     "key": "opp_name",
+     "rect": [
+      762,
+      196,
+      87,
+      29
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "Player 2",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 24.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Player 2",
+     "lines": 1
+    },
+    {
+     "key": "opp_initial",
+     "rect": [
+      692,
+      209,
+      56,
+      32
+     ],
+     "al": "center",
+     "runs": [
+      {
+       "c": "N",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 26.0,
+       "col": "#FFFFFF",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "N",
+     "lines": 1
+    },
+    {
+     "key": "opp_score",
+     "rect": [
+      956,
+      412,
+      200,
+      101
+     ],
+     "al": "right",
+     "runs": [
+      {
+       "c": "10",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 84.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "10",
+     "lines": 1
+    },
+    {
+     "key": "opp_row_label#0",
+     "rect": [
+      692,
+      280,
+      68,
+      20
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "Time left",
+       "ff": "Nunito",
+       "fw": 700,
+       "fs": 16.0,
+       "col": "#5D7894",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Time left",
+     "lines": 1
+    },
+    {
+     "key": "opp_row_label#1",
+     "rect": [
+      692,
+      320,
+      143,
+      20
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "Thermal scan 1 × 8",
+       "ff": "Nunito",
+       "fw": 700,
+       "fs": 16.0,
+       "col": "#5D7894",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Thermal scan 1 × 8",
+     "lines": 1
+    },
+    {
+     "key": "opp_row_value#0",
+     "rect": [
+      1024,
+      277,
+      132,
+      24
+     ],
+     "al": "right",
+     "runs": [
+      {
+       "c": "18",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 20.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "18",
+     "lines": 1
+    },
+    {
+     "key": "opp_row_value#1",
+     "rect": [
+      1024,
+      317,
+      132,
+      24
+     ],
+     "al": "right",
+     "runs": [
+      {
+       "c": "-8",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 20.0,
+       "col": "#E8676B",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "-8",
+     "lines": 1
+    }
+   ],
+   "bars": [],
+   "pips": [],
+   "pills": [
+    {
+     "key": "you_pill",
+     "rect": [
+      194,
+      228,
+      132,
+      26
+     ],
+     "radius": 13,
+     "pad": 12,
+     "font": {
+      "ff": "Nunito",
+      "fw": 900,
+      "fs": 11.0,
+      "ls": 1.0
+     },
+     "styles": {
+      "won": {
+       "bg": "#E2F4EA",
+       "fg": "#2A8763"
+      },
+      "lost": {
+       "bg": "#F5F9FE",
+       "fg": "#5D7894"
+      }
+     },
+     "sample": "won this match"
+    },
+    {
+     "key": "opp_pill",
+     "rect": [
+      762,
+      228,
+      96,
+      26
+     ],
+     "radius": 13,
+     "pad": 12,
+     "font": {
+      "ff": "Nunito",
+      "fw": 900,
+      "fs": 11.0,
+      "ls": 1.0
+     },
+     "styles": {
+      "won": {
+       "bg": "#E2F4EA",
+       "fg": "#2A8763"
+      },
+      "lost": {
+       "bg": "#F5F9FE",
+       "fg": "#5D7894"
+      }
+     },
+     "sample": "runner-up"
+    }
+   ],
+   "hotspots": [
+    {
+     "n": "btn_Back to album",
+     "rect": [
+      298,
+      612,
+      200,
+      54
+     ]
+    },
+    {
+     "n": "btn_Leaderboard",
+     "rect": [
+      510,
+      612,
+      200,
+      54
+     ]
+    },
+    {
+     "n": "btn_Rematch",
+     "rect": [
+      722,
+      612,
+      260,
+      54
+     ]
+    }
+   ],
+   "sprites": [
+    {
+     "key": "crown",
+     "file": "sprites/v3_13_pvp_result__crown.png",
+     "rect": [
+      616.0,
+      26.0,
+      48.0,
+      48.0
+     ],
+     "anchor": [
+      618,
+      28,
+      44,
+      44
+     ],
+     "default": true
+    },
+    {
+     "key": "sel:winner",
+     "file": "sprites/v3_13_pvp_result__sel_winner.png",
+     "rect": [
+      90.0,
+      166.0,
+      532.0,
+      368.0
+     ],
+     "anchor": [
+      96,
+      172,
+      520,
+      356
+     ],
+     "default": true,
+     "targets": {
+      "you": [
+       96,
+       172,
+       520,
+       356
+      ],
+      "opponent": [
+       664,
+       172,
+       520,
+       356
+      ]
+     }
+    }
+   ],
+   "notes": []
+  },
+  "v3_14_leaderboard": {
+   "base": "v3_14_leaderboard/base.png",
+   "top": null,
+   "source_board": "v3_14_leaderboard",
+   "photos": [],
+   "texts": [
+    {
+     "key": "you_rank",
+     "rect": [
+      680,
+      566,
+      28,
+      22
+     ],
+     "al": "center",
+     "runs": [
+      {
+       "c": "12",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 18.0,
+       "col": "#3B72B4",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "12",
+     "lines": 1
+    },
+    {
+     "key": "you_name",
+     "rect": [
+      768,
+      570,
+      102,
+      18
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "You · anhkhoa",
+       "ff": "Nunito",
+       "fw": 900,
+       "fs": 15.0,
+       "col": "#24415F",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "You · anhkhoa",
+     "lines": 1
+    },
+    {
+     "key": "you_score",
+     "rect": [
+      1056,
+      566,
+      136,
+      22
+     ],
+     "al": "right",
+     "runs": [
+      {
+       "c": "640",
+       "ff": "Baloo 2",
+       "fw": 800,
+       "fs": 18.0,
+       "col": "#3B72B4",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "640",
+     "lines": 1
+    }
+   ],
+   "bars": [],
+   "pips": [],
+   "pills": [],
+   "hotspots": [
+    {
+     "n": "tab_Solo",
+     "rect": [
+      806,
+      34,
+      88,
+      36
+     ]
+    },
+    {
+     "n": "tab_PvP",
+     "rect": [
+      894,
+      34,
+      86,
+      36
+     ]
+    },
+    {
+     "n": "tab_Leaderboard",
+     "rect": [
+      980,
+      34,
+      140,
+      36
+     ]
+    },
+    {
+     "n": "tab_Settings",
+     "rect": [
+      1120,
+      34,
+      114,
+      36
+     ]
+    },
+    {
+     "n": "seg_Solo",
+     "rect": [
+      662,
+      114,
+      120,
+      34
+     ]
+    },
+    {
+     "n": "seg_PvP · Competitive",
+     "rect": [
+      782,
+      114,
+      206,
+      34
+     ]
+    },
+    {
+     "n": "seg_PvP · Hunt & Hide",
+     "rect": [
+      988,
+      114,
+      222,
+      34
+     ]
+    }
+   ],
+   "sprites": [],
+   "notes": []
+  }
+ },
+ "sprites": {},
+ "colors": {
+  "sky_top": "#D7E8F8",
+  "sky_bottom": "#EEF6FD",
+  "card": "#FFFFFF",
+  "line": "#C9DCEF",
+  "primary": "#3B72B4",
+  "primary_dark": "#2A5A93",
+  "primary_soft": "#DCE9F7",
+  "ink": "#24415F",
+  "ink_soft": "#5D7894",
+  "muted": "#8DA3BA",
+  "health": "#E8676B",
+  "stamina": "#F2B544",
+  "safe": "#3AA17A",
+  "poison": "#8E74C9",
+  "bite": "#D2557A",
+  "warning": "#FBE3CC"
+ },
+ "fonts": {
+  "files": {
+   "Nunito": {
+    "600": "fonts/Nunito-600.ttf",
+    "700": "fonts/Nunito-700.ttf",
+    "800": "fonts/Nunito-800.ttf",
+    "900": "fonts/Nunito-900.ttf"
+   },
+   "Baloo 2": {
+    "700": "fonts/Baloo2-700.ttf",
+    "800": "fonts/Baloo2-800.ttf"
+   },
+   "Patrick Hand": {
+    "400": "fonts/PatrickHand-Regular.ttf"
+   },
+   "Inter": {
+    "800": "fonts/Inter-Bold.ttf"
+   }
+  }
+ },
+ "sample_photo": "sample/sample_room.png"
+}

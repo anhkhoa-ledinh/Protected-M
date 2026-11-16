@@ -1,0 +1,15 @@
+{
+  "camera_intrinsics": {
+    "fx": 960.0,
+    "fy": 960.0,
+    "cx": 640.0,
+    "cy": 360.0,
+    "dist_coeffs": [0.0, 0.0, 0.0, 0.0, 0.0]
+  },
+  "tracking": {
+    "model_complexity": 1,
+    "min_detection_confidence": 0.5,
+    "min_tracking_confidence": 0.5,
+    "simulation_fallback": true
+  }
+}

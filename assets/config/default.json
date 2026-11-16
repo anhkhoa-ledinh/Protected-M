@@ -1,0 +1,92 @@
+{
+  "camera": {
+    "device_id": 0,
+    "width": 1280,
+    "height": 720,
+    "fps": 60,
+    "buffer_size": 1,
+    "fourcc": "MJPG",
+    "async_capture": true,
+    "queue_size": 2
+  },
+  "screen": {
+    "_comment": "KHONG CO HIEU LUC. app.py::_load_screen_calibration cho assets/config/screen.json thang, nen kich thuoc man hinh THAT dang dung la 344 x 194 mm chu khong phai 531 x 299 o duoi. Giu lai vi ScreenSettings can gia tri mac dinh khi screen.json vang mat. Sua kich thuoc thi sua screen.json.",
+    "width_mm": 531.0,
+    "height_mm": 299.0,
+    "width_px": 1920,
+    "height_px": 1080,
+    "monitor_index": 0,
+    "center_x_m": 0.0,
+    "center_y_m": 0.0,
+    "center_z_m": 0.0
+  },
+  "webcam_mount": {
+    "offset_x_mm": 0.0,
+    "offset_y_mm": 0.0,
+    "offset_z_mm": 0.0
+  },
+  "user": {
+    "ipd_mm": 63.0,
+    "viewing_distance_mm": 600.0
+  },
+  "filter": {
+    "type": "one_euro",
+    "min_cutoff": 1.0,
+    "beta": 0.007,
+    "ema_alpha": 0.35,
+    "process_noise": 1.0,
+    "measurement_noise": 4.0,
+    "prediction_enabled": true,
+    "prediction_frames": 1.5,
+    "max_prediction_ms": 25.0,
+    "adaptive_prediction": true
+  },
+  "tracking": {
+    "model_complexity": 1,
+    "min_detection_confidence": 0.5,
+    "min_tracking_confidence": 0.5,
+    "simulation_fallback": true
+  },
+  "adaptive_quality": {
+    "enabled": true,
+    "target_fps": 60.0,
+    "min_fps": 45.0,
+    "quality_levels": [
+      100,
+      75,
+      50,
+      35
+    ]
+  },
+  "optimization": {
+    "target_latency_ms": 20.0,
+    "track_max_fps": 120.0,
+    "tracking_downscale": true,
+    "fast_solve_pnp": true,
+    "cache_projection": true,
+    "render_extrapolation": true,
+    "latency_ema_alpha": 0.15
+  },
+  "renderer": {
+    "vsync": true,
+    "triple_buffer": true,
+    "gpu_camera_uniforms": true,
+    "shader_path": "assets/shaders",
+    "window_width": 1280,
+    "window_height": 720,
+    "window_title": "HCPD — Virtual Room",
+    "msaa_samples": 4,
+    "fullscreen": true
+  },
+  "debug": {
+    "z_diagnostics": false
+  },
+  "ui": {
+    "webcam_preview_enabled": true,
+    "webcam_preview_corner": "bottom-right",
+    "webcam_preview_scale": 0.18,
+    "webcam_preview_margin_px": 16,
+    "webcam_preview_mirror": true,
+    "webcam_preview_landmarks": true
+  }
+}

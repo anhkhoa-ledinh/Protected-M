@@ -1,0 +1,11299 @@
+{
+ "version": 1,
+ "design_size": [
+  1280,
+  720
+ ],
+ "image_scale": 1.5,
+ "tokens": {
+  "ngay": {
+   "bg": "#E6F1FB",
+   "surface": "#F7FBFF",
+   "surface_2": "#DCEAF7",
+   "border": "#BCCFE6",
+   "primary": "#396FA7",
+   "primary_hover": "#2E5F94",
+   "accent": "#9D5B82",
+   "success": "#287363",
+   "warning": "#8A6030",
+   "danger": "#AD4867",
+   "text": "#294865",
+   "text_muted": "#526F8E",
+   "sky_on_color": "#F7FBFF",
+   "sky_horizon": "#B4CCE9",
+   "sky_shadow": "#7198C2",
+   "sky_success_tint": "#D3EEE3",
+   "sky_warning_tint": "#F5E8D6",
+   "sky_danger_tint": "#F5DEE7",
+   "sky_info_tint": "#DFEAF8",
+   "sky_lavender": "#E8E3F6",
+   "sky_pink": "#F8DBE8",
+   "sky_blue": "#9ACCF1"
+  },
+  "dem": {
+   "bg": "#092747",
+   "surface": "#153D61",
+   "surface_2": "#205071",
+   "border": "#507D9B",
+   "primary": "#95C8E5",
+   "primary_hover": "#B8DEEF",
+   "accent": "#C8E7EF",
+   "success": "#9DD5C7",
+   "warning": "#E9D5A5",
+   "danger": "#E8AABB",
+   "text": "#EDF5F7",
+   "text_muted": "#A8C6DA",
+   "sky_on_color": "#092747",
+   "sky_horizon": "#133D61",
+   "sky_shadow": "#03182F",
+   "sky_success_tint": "#1D4B50",
+   "sky_warning_tint": "#4A463A",
+   "sky_danger_tint": "#4B354E",
+   "sky_info_tint": "#234C6C",
+   "sky_lavender": "#2B5B7A",
+   "sky_pink": "#639CBD",
+   "sky_blue": "#377CA3"
+  }
+ },
+ "fonts": {
+  "dynamic_text_styles": [
+   {
+    "family": "Barlow Condensed",
+    "weight": 700,
+    "size": 15
+   },
+   {
+    "family": "Barlow Condensed",
+    "weight": 700,
+    "size": 18
+   },
+   {
+    "family": "Inter",
+    "weight": 400,
+    "size": 18
+   },
+   {
+    "family": "Inter",
+    "weight": 500,
+    "size": 15
+   },
+   {
+    "family": "Inter",
+    "weight": 500,
+    "size": 40
+   },
+   {
+    "family": "Inter",
+    "weight": 600,
+    "size": 16
+   },
+   {
+    "family": "Inter",
+    "weight": 700,
+    "size": 20
+   },
+   {
+    "family": "Inter",
+    "weight": 700,
+    "size": 22
+   },
+   {
+    "family": "Inter",
+    "weight": 700,
+    "size": 40
+   },
+   {
+    "family": "Inter",
+    "weight": 700,
+    "size": 48
+   },
+   {
+    "family": "Inter",
+    "weight": 700,
+    "size": 50
+   },
+   {
+    "family": "Inter",
+    "weight": 700,
+    "size": 72
+   },
+   {
+    "family": "Inter",
+    "weight": 700,
+    "size": 84
+   },
+   {
+    "family": "Patrick Hand",
+    "weight": 400,
+    "size": 17
+   },
+   {
+    "family": "Patrick Hand",
+    "weight": 400,
+    "size": 18
+   },
+   {
+    "family": "Patrick Hand",
+    "weight": 400,
+    "size": 22
+   },
+   {
+    "family": "Patrick Hand",
+    "weight": 400,
+    "size": 24
+   },
+   {
+    "family": "Patrick Hand",
+    "weight": 400,
+    "size": 30
+   }
+  ],
+  "files": {
+   "Inter": {
+    "400": "fonts/Inter-Regular.ttf",
+    "500": "fonts/Inter-Medium.ttf",
+    "600": "fonts/Inter-SemiBold.ttf",
+    "700": "fonts/Inter-Bold.ttf"
+   },
+   "Barlow Condensed": {
+    "400": "fonts/BarlowCondensed-Regular.ttf",
+    "600": "fonts/BarlowCondensed-SemiBold.ttf",
+    "700": "fonts/BarlowCondensed-Bold.ttf"
+   },
+   "Patrick Hand": {
+    "400": "fonts/PatrickHand-Regular.ttf"
+   }
+  },
+  "glyph_ranges_hint": "0x0020-0x00FF, 0x0100-0x024F, 0x0300-0x036F, 0x1E00-0x1EFF, 0x2000-0x206F, 0x2190-0x21FF, 0x2200-0x22FF, 0x25A0-0x25FF, 0x2700-0x27BF"
+ },
+ "screens": {
+  "moi_01_dang_nhap": {
+   "size": [
+    1280,
+    720
+   ],
+   "base": {
+    "ngay": "moi_01_dang_nhap/base_ngay.png",
+    "dem": "moi_01_dang_nhap/base_dem.png"
+   },
+   "top": {
+    "ngay": "moi_01_dang_nhap/top_ngay.png",
+    "dem": "moi_01_dang_nhap/top_dem.png"
+   },
+   "photos": [],
+   "dyn": [
+    {
+     "key": "field:TÊN NGƯỜI CHƠI",
+     "n": "",
+     "t": "x",
+     "rect": [
+      96,
+      222,
+      86.8,
+      36
+     ],
+     "c": "anhkhoa",
+     "ff": "Patrick Hand",
+     "fw": 400,
+     "fs": 30,
+     "col": "text",
+     "al": "left",
+     "rot": 0,
+     "children": []
+    },
+    {
+     "key": "field:MẬT KHẨU",
+     "n": "",
+     "t": "x",
+     "rect": [
+      96,
+      315.5,
+      84.5,
+      36
+     ],
+     "c": "••••••••",
+     "ff": "Patrick Hand",
+     "fw": 400,
+     "fs": 30,
+     "col": "text",
+     "al": "left",
+     "rot": 0,
+     "children": []
+    }
+   ],
+   "hotspots": [
+    {
+     "n": "o_TÊN NGƯỜI CHƠI",
+     "rect": [
+      96,
+      200,
+      520,
+      63.5
+     ],
+     "label": "TÊN NGƯỜI CHƠI"
+    },
+    {
+     "n": "o_MẬT KHẨU",
+     "rect": [
+      96,
+      293.5,
+      520,
+      63.5
+     ],
+     "label": "MẬT KHẨU"
+    },
+    {
+     "n": "nut_Mở album",
+     "rect": [
+      96,
+      423,
+      132.8,
+      52
+     ],
+     "label": "Mở album"
+    }
+   ],
+   "texts": [
+    {
+     "c": "PROTECTED M",
+     "rect": [
+      96,
+      72,
+      154.4,
+      21.6
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 18
+    },
+    {
+     "c": "Album này của",
+     "rect": [
+      96,
+      112,
+      347.3,
+      57.6
+     ],
+     "ff": "Inter",
+     "fs": 48
+    },
+    {
+     "c": "TÊN NGƯỜI CHƠI",
+     "rect": [
+      96,
+      200,
+      101.3,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "MẬT KHẨU",
+     "rect": [
+      96,
+      293.5,
+      64.1,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "Mở album",
+     "rect": [
+      122,
+      438.8,
+      80.8,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Chưa có album? Tạo album mới",
+     "rect": [
+      248.8,
+      438.8,
+      255.8,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Tấm ảnh đầu tiên của bạn\nsẽ nằm ở đây",
+     "rect": [
+      810,
+      300,
+      240,
+      48
+     ],
+     "ff": "Patrick Hand",
+     "fs": 20
+    }
+   ]
+  },
+  "moi_01b_dang_ky": {
+   "size": [
+    1280,
+    720
+   ],
+   "base": {
+    "ngay": "moi_01b_dang_ky/base_ngay.png",
+    "dem": "moi_01b_dang_ky/base_dem.png"
+   },
+   "top": {
+    "ngay": "moi_01b_dang_ky/top_ngay.png",
+    "dem": "moi_01b_dang_ky/top_dem.png"
+   },
+   "photos": [],
+   "dyn": [
+    {
+     "key": "field:TÊN NGƯỜI CHƠI",
+     "n": "",
+     "t": "x",
+     "rect": [
+      96,
+      222,
+      86.8,
+      36
+     ],
+     "c": "anhkhoa",
+     "ff": "Patrick Hand",
+     "fw": 400,
+     "fs": 30,
+     "col": "text",
+     "al": "left",
+     "rot": 0,
+     "children": []
+    },
+    {
+     "key": "field:MẬT KHẨU",
+     "n": "",
+     "t": "x",
+     "rect": [
+      96,
+      315.5,
+      84.5,
+      36
+     ],
+     "c": "••••••••",
+     "ff": "Patrick Hand",
+     "fw": 400,
+     "fs": 30,
+     "col": "text",
+     "al": "left",
+     "rot": 0,
+     "children": []
+    },
+    {
+     "key": "field:NHẬP LẠI MẬT KHẨU",
+     "n": "",
+     "t": "x",
+     "rect": [
+      96,
+      409,
+      84.5,
+      36
+     ],
+     "c": "••••••••",
+     "ff": "Patrick Hand",
+     "fw": 400,
+     "fs": 30,
+     "col": "text",
+     "al": "left",
+     "rot": 0,
+     "children": []
+    }
+   ],
+   "hotspots": [
+    {
+     "n": "o_TÊN NGƯỜI CHƠI",
+     "rect": [
+      96,
+      200,
+      520,
+      63.5
+     ],
+     "label": "TÊN NGƯỜI CHƠI"
+    },
+    {
+     "n": "o_MẬT KHẨU",
+     "rect": [
+      96,
+      293.5,
+      520,
+      63.5
+     ],
+     "label": "MẬT KHẨU"
+    },
+    {
+     "n": "o_NHẬP LẠI MẬT KHẨU",
+     "rect": [
+      96,
+      387,
+      520,
+      63.5
+     ],
+     "label": "NHẬP LẠI MẬT KHẨU"
+    },
+    {
+     "n": "nut_Tạo album",
+     "rect": [
+      96,
+      516.5,
+      136.9,
+      52
+     ],
+     "label": "Tạo album"
+    }
+   ],
+   "texts": [
+    {
+     "c": "PROTECTED M",
+     "rect": [
+      96,
+      72,
+      154.4,
+      21.6
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 18
+    },
+    {
+     "c": "Album này của",
+     "rect": [
+      96,
+      112,
+      347.3,
+      57.6
+     ],
+     "ff": "Inter",
+     "fs": 48
+    },
+    {
+     "c": "TÊN NGƯỜI CHƠI",
+     "rect": [
+      96,
+      200,
+      101.3,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "MẬT KHẨU",
+     "rect": [
+      96,
+      293.5,
+      64.1,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "NHẬP LẠI MẬT KHẨU",
+     "rect": [
+      96,
+      387,
+      127,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "Tạo album",
+     "rect": [
+      122,
+      532.3,
+      84.9,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Đã có album? Đăng nhập",
+     "rect": [
+      252.9,
+      532.3,
+      203.5,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Tấm ảnh đầu tiên của bạn\nsẽ nằm ở đây",
+     "rect": [
+      810,
+      300,
+      240,
+      48
+     ],
+     "ff": "Patrick Hand",
+     "fs": 20
+    }
+   ]
+  },
+  "moi_01c_loi_dang_nhap": {
+   "size": [
+    1280,
+    720
+   ],
+   "base": {
+    "ngay": "moi_01c_loi_dang_nhap/base_ngay.png",
+    "dem": "moi_01c_loi_dang_nhap/base_dem.png"
+   },
+   "top": {
+    "ngay": "moi_01c_loi_dang_nhap/top_ngay.png",
+    "dem": "moi_01c_loi_dang_nhap/top_dem.png"
+   },
+   "photos": [],
+   "dyn": [
+    {
+     "key": "field:TÊN NGƯỜI CHƠI",
+     "n": "",
+     "t": "x",
+     "rect": [
+      96,
+      222,
+      86.8,
+      36
+     ],
+     "c": "anhkhoa",
+     "ff": "Patrick Hand",
+     "fw": 400,
+     "fs": 30,
+     "col": "text",
+     "al": "left",
+     "rot": 0,
+     "children": []
+    },
+    {
+     "key": "field:MẬT KHẨU",
+     "n": "",
+     "t": "x",
+     "rect": [
+      96,
+      315.5,
+      63.4,
+      36
+     ],
+     "c": "••••••",
+     "ff": "Patrick Hand",
+     "fw": 400,
+     "fs": 30,
+     "col": "text_muted",
+     "al": "left",
+     "rot": 0,
+     "children": []
+    }
+   ],
+   "hotspots": [
+    {
+     "n": "o_TÊN NGƯỜI CHƠI",
+     "rect": [
+      96,
+      200,
+      520,
+      63.5
+     ],
+     "label": "TÊN NGƯỜI CHƠI"
+    },
+    {
+     "n": "o_MẬT KHẨU",
+     "rect": [
+      96,
+      293.5,
+      520,
+      64.5
+     ],
+     "label": "MẬT KHẨU"
+    },
+    {
+     "n": "nut_Mở album",
+     "rect": [
+      96,
+      424,
+      132.8,
+      52
+     ],
+     "label": "Mở album"
+    }
+   ],
+   "texts": [
+    {
+     "c": "PROTECTED M",
+     "rect": [
+      96,
+      72,
+      154.4,
+      21.6
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 18
+    },
+    {
+     "c": "Album này của",
+     "rect": [
+      96,
+      112,
+      347.3,
+      57.6
+     ],
+     "ff": "Inter",
+     "fs": 48
+    },
+    {
+     "c": "TÊN NGƯỜI CHƠI",
+     "rect": [
+      96,
+      200,
+      101.3,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "MẬT KHẨU",
+     "rect": [
+      96,
+      293.5,
+      64.1,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "Mở album",
+     "rect": [
+      122,
+      439.8,
+      80.8,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Quên mật khẩu?",
+     "rect": [
+      248.8,
+      439.8,
+      133.1,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "sai mật khẩu rồi, thử lại nhé",
+     "rect": [
+      249.4,
+      293.2,
+      260.1,
+      44.7
+     ],
+     "ff": "Patrick Hand",
+     "fs": 26
+    },
+    {
+     "c": "Tấm ảnh đầu tiên của bạn\nsẽ nằm ở đây",
+     "rect": [
+      810,
+      300,
+      240,
+      48
+     ],
+     "ff": "Patrick Hand",
+     "fs": 20
+    }
+   ]
+  },
+  "moi_02_menu_bia": {
+   "size": [
+    1280,
+    720
+   ],
+   "base": {
+    "ngay": "moi_02_menu_bia/base_ngay.png",
+    "dem": "moi_02_menu_bia/base_dem.png"
+   },
+   "top": {
+    "ngay": "moi_02_menu_bia/top_ngay.png",
+    "dem": "moi_02_menu_bia/top_dem.png"
+   },
+   "photos": [
+    {
+     "n": "cua_so_anh (ảnh mẫu)",
+     "kind": "photo",
+     "rect": [
+      538,
+      128,
+      190,
+      100
+     ]
+    }
+   ],
+   "dyn": [],
+   "hotspots": [
+    {
+     "n": "tab_CHƠI ĐƠN",
+     "rect": [
+      972,
+      140,
+      168,
+      66
+     ],
+     "label": "CHƠI ĐƠN"
+    },
+    {
+     "n": "tab_PVP",
+     "rect": [
+      972,
+      218,
+      168,
+      66
+     ],
+     "label": "PVP"
+    },
+    {
+     "n": "tab_XẾP HẠNG",
+     "rect": [
+      972,
+      296,
+      168,
+      66
+     ],
+     "label": "XẾP HẠNG"
+    },
+    {
+     "n": "tab_CÀI ĐẶT",
+     "rect": [
+      972,
+      374,
+      168,
+      66
+     ],
+     "label": "CÀI ĐẶT"
+    },
+    {
+     "n": "nhan_dan_bia",
+     "rect": [
+      429.2,
+      405.3,
+      387.8,
+      66.6
+     ],
+     "label": "Có thứ gì đó đang gặm ký ức của bạn."
+    }
+   ],
+   "texts": [
+    {
+     "c": "CHƠI ĐƠN",
+     "rect": [
+      1007,
+      160.4,
+      82.1,
+      25.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 21
+    },
+    {
+     "c": "›",
+     "rect": [
+      1099.1,
+      157.4,
+      11.2,
+      31.2
+     ],
+     "ff": "Inter",
+     "fs": 26
+    },
+    {
+     "c": "PVP",
+     "rect": [
+      1006,
+      238.4,
+      34,
+      25.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 21
+    },
+    {
+     "c": "XẾP HẠNG",
+     "rect": [
+      1006,
+      316.4,
+      86,
+      25.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 21
+    },
+    {
+     "c": "CÀI ĐẶT",
+     "rect": [
+      1006,
+      394.4,
+      69.8,
+      25.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 21
+    },
+    {
+     "c": "PROTECTED M",
+     "rect": [
+      326,
+      262,
+      614,
+      91.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 76
+    },
+    {
+     "c": "Có thứ gì đó đang gặm ký ức của bạn.",
+     "rect": [
+      450.6,
+      417,
+      345.1,
+      43.2
+     ],
+     "ff": "Patrick Hand",
+     "fs": 26
+    },
+    {
+     "c": "Người chơi: anhkhoa · Đăng xuất",
+     "rect": [
+      40,
+      676,
+      247.8,
+      19.2
+     ],
+     "ff": "Inter",
+     "fs": 16
+    },
+    {
+     "c": "Phím mũi tên để chọn · Enter để mở",
+     "rect": [
+      896,
+      676,
+      268.4,
+      19.2
+     ],
+     "ff": "Inter",
+     "fs": 16
+    }
+   ]
+  },
+  "moi_02b_dang_tach_lop_0": {
+   "size": [
+    1280,
+    720
+   ],
+   "base": {
+    "ngay": "moi_02b_dang_tach_lop_0/base_ngay.png",
+    "dem": "moi_02b_dang_tach_lop_0/base_dem.png"
+   },
+   "top": {
+    "ngay": "moi_02b_dang_tach_lop_0/top_ngay.png",
+    "dem": "moi_02b_dang_tach_lop_0/top_dem.png"
+   },
+   "photos": [
+    {
+     "n": "lop_gan (ảnh mẫu)",
+     "kind": "photo",
+     "rect": [
+      222,
+      240,
+      384,
+      244
+     ]
+    }
+   ],
+   "dyn": [
+    {
+     "key": "pct",
+     "n": "",
+     "t": "x",
+     "rect": [
+      720,
+      214,
+      46.6,
+      86.4
+     ],
+     "c": "0",
+     "ff": "Inter",
+     "fw": 700,
+     "fs": 72,
+     "col": "text",
+     "al": "left",
+     "rot": 0,
+     "children": []
+    },
+    {
+     "key": "pct_track",
+     "n": "thanh",
+     "t": "b",
+     "rect": [
+      720,
+      316.4,
+      400,
+      12
+     ],
+     "rot": 0,
+     "f": "sky_info_tint",
+     "sw": 0,
+     "r": "0",
+     "op": 1,
+     "children": [
+      {
+       "n": "muc",
+       "t": "r",
+       "rect": [
+        720,
+        316.4,
+        2,
+        12
+       ],
+       "rot": 0,
+       "f": "primary",
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      }
+     ]
+    },
+    {
+     "key": "pct_bar",
+     "n": "muc",
+     "t": "r",
+     "rect": [
+      720,
+      316.4,
+      2,
+      12
+     ],
+     "rot": 0,
+     "f": "primary",
+     "sw": 0,
+     "r": "0",
+     "op": 1,
+     "children": []
+    },
+    {
+     "key": "step_dot_0",
+     "n": "cham",
+     "t": "e",
+     "rect": [
+      720,
+      348.2,
+      14,
+      14
+     ],
+     "rot": 0,
+     "s": "text_muted",
+     "sw": 2,
+     "r": "ellipse",
+     "op": 1,
+     "children": []
+    },
+    {
+     "key": "step_dot_1",
+     "n": "cham",
+     "t": "e",
+     "rect": [
+      720,
+      385.8,
+      14,
+      14
+     ],
+     "rot": 0,
+     "s": "text_muted",
+     "sw": 2,
+     "r": "ellipse",
+     "op": 1,
+     "children": []
+    },
+    {
+     "key": "step_dot_2",
+     "n": "cham",
+     "t": "e",
+     "rect": [
+      720,
+      423.4,
+      14,
+      14
+     ],
+     "rot": 0,
+     "s": "text_muted",
+     "sw": 2,
+     "r": "ellipse",
+     "op": 1,
+     "children": []
+    },
+    {
+     "key": "step_dot_3",
+     "n": "cham",
+     "t": "e",
+     "rect": [
+      720,
+      461,
+      14,
+      14
+     ],
+     "rot": 0,
+     "s": "text_muted",
+     "sw": 2,
+     "r": "ellipse",
+     "op": 1,
+     "children": []
+    }
+   ],
+   "hotspots": [],
+   "texts": [
+    {
+     "c": "Đang mở tấm ảnh",
+     "rect": [
+      96,
+      72,
+      305.4,
+      43.2
+     ],
+     "ff": "Inter",
+     "fs": 36
+    },
+    {
+     "c": "đang đọc ảnh…",
+     "rect": [
+      96,
+      124,
+      126.6,
+      28.8
+     ],
+     "ff": "Patrick Hand",
+     "fs": 24
+    },
+    {
+     "c": "%",
+     "rect": [
+      776.6,
+      235.6,
+      36.6,
+      43.2
+     ],
+     "ff": "Inter",
+     "fs": 36
+    },
+    {
+     "c": "Đọc ảnh",
+     "rect": [
+      744,
+      344.4,
+      70.5,
+      21.6
+     ],
+     "ff": "Inter",
+     "fs": 18
+    },
+    {
+     "c": "Ước lượng độ sâu",
+     "rect": [
+      744,
+      382,
+      148.9,
+      21.6
+     ],
+     "ff": "Inter",
+     "fs": 18
+    },
+    {
+     "c": "Cắt thành 4 lớp",
+     "rect": [
+      744,
+      419.6,
+      130,
+      21.6
+     ],
+     "ff": "Inter",
+     "fs": 18
+    },
+    {
+     "c": "Lấp phần bị che ở tấm nền",
+     "rect": [
+      744,
+      457.2,
+      225.3,
+      21.6
+     ],
+     "ff": "Inter",
+     "fs": 18
+    },
+    {
+     "c": "ảnh mới lần đầu mất khoảng 20–30 giây",
+     "rect": [
+      720,
+      560,
+      312.2,
+      26.4
+     ],
+     "ff": "Patrick Hand",
+     "fs": 22
+    }
+   ]
+  },
+  "moi_02b_dang_tach_lop": {
+   "size": [
+    1280,
+    720
+   ],
+   "base": {
+    "ngay": "moi_02b_dang_tach_lop/base_ngay.png",
+    "dem": "moi_02b_dang_tach_lop/base_dem.png"
+   },
+   "top": {
+    "ngay": "moi_02b_dang_tach_lop/top_ngay.png",
+    "dem": "moi_02b_dang_tach_lop/top_dem.png"
+   },
+   "photos": [
+    {
+     "n": "lop_gan (ảnh mẫu)",
+     "kind": "photo",
+     "rect": [
+      222,
+      240,
+      384,
+      244
+     ]
+    }
+   ],
+   "dyn": [
+    {
+     "key": "pct",
+     "n": "",
+     "t": "x",
+     "rect": [
+      720,
+      214,
+      88.1,
+      86.4
+     ],
+     "c": "62",
+     "ff": "Inter",
+     "fw": 700,
+     "fs": 72,
+     "col": "text",
+     "al": "left",
+     "rot": 0,
+     "children": []
+    },
+    {
+     "key": "pct_track",
+     "n": "thanh",
+     "t": "b",
+     "rect": [
+      720,
+      316.4,
+      400,
+      12
+     ],
+     "rot": 0,
+     "f": "sky_info_tint",
+     "sw": 0,
+     "r": "0",
+     "op": 1,
+     "children": [
+      {
+       "n": "muc",
+       "t": "r",
+       "rect": [
+        720,
+        316.4,
+        248,
+        12
+       ],
+       "rot": 0,
+       "f": "primary",
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      }
+     ]
+    },
+    {
+     "key": "pct_bar",
+     "n": "muc",
+     "t": "r",
+     "rect": [
+      720,
+      316.4,
+      248,
+      12
+     ],
+     "rot": 0,
+     "f": "primary",
+     "sw": 0,
+     "r": "0",
+     "op": 1,
+     "children": []
+    },
+    {
+     "key": "step_dot_0",
+     "n": "cham",
+     "t": "e",
+     "rect": [
+      720,
+      348.2,
+      14,
+      14
+     ],
+     "rot": 0,
+     "f": "success",
+     "sw": 2,
+     "r": "ellipse",
+     "op": 1,
+     "children": []
+    },
+    {
+     "key": "step_dot_1",
+     "n": "cham",
+     "t": "e",
+     "rect": [
+      720,
+      385.8,
+      14,
+      14
+     ],
+     "rot": 0,
+     "f": "success",
+     "sw": 2,
+     "r": "ellipse",
+     "op": 1,
+     "children": []
+    },
+    {
+     "key": "step_dot_2",
+     "n": "cham",
+     "t": "e",
+     "rect": [
+      720,
+      423.4,
+      14,
+      14
+     ],
+     "rot": 0,
+     "s": "text_muted",
+     "sw": 2,
+     "r": "ellipse",
+     "op": 1,
+     "children": []
+    },
+    {
+     "key": "step_dot_3",
+     "n": "cham",
+     "t": "e",
+     "rect": [
+      720,
+      461,
+      14,
+      14
+     ],
+     "rot": 0,
+     "s": "text_muted",
+     "sw": 2,
+     "r": "ellipse",
+     "op": 1,
+     "children": []
+    }
+   ],
+   "hotspots": [],
+   "texts": [
+    {
+     "c": "Đang tách ảnh thành 4 lớp",
+     "rect": [
+      96,
+      72,
+      458.5,
+      43.2
+     ],
+     "ff": "Inter",
+     "fs": 36
+    },
+    {
+     "c": "đừng rời mắt khỏi tấm ảnh",
+     "rect": [
+      96,
+      124,
+      227.2,
+      28.8
+     ],
+     "ff": "Patrick Hand",
+     "fs": 24
+    },
+    {
+     "c": "%",
+     "rect": [
+      818.1,
+      235.6,
+      36.6,
+      43.2
+     ],
+     "ff": "Inter",
+     "fs": 36
+    },
+    {
+     "c": "Đọc ảnh",
+     "rect": [
+      744,
+      344.4,
+      71.4,
+      21.6
+     ],
+     "ff": "Inter",
+     "fs": 18
+    },
+    {
+     "c": "Ước lượng độ sâu",
+     "rect": [
+      744,
+      382,
+      150.3,
+      21.6
+     ],
+     "ff": "Inter",
+     "fs": 18
+    },
+    {
+     "c": "Cắt thành 4 lớp",
+     "rect": [
+      744,
+      419.6,
+      130,
+      21.6
+     ],
+     "ff": "Inter",
+     "fs": 18
+    },
+    {
+     "c": "Lấp phần bị che ở tấm nền",
+     "rect": [
+      744,
+      457.2,
+      225.3,
+      21.6
+     ],
+     "ff": "Inter",
+     "fs": 18
+    },
+    {
+     "c": "ảnh mới lần đầu mất khoảng 20–30 giây",
+     "rect": [
+      720,
+      560,
+      312.2,
+      26.4
+     ],
+     "ff": "Patrick Hand",
+     "fs": 22
+    }
+   ]
+  },
+  "moi_02b_dang_tach_lop_100": {
+   "size": [
+    1280,
+    720
+   ],
+   "base": {
+    "ngay": "moi_02b_dang_tach_lop_100/base_ngay.png",
+    "dem": "moi_02b_dang_tach_lop_100/base_dem.png"
+   },
+   "top": {
+    "ngay": "moi_02b_dang_tach_lop_100/top_ngay.png",
+    "dem": "moi_02b_dang_tach_lop_100/top_dem.png"
+   },
+   "photos": [
+    {
+     "n": "lop_gan (ảnh mẫu)",
+     "kind": "photo",
+     "rect": [
+      222,
+      240,
+      384,
+      244
+     ]
+    }
+   ],
+   "dyn": [
+    {
+     "key": "pct",
+     "n": "",
+     "t": "x",
+     "rect": [
+      720,
+      214,
+      122.2,
+      86.4
+     ],
+     "c": "100",
+     "ff": "Inter",
+     "fw": 700,
+     "fs": 72,
+     "col": "success",
+     "al": "left",
+     "rot": 0,
+     "children": []
+    },
+    {
+     "key": "pct_track",
+     "n": "thanh",
+     "t": "b",
+     "rect": [
+      720,
+      316.4,
+      400,
+      12
+     ],
+     "rot": 0,
+     "f": "sky_info_tint",
+     "sw": 0,
+     "r": "0",
+     "op": 1,
+     "children": [
+      {
+       "n": "muc",
+       "t": "r",
+       "rect": [
+        720,
+        316.4,
+        400,
+        12
+       ],
+       "rot": 0,
+       "f": "success",
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      }
+     ]
+    },
+    {
+     "key": "pct_bar",
+     "n": "muc",
+     "t": "r",
+     "rect": [
+      720,
+      316.4,
+      400,
+      12
+     ],
+     "rot": 0,
+     "f": "success",
+     "sw": 0,
+     "r": "0",
+     "op": 1,
+     "children": []
+    },
+    {
+     "key": "step_dot_0",
+     "n": "cham",
+     "t": "e",
+     "rect": [
+      720,
+      348.2,
+      14,
+      14
+     ],
+     "rot": 0,
+     "f": "success",
+     "sw": 2,
+     "r": "ellipse",
+     "op": 1,
+     "children": []
+    },
+    {
+     "key": "step_dot_1",
+     "n": "cham",
+     "t": "e",
+     "rect": [
+      720,
+      385.8,
+      14,
+      14
+     ],
+     "rot": 0,
+     "f": "success",
+     "sw": 2,
+     "r": "ellipse",
+     "op": 1,
+     "children": []
+    },
+    {
+     "key": "step_dot_2",
+     "n": "cham",
+     "t": "e",
+     "rect": [
+      720,
+      423.4,
+      14,
+      14
+     ],
+     "rot": 0,
+     "f": "success",
+     "sw": 2,
+     "r": "ellipse",
+     "op": 1,
+     "children": []
+    },
+    {
+     "key": "step_dot_3",
+     "n": "cham",
+     "t": "e",
+     "rect": [
+      720,
+      461,
+      14,
+      14
+     ],
+     "rot": 0,
+     "f": "success",
+     "sw": 2,
+     "r": "ellipse",
+     "op": 1,
+     "children": []
+    }
+   ],
+   "hotspots": [
+    {
+     "n": "nut_Tiếp: chọn trang bị",
+     "rect": [
+      720,
+      560,
+      206.1,
+      52
+     ],
+     "label": "Tiếp: chọn trang bị"
+    }
+   ],
+   "texts": [
+    {
+     "c": "Ảnh đã tách xong 4 lớp",
+     "rect": [
+      96,
+      72,
+      402,
+      43.2
+     ],
+     "ff": "Inter",
+     "fs": 36
+    },
+    {
+     "c": "bọ đã vào chỗ nấp",
+     "rect": [
+      96,
+      124,
+      150.1,
+      28.8
+     ],
+     "ff": "Patrick Hand",
+     "fs": 24
+    },
+    {
+     "c": "%",
+     "rect": [
+      852.2,
+      235.6,
+      36.6,
+      43.2
+     ],
+     "ff": "Inter",
+     "fs": 36
+    },
+    {
+     "c": "Đọc ảnh",
+     "rect": [
+      744,
+      344.4,
+      71.4,
+      21.6
+     ],
+     "ff": "Inter",
+     "fs": 18
+    },
+    {
+     "c": "Ước lượng độ sâu",
+     "rect": [
+      744,
+      382,
+      150.3,
+      21.6
+     ],
+     "ff": "Inter",
+     "fs": 18
+    },
+    {
+     "c": "Cắt thành 4 lớp",
+     "rect": [
+      744,
+      419.6,
+      132.2,
+      21.6
+     ],
+     "ff": "Inter",
+     "fs": 18
+    },
+    {
+     "c": "Lấp phần bị che ở tấm nền",
+     "rect": [
+      744,
+      457.2,
+      227.2,
+      21.6
+     ],
+     "ff": "Inter",
+     "fs": 18
+    },
+    {
+     "c": "Tiếp: chọn trang bị",
+     "rect": [
+      746,
+      575.8,
+      154.1,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    }
+   ]
+  },
+  "moi_02c_cai_dat": {
+   "size": [
+    1280,
+    720
+   ],
+   "base": {
+    "ngay": "moi_02c_cai_dat/base_ngay.png",
+    "dem": "moi_02c_cai_dat/base_dem.png"
+   },
+   "top": {
+    "ngay": "moi_02c_cai_dat/top_ngay.png",
+    "dem": "moi_02c_cai_dat/top_dem.png"
+   },
+   "photos": [],
+   "dyn": [],
+   "hotspots": [
+    {
+     "n": "tab_CHƠI ĐƠN",
+     "rect": [
+      1166,
+      96,
+      114,
+      58
+     ],
+     "label": "CHƠI ĐƠN"
+    },
+    {
+     "n": "tab_PVP",
+     "rect": [
+      1166,
+      166,
+      114,
+      58
+     ],
+     "label": "PVP"
+    },
+    {
+     "n": "tab_XẾP HẠNG",
+     "rect": [
+      1166,
+      236,
+      114,
+      58
+     ],
+     "label": "XẾP HẠNG"
+    },
+    {
+     "n": "tab_CÀI ĐẶT",
+     "rect": [
+      1166,
+      306,
+      114,
+      58
+     ],
+     "label": "CÀI ĐẶT"
+    },
+    {
+     "n": "o_Ngày",
+     "rect": [
+      516,
+      164,
+      120,
+      48
+     ],
+     "label": "Ngày"
+    },
+    {
+     "n": "o_Đêm",
+     "rect": [
+      636,
+      164,
+      120,
+      48
+     ],
+     "label": "Đêm"
+    },
+    {
+     "n": "chon_webcam",
+     "rect": [
+      516,
+      253,
+      240,
+      48
+     ],
+     "label": "Webcam tích hợp"
+    },
+    {
+     "n": "nut_Căn lại (C)",
+     "rect": [
+      616.9,
+      342,
+      139.1,
+      52
+     ],
+     "label": "Căn lại (C)"
+    }
+   ],
+   "texts": [
+    {
+     "c": "CHƠI ĐƠN",
+     "rect": [
+      1192,
+      115.4,
+      63,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "PVP",
+     "rect": [
+      1192,
+      185.4,
+      26.1,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "XẾP HẠNG",
+     "rect": [
+      1192,
+      255.4,
+      65.9,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "CÀI ĐẶT",
+     "rect": [
+      1192,
+      325.4,
+      53.6,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "Cài đặt",
+     "rect": [
+      96,
+      52,
+      122.6,
+      43.2
+     ],
+     "ff": "Inter",
+     "fs": 36
+    },
+    {
+     "c": "Giao diện",
+     "rect": [
+      116,
+      166,
+      90.7,
+      24
+     ],
+     "ff": "Inter",
+     "fs": 20
+    },
+    {
+     "c": "Ngày hợp phòng sáng đèn",
+     "rect": [
+      116,
+      192,
+      280,
+      18
+     ],
+     "ff": "Inter",
+     "fs": 15
+    },
+    {
+     "c": "Ngày",
+     "rect": [
+      553.2,
+      177.2,
+      45.6,
+      21.6
+     ],
+     "ff": "Inter",
+     "fs": 18
+    },
+    {
+     "c": "Đêm",
+     "rect": [
+      676.1,
+      177.2,
+      39.9,
+      21.6
+     ],
+     "ff": "Inter",
+     "fs": 18
+    },
+    {
+     "c": "Webcam",
+     "rect": [
+      116,
+      255,
+      85,
+      24
+     ],
+     "ff": "Inter",
+     "fs": 20
+    },
+    {
+     "c": "Chọn camera nhìn thấy mặt bạn",
+     "rect": [
+      116,
+      281,
+      280,
+      18
+     ],
+     "ff": "Inter",
+     "fs": 15
+    },
+    {
+     "c": "Webcam tích hợp",
+     "rect": [
+      531,
+      266.8,
+      141.6,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "▾",
+     "rect": [
+      732,
+      266.2,
+      9,
+      21.6
+     ],
+     "ff": "Inter",
+     "fs": 18
+    },
+    {
+     "c": "Căn chỗ ngồi",
+     "rect": [
+      116,
+      346,
+      126.8,
+      24
+     ],
+     "ff": "Inter",
+     "fs": 20
+    },
+    {
+     "c": "Ngồi cách màn hình khoảng 60 cm",
+     "rect": [
+      116,
+      372,
+      280,
+      18
+     ],
+     "ff": "Inter",
+     "fs": 15
+    },
+    {
+     "c": "Căn lại (C)",
+     "rect": [
+      643.9,
+      357.8,
+      85.1,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Âm thanh",
+     "rect": [
+      116,
+      435,
+      92.9,
+      24
+     ],
+     "ff": "Inter",
+     "fs": 20
+    },
+    {
+     "c": "70%",
+     "rect": [
+      116,
+      461,
+      280,
+      18
+     ],
+     "ff": "Inter",
+     "fs": 15
+    },
+    {
+     "c": "Đang thấy khuôn mặt",
+     "rect": [
+      820,
+      452,
+      184.4,
+      21.6
+     ],
+     "ff": "Inter",
+     "fs": 18
+    }
+   ]
+  },
+  "moi_02d_mat_ket_noi": {
+   "size": [
+    1280,
+    720
+   ],
+   "base": {
+    "ngay": "moi_02d_mat_ket_noi/base_ngay.png",
+    "dem": "moi_02d_mat_ket_noi/base_dem.png"
+   },
+   "top": {
+    "ngay": "moi_02d_mat_ket_noi/top_ngay.png",
+    "dem": "moi_02d_mat_ket_noi/top_dem.png"
+   },
+   "photos": [
+    {
+     "n": "tran_dang_choi (ảnh mẫu)",
+     "kind": "photo",
+     "rect": [
+      96,
+      80,
+      980,
+      560
+     ]
+    }
+   ],
+   "dyn": [],
+   "hotspots": [
+    {
+     "n": "tab_CHƠI ĐƠN",
+     "rect": [
+      1166,
+      96,
+      114,
+      58
+     ],
+     "label": "CHƠI ĐƠN"
+    },
+    {
+     "n": "tab_XẾP HẠNG",
+     "rect": [
+      1166,
+      236,
+      114,
+      58
+     ],
+     "label": "XẾP HẠNG"
+    },
+    {
+     "n": "tab_CÀI ĐẶT",
+     "rect": [
+      1166,
+      306,
+      114,
+      58
+     ],
+     "label": "CÀI ĐẶT"
+    },
+    {
+     "n": "tab_PVP",
+     "rect": [
+      1166,
+      166,
+      114,
+      58
+     ],
+     "label": "PVP"
+    },
+    {
+     "n": "nut_Thử lại ngay",
+     "rect": [
+      425.5,
+      371.7,
+      153.7,
+      56
+     ],
+     "label": "Thử lại ngay"
+    },
+    {
+     "n": "nut_Về album",
+     "rect": [
+      589.8,
+      368,
+      131.6,
+      55.4
+     ],
+     "label": "Về album"
+    }
+   ],
+   "texts": [
+    {
+     "c": "CHƠI ĐƠN",
+     "rect": [
+      1192,
+      115.4,
+      63,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "XẾP HẠNG",
+     "rect": [
+      1192,
+      255.4,
+      65.9,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "CÀI ĐẶT",
+     "rect": [
+      1192,
+      325.4,
+      53.6,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "PVP",
+     "rect": [
+      1192,
+      185.4,
+      26.1,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "Mất kết nối với đối thủ",
+     "rect": [
+      421.9,
+      229.7,
+      400.9,
+      48.8
+     ],
+     "ff": "Inter",
+     "fs": 32
+    },
+    {
+     "c": "Trận được giữ nguyên. Đang thử nối lại…",
+     "rect": [
+      423.3,
+      282,
+      400.4,
+      32.1
+     ],
+     "ff": "Inter",
+     "fs": 18
+    },
+    {
+     "c": "còn 12 giây",
+     "rect": [
+      424.2,
+      325.2,
+      113.4,
+      36.5
+     ],
+     "ff": "Patrick Hand",
+     "fs": 28
+    },
+    {
+     "c": "Thử lại ngay",
+     "rect": [
+      451.9,
+      388.2,
+      100.9,
+      23
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Về album",
+     "rect": [
+      617.2,
+      384.5,
+      76.8,
+      22.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    }
+   ]
+  },
+  "moi_03_chon_cap": {
+   "size": [
+    1280,
+    720
+   ],
+   "base": {
+    "ngay": "moi_03_chon_cap/base_ngay.png",
+    "dem": "moi_03_chon_cap/base_dem.png"
+   },
+   "top": {
+    "ngay": "moi_03_chon_cap/top_ngay.png",
+    "dem": "moi_03_chon_cap/top_dem.png"
+   },
+   "photos": [
+    {
+     "n": "anh_cap_1",
+     "kind": "photo",
+     "rect": [
+      74,
+      190,
+      172,
+      110
+     ]
+    },
+    {
+     "n": "anh_cap_2",
+     "kind": "photo",
+     "rect": [
+      290,
+      190,
+      172,
+      110
+     ]
+    },
+    {
+     "n": "anh_cap_3",
+     "kind": "photo",
+     "rect": [
+      506,
+      190,
+      172,
+      110
+     ]
+    },
+    {
+     "n": "anh_cap_4",
+     "kind": "photo",
+     "rect": [
+      722,
+      190,
+      172,
+      110
+     ]
+    },
+    {
+     "n": "anh_cap_5",
+     "kind": "photo",
+     "rect": [
+      938,
+      190,
+      172,
+      110
+     ]
+    }
+   ],
+   "dyn": [],
+   "hotspots": [
+    {
+     "n": "tab_PVP",
+     "rect": [
+      1166,
+      166,
+      114,
+      58
+     ],
+     "label": "PVP"
+    },
+    {
+     "n": "tab_XẾP HẠNG",
+     "rect": [
+      1166,
+      236,
+      114,
+      58
+     ],
+     "label": "XẾP HẠNG"
+    },
+    {
+     "n": "tab_CÀI ĐẶT",
+     "rect": [
+      1166,
+      306,
+      114,
+      58
+     ],
+     "label": "CÀI ĐẶT"
+    },
+    {
+     "n": "tab_CHƠI ĐƠN",
+     "rect": [
+      1166,
+      96,
+      114,
+      58
+     ],
+     "label": "CHƠI ĐƠN"
+    },
+    {
+     "n": "cap_1_tui",
+     "rect": [
+      60,
+      176,
+      200,
+      138
+     ]
+    },
+    {
+     "n": "cap_2_tui",
+     "rect": [
+      276,
+      176,
+      200,
+      138
+     ]
+    },
+    {
+     "n": "cap_3_tui",
+     "rect": [
+      492,
+      176,
+      200,
+      138
+     ],
+     "sel": true
+    },
+    {
+     "n": "cap_4_tui",
+     "rect": [
+      708,
+      176,
+      200,
+      138
+     ]
+    },
+    {
+     "n": "cap_5_tui",
+     "rect": [
+      924,
+      176,
+      200,
+      138
+     ]
+    },
+    {
+     "n": "nut_Quay lại",
+     "rect": [
+      812,
+      628,
+      120,
+      52
+     ],
+     "label": "Quay lại"
+    },
+    {
+     "n": "nut_Tiếp: chọn ảnh",
+     "rect": [
+      944,
+      628,
+      174,
+      52
+     ],
+     "label": "Tiếp: chọn ảnh"
+    }
+   ],
+   "texts": [
+    {
+     "c": "PVP",
+     "rect": [
+      1192,
+      185.4,
+      26.1,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "XẾP HẠNG",
+     "rect": [
+      1192,
+      255.4,
+      65.9,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "CÀI ĐẶT",
+     "rect": [
+      1192,
+      325.4,
+      53.6,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "CHƠI ĐƠN",
+     "rect": [
+      1192,
+      115.4,
+      63,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "Chọn cấp độ",
+     "rect": [
+      60,
+      56,
+      220.5,
+      43.2
+     ],
+     "ff": "Inter",
+     "fs": 36
+    },
+    {
+     "c": "cấp càng cao, bọ càng khôn và ảnh càng bị gặm nặng",
+     "rect": [
+      62,
+      108,
+      446.6,
+      28.8
+     ],
+     "ff": "Patrick Hand",
+     "fs": 24
+    },
+    {
+     "c": "CẤP 1",
+     "rect": [
+      60,
+      342,
+      34.4,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "Dễ",
+     "rect": [
+      60,
+      370,
+      39.5,
+      36
+     ],
+     "ff": "Inter",
+     "fs": 30
+    },
+    {
+     "c": "Bọ chỉ nấp sau đồ vật, không chống trả.",
+     "rect": [
+      60,
+      416,
+      196,
+      49.3
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "6 bọ · 03:00 · 2 ô",
+     "rect": [
+      60,
+      475.3,
+      111.6,
+      20.4
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 17
+    },
+    {
+     "c": "CẤP 2",
+     "rect": [
+      276,
+      342,
+      36.8,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "Cơ bản",
+     "rect": [
+      276,
+      370,
+      103,
+      36
+     ],
+     "ff": "Inter",
+     "fs": 30
+    },
+    {
+     "c": "Bọ bắt đầu ngụy trang theo màu ảnh.",
+     "rect": [
+      276,
+      416,
+      196,
+      49.3
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "8 bọ · 02:30 · 3 ô",
+     "rect": [
+      276,
+      475.3,
+      111.3,
+      20.4
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 17
+    },
+    {
+     "c": "CẤP 3",
+     "rect": [
+      492,
+      342,
+      36.7,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "Khó",
+     "rect": [
+      492,
+      370,
+      58.7,
+      36
+     ],
+     "ff": "Inter",
+     "fs": 30
+    },
+    {
+     "c": "Bọ ẩn kỹ hơn và bắt đầu phản công.",
+     "rect": [
+      492,
+      416,
+      196,
+      49.3
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "10 bọ · 02:30 · 3 ô",
+     "rect": [
+      492,
+      475.3,
+      116.9,
+      20.4
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 17
+    },
+    {
+     "c": "CẤP 4",
+     "rect": [
+      708,
+      342,
+      37.4,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "Xâm thực",
+     "rect": [
+      708,
+      370,
+      139.5,
+      36
+     ],
+     "ff": "Inter",
+     "fs": 30
+    },
+    {
+     "c": "Bọ tiến hoá đủ, dùng mọi đòn hiểm.",
+     "rect": [
+      708,
+      416,
+      196,
+      49.3
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "12 bọ · 02:00 · 4 ô",
+     "rect": [
+      708,
+      475.3,
+      117.8,
+      20.4
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 17
+    },
+    {
+     "c": "CẤP 5",
+     "rect": [
+      924,
+      342,
+      36.8,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "Châu Á",
+     "rect": [
+      924,
+      370,
+      106.5,
+      36
+     ],
+     "ff": "Inter",
+     "fs": 30
+    },
+    {
+     "c": "Như Xâm thực, thêm stamina và phạt quá giờ.",
+     "rect": [
+      924,
+      416,
+      196,
+      73.9
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "12 bọ · 02:00 · 4 ô",
+     "rect": [
+      924,
+      499.9,
+      117.8,
+      20.4
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 17
+    },
+    {
+     "c": "STAMINA · PHẠT QUÁ GIỜ",
+     "rect": [
+      934,
+      534.3,
+      142.5,
+      16.8
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 14
+    },
+    {
+     "c": "số bọ · thời gian · ô vật phẩm là số đề xuất",
+     "rect": [
+      60,
+      640,
+      300.1,
+      24
+     ],
+     "ff": "Patrick Hand",
+     "fs": 20
+    },
+    {
+     "c": "Quay lại",
+     "rect": [
+      839,
+      643.8,
+      66,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Tiếp: chọn ảnh",
+     "rect": [
+      970,
+      643.8,
+      122,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    }
+   ]
+  },
+  "moi_04_chon_anh": {
+   "size": [
+    1280,
+    720
+   ],
+   "base": {
+    "ngay": "moi_04_chon_anh/base_ngay.png",
+    "dem": "moi_04_chon_anh/base_dem.png"
+   },
+   "top": {
+    "ngay": "moi_04_chon_anh/top_ngay.png",
+    "dem": "moi_04_chon_anh/top_dem.png"
+   },
+   "photos": [
+    {
+     "n": "ky_uc_1",
+     "kind": "photo",
+     "rect": [
+      748,
+      170,
+      150,
+      95
+     ]
+    },
+    {
+     "n": "ky_uc_2",
+     "kind": "photo",
+     "rect": [
+      932,
+      170,
+      150,
+      95
+     ]
+    },
+    {
+     "n": "ky_uc_3",
+     "kind": "photo",
+     "rect": [
+      748,
+      304,
+      150,
+      95
+     ]
+    },
+    {
+     "n": "ky_uc_4",
+     "kind": "photo",
+     "rect": [
+      932,
+      304,
+      150,
+      95
+     ]
+    }
+   ],
+   "dyn": [],
+   "hotspots": [
+    {
+     "n": "tab_PVP",
+     "rect": [
+      1166,
+      166,
+      114,
+      58
+     ],
+     "label": "PVP"
+    },
+    {
+     "n": "tab_XẾP HẠNG",
+     "rect": [
+      1166,
+      236,
+      114,
+      58
+     ],
+     "label": "XẾP HẠNG"
+    },
+    {
+     "n": "tab_CÀI ĐẶT",
+     "rect": [
+      1166,
+      306,
+      114,
+      58
+     ],
+     "label": "CÀI ĐẶT"
+    },
+    {
+     "n": "tab_CHƠI ĐƠN",
+     "rect": [
+      1166,
+      96,
+      114,
+      58
+     ],
+     "label": "CHƠI ĐƠN"
+    },
+    {
+     "n": "tui_trong_tui",
+     "rect": [
+      60,
+      130,
+      640,
+      470
+     ]
+    },
+    {
+     "n": "nut_Chọn từ máy",
+     "rect": [
+      301,
+      353.2,
+      158,
+      52
+     ],
+     "label": "Chọn từ máy"
+    },
+    {
+     "n": "ky_uc_1_tui",
+     "rect": [
+      740,
+      162,
+      166,
+      111
+     ],
+     "sel": true
+    },
+    {
+     "n": "ky_uc_2_tui",
+     "rect": [
+      924,
+      162,
+      166,
+      111
+     ]
+    },
+    {
+     "n": "ky_uc_3_tui",
+     "rect": [
+      740,
+      296,
+      166,
+      111
+     ]
+    },
+    {
+     "n": "ky_uc_4_tui",
+     "rect": [
+      924,
+      296,
+      166,
+      111
+     ]
+    },
+    {
+     "n": "nut_Quay lại",
+     "rect": [
+      760,
+      628,
+      120,
+      52
+     ],
+     "label": "Quay lại"
+    },
+    {
+     "n": "nut_Tách lớp & tiếp tục",
+     "rect": [
+      892,
+      628,
+      203.3,
+      52
+     ],
+     "label": "Tách lớp & tiếp tục"
+    }
+   ],
+   "texts": [
+    {
+     "c": "PVP",
+     "rect": [
+      1192,
+      185.4,
+      26.1,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "XẾP HẠNG",
+     "rect": [
+      1192,
+      255.4,
+      65.9,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "CÀI ĐẶT",
+     "rect": [
+      1192,
+      325.4,
+      53.6,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "CHƠI ĐƠN",
+     "rect": [
+      1192,
+      115.4,
+      63,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "Đặt một tấm ảnh vào túi",
+     "rect": [
+      60,
+      56,
+      413.2,
+      43.2
+     ],
+     "ff": "Inter",
+     "fs": 36
+    },
+    {
+     "c": "CẤP 3 · KHÓ",
+     "rect": [
+      531,
+      73,
+      68.6,
+      16.8
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 14
+    },
+    {
+     "c": "Kéo-thả một tấm ảnh vào đây",
+     "rect": [
+      208.7,
+      260,
+      342.6,
+      28.8
+     ],
+     "ff": "Inter",
+     "fs": 24
+    },
+    {
+     "c": "JPG, PNG hoặc WEBP · ảnh gia đình, chuyến đi, góc phòng",
+     "rect": [
+      142.6,
+      300.8,
+      474.9,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Chọn từ máy",
+     "rect": [
+      328,
+      369,
+      104,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "KÝ ỨC GẦN ĐÂY",
+     "rect": [
+      740,
+      132,
+      96.3,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "bị gặm 60%",
+     "rect": [
+      748,
+      410,
+      82.1,
+      24
+     ],
+     "ff": "Patrick Hand",
+     "fs": 20
+    },
+    {
+     "c": "Ảnh sẽ được tách thành 4 lớp",
+     "rect": [
+      740,
+      450,
+      255.1,
+      21.6
+     ],
+     "ff": "Inter",
+     "fs": 18
+    },
+    {
+     "c": "Bọ trốn giữa các lớp. Nghiêng đầu để nhìn ra sau.",
+     "rect": [
+      740,
+      477.6,
+      350,
+      38.4
+     ],
+     "ff": "Inter",
+     "fs": 16
+    },
+    {
+     "c": "Quay lại",
+     "rect": [
+      787,
+      643.8,
+      66,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Tách lớp & tiếp tục",
+     "rect": [
+      918,
+      643.8,
+      151.3,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    }
+   ]
+  },
+  "moi_05_trang_bi": {
+   "size": [
+    1280,
+    720
+   ],
+   "base": {
+    "ngay": "moi_05_trang_bi/base_ngay.png",
+    "dem": "moi_05_trang_bi/base_dem.png"
+   },
+   "top": {
+    "ngay": "moi_05_trang_bi/top_ngay.png",
+    "dem": "moi_05_trang_bi/top_dem.png"
+   },
+   "photos": [],
+   "dyn": [],
+   "hotspots": [
+    {
+     "n": "tab_PVP",
+     "rect": [
+      1166,
+      166,
+      114,
+      58
+     ],
+     "label": "PVP"
+    },
+    {
+     "n": "tab_XẾP HẠNG",
+     "rect": [
+      1166,
+      236,
+      114,
+      58
+     ],
+     "label": "XẾP HẠNG"
+    },
+    {
+     "n": "tab_CÀI ĐẶT",
+     "rect": [
+      1166,
+      306,
+      114,
+      58
+     ],
+     "label": "CÀI ĐẶT"
+    },
+    {
+     "n": "tab_CHƠI ĐƠN",
+     "rect": [
+      1166,
+      96,
+      114,
+      58
+     ],
+     "label": "CHƠI ĐƠN"
+    },
+    {
+     "n": "vu_khi_0_tui",
+     "rect": [
+      60,
+      148,
+      260,
+      112
+     ],
+     "sel": true
+    },
+    {
+     "n": "vu_khi_1_tui",
+     "rect": [
+      60,
+      274,
+      260,
+      112
+     ]
+    },
+    {
+     "n": "vu_khi_2_tui",
+     "rect": [
+      60,
+      400,
+      260,
+      112
+     ]
+    },
+    {
+     "n": "cho_da_boc_Pháo sáng",
+     "rect": [
+      364,
+      160,
+      116,
+      128
+     ]
+    },
+    {
+     "n": "cho_da_boc_Thuốc giải",
+     "rect": [
+      488,
+      160,
+      116,
+      128
+     ]
+    },
+    {
+     "n": "sticker_Khiên axit",
+     "rect": [
+      612,
+      160,
+      116,
+      128
+     ],
+     "label": "◇"
+    },
+    {
+     "n": "sticker_Kính lọc",
+     "rect": [
+      736,
+      160,
+      116,
+      128
+     ],
+     "label": "◉"
+    },
+    {
+     "n": "sticker_La bàn",
+     "rect": [
+      364,
+      300,
+      116,
+      128
+     ],
+     "label": "↻"
+    },
+    {
+     "n": "sticker_Máy quét nhiệt",
+     "rect": [
+      488,
+      300,
+      116,
+      128
+     ],
+     "label": "≋"
+    },
+    {
+     "n": "sticker_Nước tăng lực",
+     "rect": [
+      612,
+      300,
+      116,
+      128
+     ],
+     "label": "ϟ"
+    },
+    {
+     "n": "sticker_Bom khói",
+     "rect": [
+      736,
+      300,
+      116,
+      128
+     ],
+     "label": "○"
+    },
+    {
+     "n": "o_1",
+     "rect": [
+      894.4,
+      143.7,
+      253.2,
+      104.7
+     ],
+     "label": "+"
+    },
+    {
+     "n": "o_2",
+     "rect": [
+      894.8,
+      252.7,
+      252.4,
+      102.5
+     ],
+     "label": "✦"
+    },
+    {
+     "n": "o_3_trong",
+     "rect": [
+      896,
+      364,
+      250,
+      96
+     ],
+     "label": "phím 3 · còn trống"
+    },
+    {
+     "n": "nut_Quay lại",
+     "rect": [
+      880,
+      628,
+      120,
+      52
+     ],
+     "label": "Quay lại"
+    },
+    {
+     "n": "nut_Bắt đầu",
+     "rect": [
+      1012,
+      628,
+      114,
+      52
+     ],
+     "label": "Bắt đầu"
+    }
+   ],
+   "texts": [
+    {
+     "c": "PVP",
+     "rect": [
+      1192,
+      185.4,
+      26.1,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "XẾP HẠNG",
+     "rect": [
+      1192,
+      255.4,
+      65.9,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "CÀI ĐẶT",
+     "rect": [
+      1192,
+      325.4,
+      53.6,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "CHƠI ĐƠN",
+     "rect": [
+      1192,
+      115.4,
+      63,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "Mang gì vào trận?",
+     "rect": [
+      60,
+      50,
+      312.7,
+      43.2
+     ],
+     "ff": "Inter",
+     "fs": 36
+    },
+    {
+     "c": "cấp 3 · bọ có axit và chất độc",
+     "rect": [
+      400,
+      60,
+      246.9,
+      28.8
+     ],
+     "ff": "Patrick Hand",
+     "fs": 24
+    },
+    {
+     "c": "VŨ KHÍ · CHỌN 1",
+     "rect": [
+      60,
+      120,
+      99.1,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "Súng chính xác",
+     "rect": [
+      92,
+      170,
+      149.6,
+      24
+     ],
+     "ff": "Inter",
+     "fs": 20
+    },
+    {
+     "c": "Tâm nhỏ, ít đạn. Diệt từng con ẩn kỹ.",
+     "rect": [
+      92,
+      198,
+      200,
+      36
+     ],
+     "ff": "Inter",
+     "fs": 15
+    },
+    {
+     "c": "Súng quét vùng",
+     "rect": [
+      92,
+      296,
+      153.9,
+      24
+     ],
+     "ff": "Inter",
+     "fs": 20
+    },
+    {
+     "c": "Một phát trúng nhiều con đứng gần.",
+     "rect": [
+      92,
+      324,
+      200,
+      36
+     ],
+     "ff": "Inter",
+     "fs": 15
+    },
+    {
+     "c": "Súng nhiều đạn",
+     "rect": [
+      92,
+      422,
+      151.5,
+      24
+     ],
+     "ff": "Inter",
+     "fs": 20
+    },
+    {
+     "c": "Băng lớn, bắn hụt ít bị phạt hơn.",
+     "rect": [
+      92,
+      450,
+      200,
+      36
+     ],
+     "ff": "Inter",
+     "fs": 15
+    },
+    {
+     "c": "TỜ STICKER VẬT PHẨM",
+     "rect": [
+      352,
+      120,
+      142.1,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "◇",
+     "rect": [
+      633,
+      179.8,
+      18,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Khiên axit",
+     "rect": [
+      625,
+      211,
+      92,
+      18
+     ],
+     "ff": "Inter",
+     "fs": 15
+    },
+    {
+     "c": "Chặn 1 đòn axit",
+     "rect": [
+      625,
+      233,
+      92,
+      31.2
+     ],
+     "ff": "Inter",
+     "fs": 13
+    },
+    {
+     "c": "TRỌNG SỐ 4",
+     "rect": [
+      625,
+      268.2,
+      64.5,
+      15.6
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 13
+    },
+    {
+     "c": "◉",
+     "rect": [
+      758.6,
+      179.8,
+      14.8,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Kính lọc",
+     "rect": [
+      749,
+      211,
+      92,
+      18
+     ],
+     "ff": "Inter",
+     "fs": 15
+    },
+    {
+     "c": "Lộ bọ ảo giác",
+     "rect": [
+      749,
+      233,
+      92,
+      15.6
+     ],
+     "ff": "Inter",
+     "fs": 13
+    },
+    {
+     "c": "TRỌNG SỐ 4",
+     "rect": [
+      749,
+      252.6,
+      64.5,
+      15.6
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 13
+    },
+    {
+     "c": "↻",
+     "rect": [
+      385.9,
+      319.8,
+      16.2,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "La bàn",
+     "rect": [
+      377,
+      351,
+      92,
+      18
+     ],
+     "ff": "Inter",
+     "fs": 15
+    },
+    {
+     "c": "Hết mất hướng",
+     "rect": [
+      377,
+      373,
+      92,
+      15.6
+     ],
+     "ff": "Inter",
+     "fs": 13
+    },
+    {
+     "c": "TRỌNG SỐ 2",
+     "rect": [
+      377,
+      392.6,
+      63.9,
+      15.6
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 13
+    },
+    {
+     "c": "≋",
+     "rect": [
+      510.9,
+      319.8,
+      14.3,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Máy quét nhiệt",
+     "rect": [
+      501,
+      351,
+      92,
+      36
+     ],
+     "ff": "Inter",
+     "fs": 15
+    },
+    {
+     "c": "Lộ bọ vài giây",
+     "rect": [
+      501,
+      391,
+      92,
+      15.6
+     ],
+     "ff": "Inter",
+     "fs": 13
+    },
+    {
+     "c": "TRỌNG SỐ 8",
+     "rect": [
+      501,
+      410.6,
+      64,
+      15.6
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 13
+    },
+    {
+     "c": "ϟ",
+     "rect": [
+      638.1,
+      319.8,
+      7.8,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Nước tăng lực",
+     "rect": [
+      625,
+      351,
+      92,
+      36
+     ],
+     "ff": "Inter",
+     "fs": 15
+    },
+    {
+     "c": "Hồi stamina",
+     "rect": [
+      625,
+      391,
+      92,
+      15.6
+     ],
+     "ff": "Inter",
+     "fs": 13
+    },
+    {
+     "c": "TRỌNG SỐ 3",
+     "rect": [
+      625,
+      410.6,
+      63.9,
+      15.6
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 13
+    },
+    {
+     "c": "○",
+     "rect": [
+      758.2,
+      319.8,
+      15.5,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Bom khói",
+     "rect": [
+      749,
+      351,
+      92,
+      18
+     ],
+     "ff": "Inter",
+     "fs": 15
+    },
+    {
+     "c": "Bọ ngừng phản công",
+     "rect": [
+      749,
+      373,
+      92,
+      31.2
+     ],
+     "ff": "Inter",
+     "fs": 13
+    },
+    {
+     "c": "TRỌNG SỐ 6",
+     "rect": [
+      749,
+      408.2,
+      64,
+      15.6
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 13
+    },
+    {
+     "c": "Ô VẬT PHẨM · 2/3",
+     "rect": [
+      896,
+      120,
+      112.2,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "+",
+     "rect": [
+      923.9,
+      188.8,
+      12.3,
+      20.8
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Thuốc giải",
+     "rect": [
+      958.4,
+      175.8,
+      92.6,
+      24.8
+     ],
+     "ff": "Inter",
+     "fs": 18
+    },
+    {
+     "c": "phím 1 · trọng số 5",
+     "rect": [
+      959.1,
+      196.3,
+      121.6,
+      21
+     ],
+     "ff": "Inter",
+     "fs": 14
+    },
+    {
+     "c": "✦",
+     "rect": [
+      922.6,
+      291.2,
+      14.8,
+      20.8
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Pháo sáng",
+     "rect": [
+      959,
+      283.2,
+      92.3,
+      24
+     ],
+     "ff": "Inter",
+     "fs": 18
+    },
+    {
+     "c": "phím 2 · trọng số 3",
+     "rect": [
+      958.5,
+      304.8,
+      124.5,
+      20
+     ],
+     "ff": "Inter",
+     "fs": 14
+    },
+    {
+     "c": "phím 3 · còn trống",
+     "rect": [
+      961.7,
+      401.2,
+      118.7,
+      21.6
+     ],
+     "ff": "Patrick Hand",
+     "fs": 18
+    },
+    {
+     "c": "Gợi ý: bọ cấp này phun axit và chất độc. Mang Thuốc giải hoặc Khiên axit.",
+     "rect": [
+      368,
+      540,
+      480,
+      40.8
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Quay lại",
+     "rect": [
+      907,
+      643.8,
+      66,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Bắt đầu",
+     "rect": [
+      1038,
+      643.8,
+      62,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    }
+   ]
+  },
+  "moi_05b_trang_bi_chua_chon": {
+   "size": [
+    1280,
+    720
+   ],
+   "base": {
+    "ngay": "moi_05b_trang_bi_chua_chon/base_ngay.png",
+    "dem": "moi_05b_trang_bi_chua_chon/base_dem.png"
+   },
+   "top": {
+    "ngay": "moi_05b_trang_bi_chua_chon/top_ngay.png",
+    "dem": "moi_05b_trang_bi_chua_chon/top_dem.png"
+   },
+   "photos": [],
+   "dyn": [],
+   "hotspots": [
+    {
+     "n": "tab_PVP",
+     "rect": [
+      1166,
+      166,
+      114,
+      58
+     ],
+     "label": "PVP"
+    },
+    {
+     "n": "tab_XẾP HẠNG",
+     "rect": [
+      1166,
+      236,
+      114,
+      58
+     ],
+     "label": "XẾP HẠNG"
+    },
+    {
+     "n": "tab_CÀI ĐẶT",
+     "rect": [
+      1166,
+      306,
+      114,
+      58
+     ],
+     "label": "CÀI ĐẶT"
+    },
+    {
+     "n": "tab_CHƠI ĐƠN",
+     "rect": [
+      1166,
+      96,
+      114,
+      58
+     ],
+     "label": "CHƠI ĐƠN"
+    },
+    {
+     "n": "vu_khi_0_tui",
+     "rect": [
+      60,
+      148,
+      260,
+      112
+     ]
+    },
+    {
+     "n": "vu_khi_1_tui",
+     "rect": [
+      60,
+      274,
+      260,
+      112
+     ]
+    },
+    {
+     "n": "vu_khi_2_tui",
+     "rect": [
+      60,
+      400,
+      260,
+      112
+     ]
+    },
+    {
+     "n": "sticker_Pháo sáng",
+     "rect": [
+      364,
+      160,
+      116,
+      128
+     ],
+     "label": "✦"
+    },
+    {
+     "n": "sticker_Thuốc giải",
+     "rect": [
+      488,
+      160,
+      116,
+      128
+     ],
+     "label": "+"
+    },
+    {
+     "n": "sticker_Khiên axit",
+     "rect": [
+      612,
+      160,
+      116,
+      128
+     ],
+     "label": "◇"
+    },
+    {
+     "n": "sticker_Kính lọc",
+     "rect": [
+      736,
+      160,
+      116,
+      128
+     ],
+     "label": "◉"
+    },
+    {
+     "n": "sticker_La bàn",
+     "rect": [
+      364,
+      300,
+      116,
+      128
+     ],
+     "label": "↻"
+    },
+    {
+     "n": "sticker_Máy quét nhiệt",
+     "rect": [
+      488,
+      300,
+      116,
+      128
+     ],
+     "label": "≋"
+    },
+    {
+     "n": "sticker_Nước tăng lực",
+     "rect": [
+      612,
+      300,
+      116,
+      128
+     ],
+     "label": "ϟ"
+    },
+    {
+     "n": "sticker_Bom khói",
+     "rect": [
+      736,
+      300,
+      116,
+      128
+     ],
+     "label": "○"
+    },
+    {
+     "n": "o_1",
+     "rect": [
+      896,
+      148,
+      250,
+      96
+     ],
+     "label": "phím 1 · còn trống"
+    },
+    {
+     "n": "o_2",
+     "rect": [
+      896,
+      256,
+      250,
+      96
+     ],
+     "label": "phím 2 · còn trống"
+    },
+    {
+     "n": "o_3",
+     "rect": [
+      896,
+      364,
+      250,
+      96
+     ],
+     "label": "phím 3 · còn trống"
+    },
+    {
+     "n": "nut_Quay lại",
+     "rect": [
+      880,
+      628,
+      120,
+      52
+     ],
+     "label": "Quay lại"
+    },
+    {
+     "n": "nut_Bắt đầu",
+     "rect": [
+      1012,
+      628,
+      114,
+      52
+     ],
+     "label": "Bắt đầu"
+    }
+   ],
+   "texts": [
+    {
+     "c": "PVP",
+     "rect": [
+      1192,
+      185.4,
+      26.1,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "XẾP HẠNG",
+     "rect": [
+      1192,
+      255.4,
+      65.9,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "CÀI ĐẶT",
+     "rect": [
+      1192,
+      325.4,
+      53.6,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "CHƠI ĐƠN",
+     "rect": [
+      1192,
+      115.4,
+      63,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "Mang gì vào trận?",
+     "rect": [
+      60,
+      50,
+      312.7,
+      43.2
+     ],
+     "ff": "Inter",
+     "fs": 36
+    },
+    {
+     "c": "cấp 3 · bọ có axit và chất độc",
+     "rect": [
+      400,
+      60,
+      246.9,
+      28.8
+     ],
+     "ff": "Patrick Hand",
+     "fs": 24
+    },
+    {
+     "c": "VŨ KHÍ · CHỌN 1",
+     "rect": [
+      60,
+      120,
+      99.1,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "Súng chính xác",
+     "rect": [
+      92,
+      170,
+      149.6,
+      24
+     ],
+     "ff": "Inter",
+     "fs": 20
+    },
+    {
+     "c": "Tâm nhỏ, ít đạn. Diệt từng con ẩn kỹ.",
+     "rect": [
+      92,
+      198,
+      200,
+      36
+     ],
+     "ff": "Inter",
+     "fs": 15
+    },
+    {
+     "c": "Súng quét vùng",
+     "rect": [
+      92,
+      296,
+      153.9,
+      24
+     ],
+     "ff": "Inter",
+     "fs": 20
+    },
+    {
+     "c": "Một phát trúng nhiều con đứng gần.",
+     "rect": [
+      92,
+      324,
+      200,
+      36
+     ],
+     "ff": "Inter",
+     "fs": 15
+    },
+    {
+     "c": "Súng nhiều đạn",
+     "rect": [
+      92,
+      422,
+      151.5,
+      24
+     ],
+     "ff": "Inter",
+     "fs": 20
+    },
+    {
+     "c": "Băng lớn, bắn hụt ít bị phạt hơn.",
+     "rect": [
+      92,
+      450,
+      200,
+      36
+     ],
+     "ff": "Inter",
+     "fs": 15
+    },
+    {
+     "c": "TỜ STICKER VẬT PHẨM",
+     "rect": [
+      352,
+      120,
+      142.1,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "✦",
+     "rect": [
+      386.9,
+      179.8,
+      14.3,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Pháo sáng",
+     "rect": [
+      377,
+      211,
+      92,
+      18
+     ],
+     "ff": "Inter",
+     "fs": 15
+    },
+    {
+     "c": "Xoá mù tạm thời",
+     "rect": [
+      377,
+      233,
+      92,
+      31.2
+     ],
+     "ff": "Inter",
+     "fs": 13
+    },
+    {
+     "c": "TRỌNG SỐ 3",
+     "rect": [
+      377,
+      268.2,
+      63.9,
+      15.6
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 13
+    },
+    {
+     "c": "+",
+     "rect": [
+      512.2,
+      179.8,
+      11.5,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Thuốc giải",
+     "rect": [
+      501,
+      211,
+      92,
+      18
+     ],
+     "ff": "Inter",
+     "fs": 15
+    },
+    {
+     "c": "Giải độc",
+     "rect": [
+      501,
+      233,
+      92,
+      15.6
+     ],
+     "ff": "Inter",
+     "fs": 13
+    },
+    {
+     "c": "TRỌNG SỐ 5",
+     "rect": [
+      501,
+      252.6,
+      63.9,
+      15.6
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 13
+    },
+    {
+     "c": "◇",
+     "rect": [
+      633,
+      179.8,
+      18,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Khiên axit",
+     "rect": [
+      625,
+      211,
+      92,
+      18
+     ],
+     "ff": "Inter",
+     "fs": 15
+    },
+    {
+     "c": "Chặn 1 đòn axit",
+     "rect": [
+      625,
+      233,
+      92,
+      31.2
+     ],
+     "ff": "Inter",
+     "fs": 13
+    },
+    {
+     "c": "TRỌNG SỐ 4",
+     "rect": [
+      625,
+      268.2,
+      64.5,
+      15.6
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 13
+    },
+    {
+     "c": "◉",
+     "rect": [
+      758.6,
+      179.8,
+      14.8,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Kính lọc",
+     "rect": [
+      749,
+      211,
+      92,
+      18
+     ],
+     "ff": "Inter",
+     "fs": 15
+    },
+    {
+     "c": "Lộ bọ ảo giác",
+     "rect": [
+      749,
+      233,
+      92,
+      15.6
+     ],
+     "ff": "Inter",
+     "fs": 13
+    },
+    {
+     "c": "TRỌNG SỐ 4",
+     "rect": [
+      749,
+      252.6,
+      64.5,
+      15.6
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 13
+    },
+    {
+     "c": "↻",
+     "rect": [
+      385.9,
+      319.8,
+      16.2,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "La bàn",
+     "rect": [
+      377,
+      351,
+      92,
+      18
+     ],
+     "ff": "Inter",
+     "fs": 15
+    },
+    {
+     "c": "Hết mất hướng",
+     "rect": [
+      377,
+      373,
+      92,
+      15.6
+     ],
+     "ff": "Inter",
+     "fs": 13
+    },
+    {
+     "c": "TRỌNG SỐ 2",
+     "rect": [
+      377,
+      392.6,
+      63.9,
+      15.6
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 13
+    },
+    {
+     "c": "≋",
+     "rect": [
+      510.9,
+      319.8,
+      14.3,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Máy quét nhiệt",
+     "rect": [
+      501,
+      351,
+      92,
+      36
+     ],
+     "ff": "Inter",
+     "fs": 15
+    },
+    {
+     "c": "Lộ bọ vài giây",
+     "rect": [
+      501,
+      391,
+      92,
+      15.6
+     ],
+     "ff": "Inter",
+     "fs": 13
+    },
+    {
+     "c": "TRỌNG SỐ 8",
+     "rect": [
+      501,
+      410.6,
+      64,
+      15.6
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 13
+    },
+    {
+     "c": "ϟ",
+     "rect": [
+      638.1,
+      319.8,
+      7.8,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Nước tăng lực",
+     "rect": [
+      625,
+      351,
+      92,
+      36
+     ],
+     "ff": "Inter",
+     "fs": 15
+    },
+    {
+     "c": "Hồi stamina",
+     "rect": [
+      625,
+      391,
+      92,
+      15.6
+     ],
+     "ff": "Inter",
+     "fs": 13
+    },
+    {
+     "c": "TRỌNG SỐ 3",
+     "rect": [
+      625,
+      410.6,
+      63.9,
+      15.6
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 13
+    },
+    {
+     "c": "○",
+     "rect": [
+      758.2,
+      319.8,
+      15.5,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Bom khói",
+     "rect": [
+      749,
+      351,
+      92,
+      18
+     ],
+     "ff": "Inter",
+     "fs": 15
+    },
+    {
+     "c": "Bọ ngừng phản công",
+     "rect": [
+      749,
+      373,
+      92,
+      31.2
+     ],
+     "ff": "Inter",
+     "fs": 13
+    },
+    {
+     "c": "TRỌNG SỐ 6",
+     "rect": [
+      749,
+      408.2,
+      64,
+      15.6
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 13
+    },
+    {
+     "c": "Ô VẬT PHẨM · 0/3",
+     "rect": [
+      896,
+      120,
+      112.4,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "phím 1 · còn trống",
+     "rect": [
+      962.4,
+      185.2,
+      117.1,
+      21.6
+     ],
+     "ff": "Patrick Hand",
+     "fs": 18
+    },
+    {
+     "c": "phím 2 · còn trống",
+     "rect": [
+      961.5,
+      293.2,
+      119,
+      21.6
+     ],
+     "ff": "Patrick Hand",
+     "fs": 18
+    },
+    {
+     "c": "phím 3 · còn trống",
+     "rect": [
+      961.7,
+      401.2,
+      118.7,
+      21.6
+     ],
+     "ff": "Patrick Hand",
+     "fs": 18
+    },
+    {
+     "c": "Chọn 1 vũ khí để bắt đầu. Vật phẩm có thể để trống, nhưng cấp này bọ có axit và chất độc.",
+     "rect": [
+      368,
+      540,
+      480,
+      40.8
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Quay lại",
+     "rect": [
+      907,
+      643.8,
+      66,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Bắt đầu",
+     "rect": [
+      1038,
+      643.8,
+      62,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    }
+   ]
+  },
+  "moi_06a_thu_nghieng": {
+   "size": [
+    1280,
+    720
+   ],
+   "base": {
+    "ngay": "moi_06a_thu_nghieng/base_ngay.png",
+    "dem": "moi_06a_thu_nghieng/base_dem.png"
+   },
+   "top": {
+    "ngay": "moi_06a_thu_nghieng/top_ngay.png",
+    "dem": "moi_06a_thu_nghieng/top_dem.png"
+   },
+   "photos": [
+    {
+     "n": "anh (ảnh mẫu)",
+     "kind": "photo",
+     "rect": [
+      76,
+      136,
+      608,
+      388
+     ]
+    }
+   ],
+   "dyn": [],
+   "hotspots": [
+    {
+     "n": "tab_PVP",
+     "rect": [
+      1166,
+      166,
+      114,
+      58
+     ],
+     "label": "PVP"
+    },
+    {
+     "n": "tab_XẾP HẠNG",
+     "rect": [
+      1166,
+      236,
+      114,
+      58
+     ],
+     "label": "XẾP HẠNG"
+    },
+    {
+     "n": "tab_CÀI ĐẶT",
+     "rect": [
+      1166,
+      306,
+      114,
+      58
+     ],
+     "label": "CÀI ĐẶT"
+    },
+    {
+     "n": "tab_CHƠI ĐƠN",
+     "rect": [
+      1166,
+      96,
+      114,
+      58
+     ],
+     "label": "CHƠI ĐƠN"
+    },
+    {
+     "n": "nut_Căn lại (C)",
+     "rect": [
+      760,
+      628,
+      139.1,
+      52
+     ],
+     "label": "Căn lại (C)"
+    },
+    {
+     "n": "nut_Vào trận",
+     "rect": [
+      911.1,
+      628,
+      120.6,
+      52
+     ],
+     "label": "Vào trận"
+    }
+   ],
+   "texts": [
+    {
+     "c": "PVP",
+     "rect": [
+      1192,
+      185.4,
+      26.1,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "XẾP HẠNG",
+     "rect": [
+      1192,
+      255.4,
+      65.9,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "CÀI ĐẶT",
+     "rect": [
+      1192,
+      325.4,
+      53.6,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "CHƠI ĐƠN",
+     "rect": [
+      1192,
+      115.4,
+      63,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "Thử nghiêng đầu",
+     "rect": [
+      60,
+      50,
+      297.2,
+      43.2
+     ],
+     "ff": "Inter",
+     "fs": 36
+    },
+    {
+     "c": "ngồi cách màn hình khoảng 60 cm",
+     "rect": [
+      380,
+      60,
+      287.4,
+      28.8
+     ],
+     "ff": "Patrick Hand",
+     "fs": 24
+    },
+    {
+     "c": "← vệt loá đang trượt sang phải",
+     "rect": [
+      300,
+      548,
+      272.1,
+      28.8
+     ],
+     "ff": "Patrick Hand",
+     "fs": 24
+    },
+    {
+     "c": "Thấy khuôn mặt",
+     "rect": [
+      784,
+      380,
+      139.8,
+      21.6
+     ],
+     "ff": "Inter",
+     "fs": 18
+    },
+    {
+     "c": "Nghiêng sang trái",
+     "rect": [
+      784,
+      415.6,
+      153.5,
+      21.6
+     ],
+     "ff": "Inter",
+     "fs": 18
+    },
+    {
+     "c": "Nghiêng sang phải",
+     "rect": [
+      784,
+      451.2,
+      159.3,
+      21.6
+     ],
+     "ff": "Inter",
+     "fs": 18
+    },
+    {
+     "c": "Căn lại (C)",
+     "rect": [
+      787,
+      643.8,
+      85.1,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Vào trận",
+     "rect": [
+      937.1,
+      643.8,
+      68.6,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    }
+   ]
+  },
+  "moi_06_man_choi": {
+   "size": [
+    1280,
+    720
+   ],
+   "base": {
+    "ngay": "moi_06_man_choi/base_ngay.png",
+    "dem": "moi_06_man_choi/base_dem.png"
+   },
+   "top": {
+    "ngay": "moi_06_man_choi/top_ngay.png",
+    "dem": "moi_06_man_choi/top_dem.png"
+   },
+   "photos": [
+    {
+     "n": "anh_nguoi_choi (ảnh mẫu)",
+     "kind": "viewport",
+     "rect": [
+      66,
+      56,
+      868,
+      552
+     ]
+    }
+   ],
+   "dyn": [
+    {
+     "key": "level_tab",
+     "n": "tab_cap_do",
+     "t": "b",
+     "rect": [
+      66,
+      8,
+      123.7,
+      34
+     ],
+     "rot": 0,
+     "f": "sky_warning_tint",
+     "sw": 0,
+     "r": "6",
+     "op": 1,
+     "children": [
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        80,
+        14,
+        95.7,
+        18
+       ],
+       "c": "CẤP 5 · CHÂU Á",
+       "ff": "Barlow Condensed",
+       "fw": 700,
+       "fs": 15,
+       "col": "warning",
+       "al": "left",
+       "rot": 0
+      }
+     ]
+    },
+    {
+     "key": "bugs",
+     "n": "bo_b4",
+     "t": "svg",
+     "rect": [
+      211.9,
+      405.9,
+      60.1,
+      60.1
+     ],
+     "children": []
+    },
+    {
+     "key": "bugs",
+     "n": "bo_b2",
+     "t": "svg",
+     "rect": [
+      610,
+      198,
+      32,
+      32
+     ],
+     "children": []
+    },
+    {
+     "key": "bugs",
+     "n": "bo_b3",
+     "t": "svg",
+     "rect": [
+      856.6,
+      410.6,
+      48.7,
+      48.7
+     ],
+     "children": []
+    },
+    {
+     "key": "bugs",
+     "n": "bo_b1",
+     "t": "svg",
+     "rect": [
+      447.5,
+      279.5,
+      41,
+      41
+     ],
+     "children": []
+    },
+    {
+     "key": "crosshair",
+     "n": "tam_ngam_vien",
+     "t": "e",
+     "rect": [
+      624,
+      314,
+      84,
+      84
+     ],
+     "rot": 0,
+     "s": "surface",
+     "sw": 4,
+     "r": "ellipse",
+     "op": 0.9,
+     "children": []
+    },
+    {
+     "key": "crosshair",
+     "n": "tam_ngam",
+     "t": "e",
+     "rect": [
+      626,
+      316,
+      80,
+      80
+     ],
+     "rot": 0,
+     "s": "text",
+     "sw": 2,
+     "r": "ellipse",
+     "op": 1,
+     "children": []
+    },
+    {
+     "key": "crosshair",
+     "n": "vach",
+     "t": "r",
+     "rect": [
+      665,
+      292,
+      2.5,
+      18
+     ],
+     "rot": 0,
+     "f": "text",
+     "sw": 0,
+     "r": "0",
+     "op": 1,
+     "children": []
+    },
+    {
+     "key": "crosshair",
+     "n": "vach",
+     "t": "r",
+     "rect": [
+      665,
+      402,
+      2.5,
+      18
+     ],
+     "rot": 0,
+     "f": "text",
+     "sw": 0,
+     "r": "0",
+     "op": 1,
+     "children": []
+    },
+    {
+     "key": "crosshair",
+     "n": "vach",
+     "t": "r",
+     "rect": [
+      602,
+      355,
+      18,
+      2.5
+     ],
+     "rot": 0,
+     "f": "text",
+     "sw": 0,
+     "r": "0",
+     "op": 1,
+     "children": []
+    },
+    {
+     "key": "crosshair",
+     "n": "vach",
+     "t": "r",
+     "rect": [
+      712,
+      355,
+      18,
+      2.5
+     ],
+     "rot": 0,
+     "f": "text",
+     "sw": 0,
+     "r": "0",
+     "op": 1,
+     "children": []
+    },
+    {
+     "key": "crosshair",
+     "n": "tam",
+     "t": "e",
+     "rect": [
+      663.5,
+      353.5,
+      5,
+      5
+     ],
+     "rot": 0,
+     "f": "text",
+     "sw": 0,
+     "r": "ellipse",
+     "op": 1,
+     "children": []
+    },
+    {
+     "key": "photo_caption",
+     "n": "nhan_ngay",
+     "t": "b",
+     "rect": [
+      119.4,
+      645.8,
+      243.6,
+      47.2
+     ],
+     "rot": -2,
+     "f": "surface",
+     "s": "border",
+     "sw": 1,
+     "r": "0",
+     "op": 1,
+     "children": [
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        136.6,
+        654.8,
+        112.1,
+        32.7
+       ],
+       "c": "06/11/2026 · ",
+       "ff": "Patrick Hand",
+       "fw": 400,
+       "fs": 24,
+       "col": "text",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        247.7,
+        651.4,
+        98.2,
+        32.2
+       ],
+       "c": "bị gặm 18%",
+       "ff": "Patrick Hand",
+       "fw": 400,
+       "fs": 24,
+       "col": "danger",
+       "al": "left",
+       "rot": 0
+      }
+     ]
+    },
+    {
+     "key": "miss",
+     "n": "",
+     "t": "x",
+     "rect": [
+      722,
+      314,
+      135.3,
+      28.8
+     ],
+     "c": "hụt! −5 stamina",
+     "ff": "Patrick Hand",
+     "fw": 400,
+     "fs": 24,
+     "col": "danger",
+     "al": "left",
+     "rot": 0,
+     "children": []
+    },
+    {
+     "key": "items",
+     "n": "vat_pham",
+     "t": "b",
+     "rect": [
+      560,
+      654,
+      338.3,
+      34
+     ],
+     "rot": 0,
+     "sw": 0,
+     "r": "0",
+     "op": 1,
+     "children": [
+      {
+       "n": "sticker",
+       "t": "b",
+       "rect": [
+        560,
+        654,
+        122.1,
+        34
+       ],
+       "rot": 0,
+       "f": "surface",
+       "s": "border",
+       "sw": 1,
+       "r": "0",
+       "op": 1
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        571,
+        662,
+        100.1,
+        18
+       ],
+       "c": "1 · THUỐC GIẢI ×1",
+       "ff": "Barlow Condensed",
+       "fw": 700,
+       "fs": 15,
+       "col": "text",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "sticker",
+       "t": "b",
+       "rect": [
+        690.1,
+        654,
+        100.2,
+        34
+       ],
+       "rot": 0,
+       "f": "surface",
+       "s": "border",
+       "sw": 1,
+       "r": "0",
+       "op": 1
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        701.1,
+        662,
+        78.2,
+        18
+       ],
+       "c": "2 · LA BÀN ×1",
+       "ff": "Barlow Condensed",
+       "fw": 700,
+       "fs": 15,
+       "col": "text",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "sticker",
+       "t": "b",
+       "rect": [
+        798.2,
+        654,
+        100,
+        34
+       ],
+       "rot": 0,
+       "f": "surface",
+       "s": "border",
+       "sw": 1,
+       "r": "0",
+       "op": 0.45
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        809.2,
+        662,
+        78,
+        18
+       ],
+       "c": "3 · TĂNG LỰC",
+       "ff": "Barlow Condensed",
+       "fw": 700,
+       "fs": 15,
+       "col": "text",
+       "al": "left",
+       "rot": 0
+      }
+     ]
+    },
+    {
+     "key": "timer",
+     "n": "",
+     "t": "x",
+     "rect": [
+      1015.3,
+      63.1,
+      123.9,
+      68.2
+     ],
+     "c": "01:12",
+     "ff": "Inter",
+     "fw": 700,
+     "fs": 50,
+     "col": "text",
+     "al": "left",
+     "rot": 0,
+     "children": []
+    },
+    {
+     "key": "kills",
+     "n": "",
+     "t": "x",
+     "rect": [
+      1017,
+      243,
+      23.3,
+      48
+     ],
+     "c": "7",
+     "ff": "Inter",
+     "fw": 700,
+     "fs": 40,
+     "col": "text",
+     "al": "left",
+     "rot": 0,
+     "children": []
+    },
+    {
+     "key": "kills_total",
+     "n": "",
+     "t": "x",
+     "rect": [
+      1040.3,
+      243,
+      56,
+      48
+     ],
+     "c": "/12",
+     "ff": "Inter",
+     "fw": 500,
+     "fs": 40,
+     "col": "text_muted",
+     "al": "left",
+     "rot": 0,
+     "children": []
+    },
+    {
+     "key": "hp_label",
+     "n": "",
+     "t": "x",
+     "rect": [
+      1013,
+      337,
+      45.5,
+      18
+     ],
+     "c": "MÁU 72",
+     "ff": "Barlow Condensed",
+     "fw": 700,
+     "fs": 15,
+     "col": "text",
+     "al": "left",
+     "rot": 0,
+     "children": []
+    },
+    {
+     "key": "hp_track",
+     "n": "thanh",
+     "t": "b",
+     "rect": [
+      1013,
+      361,
+      208,
+      12
+     ],
+     "rot": 0,
+     "f": "sky_info_tint",
+     "sw": 0,
+     "r": "0",
+     "op": 1,
+     "children": [
+      {
+       "n": "muc",
+       "t": "r",
+       "rect": [
+        1013,
+        361,
+        150,
+        12
+       ],
+       "rot": 0,
+       "f": "success",
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      }
+     ]
+    },
+    {
+     "key": "hp_bar",
+     "n": "muc",
+     "t": "r",
+     "rect": [
+      1013,
+      361,
+      150,
+      12
+     ],
+     "rot": 0,
+     "f": "success",
+     "sw": 0,
+     "r": "0",
+     "op": 1,
+     "children": []
+    },
+    {
+     "key": "st_label",
+     "n": "",
+     "t": "x",
+     "rect": [
+      1013,
+      379,
+      88.2,
+      18
+     ],
+     "c": "STAMINA 48%",
+     "ff": "Barlow Condensed",
+     "fw": 700,
+     "fs": 15,
+     "col": "warning",
+     "al": "left",
+     "rot": 0,
+     "children": []
+    },
+    {
+     "key": "st_track",
+     "n": "thanh",
+     "t": "b",
+     "rect": [
+      1013,
+      403,
+      208,
+      12
+     ],
+     "rot": 0,
+     "f": "sky_warning_tint",
+     "sw": 0,
+     "r": "0",
+     "op": 1,
+     "children": [
+      {
+       "n": "muc",
+       "t": "r",
+       "rect": [
+        1013,
+        403,
+        100,
+        12
+       ],
+       "rot": 0,
+       "f": "warning",
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      }
+     ]
+    },
+    {
+     "key": "st_bar",
+     "n": "muc",
+     "t": "r",
+     "rect": [
+      1013,
+      403,
+      100,
+      12
+     ],
+     "rot": 0,
+     "f": "warning",
+     "sw": 0,
+     "r": "0",
+     "op": 1,
+     "children": []
+    },
+    {
+     "key": "layer",
+     "n": "",
+     "t": "x",
+     "rect": [
+      1099,
+      478.6,
+      47.7,
+      26.4
+     ],
+     "c": "2 / 4",
+     "ff": "Inter",
+     "fw": 700,
+     "fs": 22,
+     "col": "text",
+     "al": "left",
+     "rot": 0,
+     "children": []
+    },
+    {
+     "key": "effects",
+     "n": "nhan_hieu_ung",
+     "t": "b",
+     "rect": [
+      1002.9,
+      544,
+      230.3,
+      76.7
+     ],
+     "rot": 2,
+     "f": "sky_danger_tint",
+     "sw": 0,
+     "r": "0",
+     "op": 1,
+     "children": [
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        1018.1,
+        552.5,
+        155,
+        31.8
+       ],
+       "c": "● ĐỘC −2/giây · 6s",
+       "ff": "Patrick Hand",
+       "fw": 400,
+       "fs": 22,
+       "col": "danger",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        1017.1,
+        578.9,
+        125.4,
+        30.7
+       ],
+       "c": "● mất hướng 3s",
+       "ff": "Patrick Hand",
+       "fw": 400,
+       "fs": 22,
+       "col": "danger",
+       "al": "left",
+       "rot": 0
+      }
+     ]
+    },
+    {
+     "key": "ammo",
+     "n": "",
+     "t": "x",
+     "rect": [
+      998,
+      640,
+      171.8,
+      18
+     ],
+     "c": "SÚNG CHÍNH XÁC · ĐẠN 9/10",
+     "ff": "Barlow Condensed",
+     "fw": 700,
+     "fs": 15,
+     "col": "text",
+     "al": "left",
+     "rot": 0,
+     "children": []
+    },
+    {
+     "key": "head",
+     "n": "",
+     "t": "x",
+     "rect": [
+      998,
+      664,
+      73.8,
+      18
+     ],
+     "c": "● Đầu: tốt",
+     "ff": "Inter",
+     "fw": 500,
+     "fs": 15,
+     "col": "success",
+     "al": "left",
+     "rot": 0,
+     "children": []
+    }
+   ],
+   "hotspots": [
+    {
+     "n": "tab_cap_do",
+     "rect": [
+      66,
+      8,
+      123.7,
+      34
+     ],
+     "label": "CẤP 5 · CHÂU Á"
+    }
+   ],
+   "texts": [
+    {
+     "c": "hết giờ bị trừ điểm",
+     "rect": [
+      1019.4,
+      123,
+      121.3,
+      29.9
+     ],
+     "ff": "Patrick Hand",
+     "fs": 18
+    },
+    {
+     "c": "BỌ ĐÃ DIỆT",
+     "rect": [
+      1017,
+      221,
+      71.2,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "LỚP ĐANG THẤY",
+     "rect": [
+      1099,
+      463,
+      86.3,
+      15.6
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 13
+    },
+    {
+     "c": "Esc: tạm dừng",
+     "rect": [
+      1110,
+      664,
+      101.4,
+      18
+     ],
+     "ff": "Inter",
+     "fs": 15
+    }
+   ]
+  },
+  "moi_07a_thang": {
+   "size": [
+    1280,
+    720
+   ],
+   "base": {
+    "ngay": "moi_07a_thang/base_ngay.png",
+    "dem": "moi_07a_thang/base_dem.png"
+   },
+   "top": {
+    "ngay": "moi_07a_thang/top_ngay.png",
+    "dem": "moi_07a_thang/top_dem.png"
+   },
+   "photos": [
+    {
+     "n": "anh (ảnh mẫu)",
+     "kind": "photo",
+     "rect": [
+      76,
+      86,
+      588,
+      374
+     ]
+    }
+   ],
+   "dyn": [
+    {
+     "key": "score_table_0",
+     "n": "bang_diem",
+     "t": "b",
+     "rect": [
+      740,
+      180,
+      380,
+      137.6
+     ],
+     "rot": 0,
+     "sw": 0,
+     "r": "0",
+     "op": 1,
+     "children": [
+      {
+       "n": "dong",
+       "t": "b",
+       "rect": [
+        740,
+        180,
+        380,
+        24
+       ],
+       "rot": 0,
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        740,
+        181.2,
+        139.2,
+        21.6
+       ],
+       "c": "Thời gian còn lại",
+       "ff": "Inter",
+       "fw": 400,
+       "fs": 18,
+       "col": "text",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        1093.9,
+        180,
+        26.1,
+        24
+       ],
+       "c": "42",
+       "ff": "Inter",
+       "fw": 700,
+       "fs": 20,
+       "col": "text",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "dong",
+       "t": "b",
+       "rect": [
+        740,
+        214,
+        380,
+        24
+       ],
+       "rot": 0,
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        740,
+        215.2,
+        219.8,
+        21.6
+       ],
+       "c": "Thuốc giải × 1 · trọng số 5",
+       "ff": "Inter",
+       "fw": 400,
+       "fs": 18,
+       "col": "text",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        1093.6,
+        214,
+        26.4,
+        24
+       ],
+       "c": "−5",
+       "ff": "Inter",
+       "fw": 700,
+       "fs": 20,
+       "col": "danger",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "ke_tong",
+       "t": "r",
+       "rect": [
+        740,
+        248,
+        380,
+        2
+       ],
+       "rot": 0,
+       "f": "text",
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      },
+      {
+       "n": "tong",
+       "t": "b",
+       "rect": [
+        740,
+        260,
+        380,
+        57.6
+       ],
+       "rot": 0,
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        740,
+        275.6,
+        55,
+        26.4
+       ],
+       "c": "Điểm",
+       "ff": "Inter",
+       "fw": 700,
+       "fs": 22,
+       "col": "text",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        1061.1,
+        260,
+        58.9,
+        57.6
+       ],
+       "c": "37",
+       "ff": "Inter",
+       "fw": 700,
+       "fs": 48,
+       "col": "success",
+       "al": "left",
+       "rot": 0
+      }
+     ]
+    }
+   ],
+   "hotspots": [
+    {
+     "n": "tab_PVP",
+     "rect": [
+      1166,
+      166,
+      114,
+      58
+     ],
+     "label": "PVP"
+    },
+    {
+     "n": "tab_XẾP HẠNG",
+     "rect": [
+      1166,
+      236,
+      114,
+      58
+     ],
+     "label": "XẾP HẠNG"
+    },
+    {
+     "n": "tab_CÀI ĐẶT",
+     "rect": [
+      1166,
+      306,
+      114,
+      58
+     ],
+     "label": "CÀI ĐẶT"
+    },
+    {
+     "n": "tab_CHƠI ĐƠN",
+     "rect": [
+      1166,
+      96,
+      114,
+      58
+     ],
+     "label": "CHƠI ĐƠN"
+    },
+    {
+     "n": "nut_Về album",
+     "rect": [
+      740,
+      628,
+      130.3,
+      52
+     ],
+     "label": "Về album"
+    },
+    {
+     "n": "nut_Chơi lại",
+     "rect": [
+      882.3,
+      628,
+      114.7,
+      52
+     ],
+     "label": "Chơi lại"
+    },
+    {
+     "n": "nut_Cấp tiếp theo",
+     "rect": [
+      1008.9,
+      628,
+      161.4,
+      52
+     ],
+     "label": "Cấp tiếp theo"
+    }
+   ],
+   "texts": [
+    {
+     "c": "PVP",
+     "rect": [
+      1192,
+      185.4,
+      26.1,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "XẾP HẠNG",
+     "rect": [
+      1192,
+      255.4,
+      65.9,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "CÀI ĐẶT",
+     "rect": [
+      1192,
+      325.4,
+      53.6,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "CHƠI ĐƠN",
+     "rect": [
+      1192,
+      115.4,
+      63,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "ĐÃ BẢO VỆ",
+     "rect": [
+      193.4,
+      51.4,
+      221.7,
+      67.9
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 44
+    },
+    {
+     "c": "12/12 con bọ đã thành bụi",
+     "rect": [
+      80,
+      510,
+      239.2,
+      31.2
+     ],
+     "ff": "Patrick Hand",
+     "fs": 26
+    },
+    {
+     "c": "Ký ức đã được giữ lại",
+     "rect": [
+      740,
+      76,
+      361.6,
+      43.2
+     ],
+     "ff": "Inter",
+     "fs": 36
+    },
+    {
+     "c": "CẤP 3 · KHÓ",
+     "rect": [
+      751,
+      135,
+      68.6,
+      16.8
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 14
+    },
+    {
+     "c": "lên hạng 4 ở bảng Chơi đơn",
+     "rect": [
+      740,
+      430,
+      230,
+      28.8
+     ],
+     "ff": "Patrick Hand",
+     "fs": 24
+    },
+    {
+     "c": "Về album",
+     "rect": [
+      767,
+      643.8,
+      76.3,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Chơi lại",
+     "rect": [
+      909.3,
+      643.8,
+      60.7,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Cấp tiếp theo",
+     "rect": [
+      1034.9,
+      643.8,
+      109.4,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    }
+   ]
+  },
+  "moi_07b_thua": {
+   "size": [
+    1280,
+    720
+   ],
+   "base": {
+    "ngay": "moi_07b_thua/base_ngay.png",
+    "dem": "moi_07b_thua/base_dem.png"
+   },
+   "top": {
+    "ngay": "moi_07b_thua/top_ngay.png",
+    "dem": "moi_07b_thua/top_dem.png"
+   },
+   "photos": [],
+   "dyn": [
+    {
+     "key": "score_table_0",
+     "n": "bang_diem",
+     "t": "b",
+     "rect": [
+      740,
+      180,
+      380,
+      205.6
+     ],
+     "rot": 0,
+     "sw": 0,
+     "r": "0",
+     "op": 1,
+     "children": [
+      {
+       "n": "dong",
+       "t": "b",
+       "rect": [
+        740,
+        180,
+        380,
+        24
+       ],
+       "rot": 0,
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        740,
+        181.2,
+        83.2,
+        21.6
+       ],
+       "c": "Bọ còn lại",
+       "ff": "Inter",
+       "fw": 400,
+       "fs": 18,
+       "col": "text",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        1068.6,
+        180,
+        51.4,
+        24
+       ],
+       "c": "3 / 12",
+       "ff": "Inter",
+       "fw": 700,
+       "fs": 20,
+       "col": "danger",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "dong",
+       "t": "b",
+       "rect": [
+        740,
+        214,
+        380,
+        24
+       ],
+       "rot": 0,
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        740,
+        215.2,
+        139.2,
+        21.6
+       ],
+       "c": "Thời gian còn lại",
+       "ff": "Inter",
+       "fw": 400,
+       "fs": 18,
+       "col": "text",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        1106.5,
+        214,
+        13.5,
+        24
+       ],
+       "c": "0",
+       "ff": "Inter",
+       "fw": 700,
+       "fs": 20,
+       "col": "text",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "dong",
+       "t": "b",
+       "rect": [
+        740,
+        248,
+        380,
+        24
+       ],
+       "rot": 0,
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        740,
+        249.2,
+        172.8,
+        21.6
+       ],
+       "c": "Quá giờ 00:07 · phạt",
+       "ff": "Inter",
+       "fw": 400,
+       "fs": 18,
+       "col": "text",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        1080.8,
+        248,
+        39.2,
+        24
+       ],
+       "c": "−35",
+       "ff": "Inter",
+       "fw": 700,
+       "fs": 20,
+       "col": "danger",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "dong",
+       "t": "b",
+       "rect": [
+        740,
+        282,
+        380,
+        24
+       ],
+       "rot": 0,
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        740,
+        283.2,
+        249.8,
+        21.6
+       ],
+       "c": "Nước tăng lực × 1 · trọng số 3",
+       "ff": "Inter",
+       "fw": 400,
+       "fs": 18,
+       "col": "text",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        1093.6,
+        282,
+        26.4,
+        24
+       ],
+       "c": "−3",
+       "ff": "Inter",
+       "fw": 700,
+       "fs": 20,
+       "col": "danger",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "ke_tong",
+       "t": "r",
+       "rect": [
+        740,
+        316,
+        380,
+        2
+       ],
+       "rot": 0,
+       "f": "text",
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      },
+      {
+       "n": "tong",
+       "t": "b",
+       "rect": [
+        740,
+        328,
+        380,
+        57.6
+       ],
+       "rot": 0,
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        740,
+        343.6,
+        55,
+        26.4
+       ],
+       "c": "Điểm",
+       "ff": "Inter",
+       "fw": 700,
+       "fs": 22,
+       "col": "text",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        1025.5,
+        328,
+        94.5,
+        57.6
+       ],
+       "c": "−38",
+       "ff": "Inter",
+       "fw": 700,
+       "fs": 48,
+       "col": "danger",
+       "al": "left",
+       "rot": 0
+      }
+     ]
+    }
+   ],
+   "hotspots": [
+    {
+     "n": "tab_PVP",
+     "rect": [
+      1166,
+      166,
+      114,
+      58
+     ],
+     "label": "PVP"
+    },
+    {
+     "n": "tab_XẾP HẠNG",
+     "rect": [
+      1166,
+      236,
+      114,
+      58
+     ],
+     "label": "XẾP HẠNG"
+    },
+    {
+     "n": "tab_CÀI ĐẶT",
+     "rect": [
+      1166,
+      306,
+      114,
+      58
+     ],
+     "label": "CÀI ĐẶT"
+    },
+    {
+     "n": "tab_CHƠI ĐƠN",
+     "rect": [
+      1166,
+      96,
+      114,
+      58
+     ],
+     "label": "CHƠI ĐƠN"
+    },
+    {
+     "n": "nut_Về album",
+     "rect": [
+      740,
+      628,
+      130.3,
+      52
+     ],
+     "label": "Về album"
+    },
+    {
+     "n": "nut_Chọn ảnh khác",
+     "rect": [
+      882.3,
+      628,
+      176.6,
+      52
+     ],
+     "label": "Chọn ảnh khác"
+    },
+    {
+     "n": "nut_Thử lại",
+     "rect": [
+      1070.8,
+      628,
+      107.6,
+      52
+     ],
+     "label": "Thử lại"
+    }
+   ],
+   "texts": [
+    {
+     "c": "PVP",
+     "rect": [
+      1192,
+      185.4,
+      26.1,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "XẾP HẠNG",
+     "rect": [
+      1192,
+      255.4,
+      65.9,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "CÀI ĐẶT",
+     "rect": [
+      1192,
+      325.4,
+      53.6,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "CHƠI ĐƠN",
+     "rect": [
+      1192,
+      115.4,
+      63,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "chỉ còn lại bốn góc dán",
+     "rect": [
+      80,
+      510,
+      209.2,
+      31.2
+     ],
+     "ff": "Patrick Hand",
+     "fs": 26
+    },
+    {
+     "c": "Ký ức này đã mất",
+     "rect": [
+      740,
+      76,
+      300.1,
+      43.2
+     ],
+     "ff": "Inter",
+     "fs": 36
+    },
+    {
+     "c": "CẤP 5 · CHÂU Á",
+     "rect": [
+      750,
+      134,
+      87.7,
+      16.8
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 14
+    },
+    {
+     "c": "Về album",
+     "rect": [
+      767,
+      643.8,
+      76.3,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Chọn ảnh khác",
+     "rect": [
+      909.3,
+      643.8,
+      122.6,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Thử lại",
+     "rect": [
+      1096.8,
+      643.8,
+      55.6,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    }
+   ]
+  },
+  "moi_08_chon_kieu": {
+   "size": [
+    1280,
+    720
+   ],
+   "base": {
+    "ngay": "moi_08_chon_kieu/base_ngay.png",
+    "dem": "moi_08_chon_kieu/base_dem.png"
+   },
+   "top": {
+    "ngay": "moi_08_chon_kieu/top_ngay.png",
+    "dem": "moi_08_chon_kieu/top_dem.png"
+   },
+   "photos": [],
+   "dyn": [],
+   "hotspots": [
+    {
+     "n": "tab_CHƠI ĐƠN",
+     "rect": [
+      1166,
+      96,
+      114,
+      58
+     ],
+     "label": "CHƠI ĐƠN"
+    },
+    {
+     "n": "tab_XẾP HẠNG",
+     "rect": [
+      1166,
+      236,
+      114,
+      58
+     ],
+     "label": "XẾP HẠNG"
+    },
+    {
+     "n": "tab_CÀI ĐẶT",
+     "rect": [
+      1166,
+      306,
+      114,
+      58
+     ],
+     "label": "CÀI ĐẶT"
+    },
+    {
+     "n": "tab_PVP",
+     "rect": [
+      1166,
+      166,
+      114,
+      58
+     ],
+     "label": "PVP"
+    },
+    {
+     "n": "che_do_Cạnh tranh_tui",
+     "rect": [
+      60,
+      130,
+      520,
+      440
+     ],
+     "sel": true
+    },
+    {
+     "n": "che_do_Săn & Trốn_tui",
+     "rect": [
+      612,
+      130,
+      520,
+      440
+     ]
+    },
+    {
+     "n": "nut_Quay lại",
+     "rect": [
+      700,
+      628,
+      120,
+      52
+     ],
+     "label": "Quay lại"
+    },
+    {
+     "n": "nut_Mời bạn",
+     "rect": [
+      832,
+      628,
+      119.7,
+      52
+     ],
+     "label": "Mời bạn"
+    },
+    {
+     "n": "nut_Tìm trận",
+     "rect": [
+      963.7,
+      628,
+      120,
+      52
+     ],
+     "label": "Tìm trận"
+    }
+   ],
+   "texts": [
+    {
+     "c": "CHƠI ĐƠN",
+     "rect": [
+      1192,
+      115.4,
+      63,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "XẾP HẠNG",
+     "rect": [
+      1192,
+      255.4,
+      65.9,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "CÀI ĐẶT",
+     "rect": [
+      1192,
+      325.4,
+      53.6,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "PVP",
+     "rect": [
+      1192,
+      185.4,
+      26.1,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "Chọn kiểu so tài",
+     "rect": [
+      60,
+      50,
+      279.9,
+      43.2
+     ],
+     "ff": "Inter",
+     "fs": 36
+    },
+    {
+     "c": "mỗi kiểu có bảng xếp hạng riêng",
+     "rect": [
+      380,
+      60,
+      276.1,
+      28.8
+     ],
+     "ff": "Patrick Hand",
+     "fs": 24
+    },
+    {
+     "c": "KIỂU 1",
+     "rect": [
+      104,
+      164,
+      39,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "Cạnh tranh",
+     "rect": [
+      104,
+      196,
+      183.2,
+      40.8
+     ],
+     "ff": "Inter",
+     "fs": 34
+    },
+    {
+     "c": "Hai thợ săn cùng săn bọ trên ảnh của mình. Hết giờ hoặc diệt hết bọ thì tính điểm.",
+     "rect": [
+      104,
+      250.8,
+      432,
+      49.3
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "1",
+     "rect": [
+      135.3,
+      338.9,
+      7.3,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Thợ săn 1",
+     "rect": [
+      169,
+      338.9,
+      77.7,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "VS",
+     "rect": [
+      298,
+      335.9,
+      20.2,
+      26.4
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 22
+    },
+    {
+     "c": "2",
+     "rect": [
+      361.8,
+      338.9,
+      10.7,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Thợ săn 2",
+     "rect": [
+      397.2,
+      338.9,
+      81.1,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "CÁCH TÍNH ĐIỂM",
+     "rect": [
+      120,
+      412.1,
+      96.3,
+      16.8
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 14
+    },
+    {
+     "c": "Điểm = thời gian còn lại − Σ (vật phẩm × số lượng × trọng số)",
+     "rect": [
+      120,
+      434.9,
+      400,
+      50.4
+     ],
+     "ff": "Inter",
+     "fs": 18
+    },
+    {
+     "c": "Càng ít vật phẩm, điểm càng cao.",
+     "rect": [
+      120,
+      491.3,
+      237.8,
+      18
+     ],
+     "ff": "Inter",
+     "fs": 15
+    },
+    {
+     "c": "KIỂU 2",
+     "rect": [
+      656,
+      164,
+      41.3,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "Săn & Trốn",
+     "rect": [
+      656,
+      196,
+      177.9,
+      40.8
+     ],
+     "ff": "Inter",
+     "fs": 34
+    },
+    {
+     "c": "Một người hoá thành bọ, trốn trong ảnh và quấy rối. Người kia phải diệt hết bọ và cả người hoá bọ trước khi hết giờ.",
+     "rect": [
+      656,
+      250.8,
+      432,
+      73.9
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "T",
+     "rect": [
+      685.3,
+      363.5,
+      11.4,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Thợ săn",
+     "rect": [
+      721,
+      363.5,
+      66.3,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "VS",
+     "rect": [
+      850,
+      360.5,
+      20.2,
+      26.4
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 22
+    },
+    {
+     "c": "Người hoá bọ",
+     "rect": [
+      949.2,
+      363.5,
+      109.2,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "ĐIỀU KIỆN THẮNG",
+     "rect": [
+      672,
+      436.7,
+      103.9,
+      16.8
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 14
+    },
+    {
+     "c": "Thợ săn: diệt hết bọ và người hoá bọ trước khi hết giờ.",
+     "rect": [
+      672,
+      459.5,
+      400,
+      38.4
+     ],
+     "ff": "Inter",
+     "fs": 16
+    },
+    {
+     "c": "Người hoá bọ: sống sót tới hết giờ.",
+     "rect": [
+      672,
+      503.9,
+      400,
+      19.2
+     ],
+     "ff": "Inter",
+     "fs": 16
+    },
+    {
+     "c": "Quay lại",
+     "rect": [
+      727,
+      643.8,
+      66,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Mời bạn",
+     "rect": [
+      859,
+      643.8,
+      65.7,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Tìm trận",
+     "rect": [
+      989.7,
+      643.8,
+      68,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    }
+   ]
+  },
+  "moi_08b_tim_tran": {
+   "size": [
+    1280,
+    720
+   ],
+   "base": {
+    "ngay": "moi_08b_tim_tran/base_ngay.png",
+    "dem": "moi_08b_tim_tran/base_dem.png"
+   },
+   "top": {
+    "ngay": "moi_08b_tim_tran/top_ngay.png",
+    "dem": "moi_08b_tim_tran/top_dem.png"
+   },
+   "photos": [],
+   "dyn": [
+    {
+     "key": "search_time",
+     "n": "",
+     "t": "x",
+     "rect": [
+      660,
+      578.4,
+      300,
+      20.4
+     ],
+     "c": "00:12",
+     "ff": "Patrick Hand",
+     "fw": 400,
+     "fs": 17,
+     "col": "text_muted",
+     "al": "center",
+     "rot": 0,
+     "children": []
+    }
+   ],
+   "hotspots": [
+    {
+     "n": "tab_CHƠI ĐƠN",
+     "rect": [
+      1166,
+      96,
+      114,
+      58
+     ],
+     "label": "CHƠI ĐƠN"
+    },
+    {
+     "n": "tab_XẾP HẠNG",
+     "rect": [
+      1166,
+      236,
+      114,
+      58
+     ],
+     "label": "XẾP HẠNG"
+    },
+    {
+     "n": "tab_CÀI ĐẶT",
+     "rect": [
+      1166,
+      306,
+      114,
+      58
+     ],
+     "label": "CÀI ĐẶT"
+    },
+    {
+     "n": "tab_PVP",
+     "rect": [
+      1166,
+      166,
+      114,
+      58
+     ],
+     "label": "PVP"
+    },
+    {
+     "n": "nut_Huỷ",
+     "rect": [
+      1010,
+      628,
+      87.1,
+      52
+     ],
+     "label": "Huỷ"
+    }
+   ],
+   "texts": [
+    {
+     "c": "CHƠI ĐƠN",
+     "rect": [
+      1192,
+      115.4,
+      63,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "XẾP HẠNG",
+     "rect": [
+      1192,
+      255.4,
+      65.9,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "CÀI ĐẶT",
+     "rect": [
+      1192,
+      325.4,
+      53.6,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "PVP",
+     "rect": [
+      1192,
+      185.4,
+      26.1,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "Đang tìm đối thủ",
+     "rect": [
+      60,
+      50,
+      286.1,
+      43.2
+     ],
+     "ff": "Inter",
+     "fs": 36
+    },
+    {
+     "c": "CẠNH TRANH · CẤP 3",
+     "rect": [
+      411,
+      67,
+      119.3,
+      16.8
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 14
+    },
+    {
+     "c": "A",
+     "rect": [
+      291.3,
+      260,
+      37.3,
+      60
+     ],
+     "ff": "Inter",
+     "fs": 50
+    },
+    {
+     "c": "anhkhoa",
+     "rect": [
+      160,
+      548,
+      300,
+      26.4
+     ],
+     "ff": "Inter",
+     "fs": 22
+    },
+    {
+     "c": "đã sẵn sàng",
+     "rect": [
+      160,
+      578.4,
+      300,
+      20.4
+     ],
+     "ff": "Patrick Hand",
+     "fs": 17
+    },
+    {
+     "c": "VS",
+     "rect": [
+      532,
+      320,
+      44,
+      57.6
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 48
+    },
+    {
+     "c": "?",
+     "rect": [
+      660,
+      270,
+      300,
+      115.2
+     ],
+     "ff": "Inter",
+     "fs": 96
+    },
+    {
+     "c": "Đang tìm…",
+     "rect": [
+      660,
+      548,
+      300,
+      26.4
+     ],
+     "ff": "Inter",
+     "fs": 22
+    },
+    {
+     "c": "Huỷ",
+     "rect": [
+      1037,
+      643.8,
+      33.1,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    }
+   ]
+  },
+  "moi_08c_moi_ban": {
+   "size": [
+    1280,
+    720
+   ],
+   "base": {
+    "ngay": "moi_08c_moi_ban/base_ngay.png",
+    "dem": "moi_08c_moi_ban/base_dem.png"
+   },
+   "top": {
+    "ngay": "moi_08c_moi_ban/top_ngay.png",
+    "dem": "moi_08c_moi_ban/top_dem.png"
+   },
+   "photos": [],
+   "dyn": [
+    {
+     "key": "room_code",
+     "n": "",
+     "t": "x",
+     "rect": [
+      100,
+      204.2,
+      402.3,
+      107.8
+     ],
+     "c": "PM-4821",
+     "ff": "Inter",
+     "fw": 700,
+     "fs": 84,
+     "col": "text",
+     "al": "left",
+     "rot": 0,
+     "children": []
+    },
+    {
+     "key": "field:MÃ PHÒNG",
+     "n": "",
+     "t": "x",
+     "rect": [
+      680,
+      214,
+      112.9,
+      36
+     ],
+     "c": "PM-____",
+     "ff": "Patrick Hand",
+     "fw": 400,
+     "fs": 30,
+     "col": "text",
+     "al": "left",
+     "rot": 0,
+     "children": []
+    }
+   ],
+   "hotspots": [
+    {
+     "n": "tab_CHƠI ĐƠN",
+     "rect": [
+      1166,
+      96,
+      114,
+      58
+     ],
+     "label": "CHƠI ĐƠN"
+    },
+    {
+     "n": "tab_XẾP HẠNG",
+     "rect": [
+      1166,
+      236,
+      114,
+      58
+     ],
+     "label": "XẾP HẠNG"
+    },
+    {
+     "n": "tab_CÀI ĐẶT",
+     "rect": [
+      1166,
+      306,
+      114,
+      58
+     ],
+     "label": "CÀI ĐẶT"
+    },
+    {
+     "n": "tab_PVP",
+     "rect": [
+      1166,
+      166,
+      114,
+      58
+     ],
+     "label": "PVP"
+    },
+    {
+     "n": "nut_Sao chép mã",
+     "rect": [
+      102,
+      321.2,
+      160.7,
+      54.8
+     ],
+     "label": "Sao chép mã"
+    },
+    {
+     "n": "o_MÃ PHÒNG",
+     "rect": [
+      680,
+      192,
+      420,
+      63.5
+     ],
+     "label": "MÃ PHÒNG"
+    },
+    {
+     "n": "nut_Vào phòng",
+     "rect": [
+      680,
+      273.5,
+      140.2,
+      52
+     ],
+     "label": "Vào phòng"
+    },
+    {
+     "n": "nut_Huỷ phòng",
+     "rect": [
+      1010,
+      628,
+      143.8,
+      52
+     ],
+     "label": "Huỷ phòng"
+    }
+   ],
+   "texts": [
+    {
+     "c": "CHƠI ĐƠN",
+     "rect": [
+      1192,
+      115.4,
+      63,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "XẾP HẠNG",
+     "rect": [
+      1192,
+      255.4,
+      65.9,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "CÀI ĐẶT",
+     "rect": [
+      1192,
+      325.4,
+      53.6,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "PVP",
+     "rect": [
+      1192,
+      185.4,
+      26.1,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "Mời bạn vào phòng",
+     "rect": [
+      60,
+      50,
+      333.8,
+      43.2
+     ],
+     "ff": "Inter",
+     "fs": 36
+    },
+    {
+     "c": "MÃ PHÒNG",
+     "rect": [
+      99.5,
+      180.1,
+      64.4,
+      19.1
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "Sao chép mã",
+     "rect": [
+      129.3,
+      337.4,
+      106.1,
+      22.2
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "gửi mã này cho bạn của bạn",
+     "rect": [
+      274,
+      330,
+      213.6,
+      30.1
+     ],
+     "ff": "Patrick Hand",
+     "fs": 22
+    },
+    {
+     "c": "Hoặc nhập mã bạn nhận được",
+     "rect": [
+      680,
+      150,
+      288,
+      24
+     ],
+     "ff": "Inter",
+     "fs": 20
+    },
+    {
+     "c": "MÃ PHÒNG",
+     "rect": [
+      680,
+      192,
+      64,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "Vào phòng",
+     "rect": [
+      706,
+      289.3,
+      88.2,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Đang chờ người thứ hai · 1/2",
+     "rect": [
+      82,
+      430,
+      240.4,
+      21.6
+     ],
+     "ff": "Inter",
+     "fs": 18
+    },
+    {
+     "c": "Huỷ phòng",
+     "rect": [
+      1037,
+      643.8,
+      89.8,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    }
+   ]
+  },
+  "moi_08d_da_tim": {
+   "size": [
+    1280,
+    720
+   ],
+   "base": {
+    "ngay": "moi_08d_da_tim/base_ngay.png",
+    "dem": "moi_08d_da_tim/base_dem.png"
+   },
+   "top": {
+    "ngay": "moi_08d_da_tim/top_ngay.png",
+    "dem": "moi_08d_da_tim/top_dem.png"
+   },
+   "photos": [],
+   "dyn": [
+    {
+     "key": "countdown",
+     "n": "",
+     "t": "x",
+     "rect": [
+      1019,
+      324.5,
+      52.4,
+      89.4
+     ],
+     "c": "3",
+     "ff": "Inter",
+     "fw": 700,
+     "fs": 72,
+     "col": "text",
+     "al": "left",
+     "rot": 0,
+     "children": []
+    }
+   ],
+   "hotspots": [
+    {
+     "n": "tab_CHƠI ĐƠN",
+     "rect": [
+      1166,
+      96,
+      114,
+      58
+     ],
+     "label": "CHƠI ĐƠN"
+    },
+    {
+     "n": "tab_XẾP HẠNG",
+     "rect": [
+      1166,
+      236,
+      114,
+      58
+     ],
+     "label": "XẾP HẠNG"
+    },
+    {
+     "n": "tab_CÀI ĐẶT",
+     "rect": [
+      1166,
+      306,
+      114,
+      58
+     ],
+     "label": "CÀI ĐẶT"
+    },
+    {
+     "n": "tab_PVP",
+     "rect": [
+      1166,
+      166,
+      114,
+      58
+     ],
+     "label": "PVP"
+    }
+   ],
+   "texts": [
+    {
+     "c": "CHƠI ĐƠN",
+     "rect": [
+      1192,
+      115.4,
+      63,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "XẾP HẠNG",
+     "rect": [
+      1192,
+      255.4,
+      65.9,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "CÀI ĐẶT",
+     "rect": [
+      1192,
+      325.4,
+      53.6,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "PVP",
+     "rect": [
+      1192,
+      185.4,
+      26.1,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "Đã tìm thấy đối thủ",
+     "rect": [
+      60,
+      50,
+      327.1,
+      43.2
+     ],
+     "ff": "Inter",
+     "fs": 36
+    },
+    {
+     "c": "CẠNH TRANH · CẤP 3",
+     "rect": [
+      451,
+      67,
+      119.3,
+      16.8
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 14
+    },
+    {
+     "c": "A",
+     "rect": [
+      291.3,
+      260,
+      37.3,
+      60
+     ],
+     "ff": "Inter",
+     "fs": 50
+    },
+    {
+     "c": "anhkhoa",
+     "rect": [
+      160,
+      548,
+      300,
+      26.4
+     ],
+     "ff": "Inter",
+     "fs": 22
+    },
+    {
+     "c": "● sẵn sàng",
+     "rect": [
+      160,
+      578.4,
+      300,
+      20.4
+     ],
+     "ff": "Patrick Hand",
+     "fs": 17
+    },
+    {
+     "c": "VS",
+     "rect": [
+      532,
+      320,
+      44,
+      57.6
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 48
+    },
+    {
+     "c": "N",
+     "rect": [
+      790.9,
+      260,
+      38.1,
+      60
+     ],
+     "ff": "Inter",
+     "fs": 50
+    },
+    {
+     "c": "Người chơi 2",
+     "rect": [
+      660,
+      548,
+      300,
+      26.4
+     ],
+     "ff": "Inter",
+     "fs": 22
+    },
+    {
+     "c": "● sẵn sàng",
+     "rect": [
+      660,
+      578.4,
+      300,
+      20.4
+     ],
+     "ff": "Patrick Hand",
+     "fs": 17
+    },
+    {
+     "c": "vào trận sau",
+     "rect": [
+      1008.7,
+      409.5,
+      80.6,
+      27.1
+     ],
+     "ff": "Patrick Hand",
+     "fs": 18
+    }
+   ]
+  },
+  "moi_09_man_choi_tho_san": {
+   "size": [
+    1280,
+    720
+   ],
+   "base": {
+    "ngay": "moi_09_man_choi_tho_san/base_ngay.png",
+    "dem": "moi_09_man_choi_tho_san/base_dem.png"
+   },
+   "top": {
+    "ngay": "moi_09_man_choi_tho_san/top_ngay.png",
+    "dem": "moi_09_man_choi_tho_san/top_dem.png"
+   },
+   "photos": [
+    {
+     "n": "anh_nguoi_choi (ảnh mẫu)",
+     "kind": "viewport",
+     "rect": [
+      66,
+      56,
+      868,
+      552
+     ]
+    }
+   ],
+   "dyn": [
+    {
+     "key": "level_tab",
+     "n": "tab_cap_do",
+     "t": "b",
+     "rect": [
+      66,
+      8,
+      146,
+      34
+     ],
+     "rot": 0,
+     "f": "sky_info_tint",
+     "sw": 0,
+     "r": "6",
+     "op": 1,
+     "children": [
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        80,
+        14,
+        118,
+        18
+       ],
+       "c": "PVP · CẠNH TRANH",
+       "ff": "Barlow Condensed",
+       "fw": 700,
+       "fs": 15,
+       "col": "primary",
+       "al": "left",
+       "rot": 0
+      }
+     ]
+    },
+    {
+     "key": "bugs",
+     "n": "bo_b4",
+     "t": "svg",
+     "rect": [
+      211.9,
+      405.9,
+      60.1,
+      60.1
+     ],
+     "children": []
+    },
+    {
+     "key": "bugs",
+     "n": "bo_b2",
+     "t": "svg",
+     "rect": [
+      610,
+      198,
+      32,
+      32
+     ],
+     "children": []
+    },
+    {
+     "key": "bugs",
+     "n": "bo_b3",
+     "t": "svg",
+     "rect": [
+      856.6,
+      410.6,
+      48.7,
+      48.7
+     ],
+     "children": []
+    },
+    {
+     "key": "bugs",
+     "n": "bo_b1",
+     "t": "svg",
+     "rect": [
+      447.5,
+      279.5,
+      41,
+      41
+     ],
+     "children": []
+    },
+    {
+     "key": "crosshair",
+     "n": "tam_ngam_vien",
+     "t": "e",
+     "rect": [
+      624,
+      314,
+      84,
+      84
+     ],
+     "rot": 0,
+     "s": "surface",
+     "sw": 4,
+     "r": "ellipse",
+     "op": 0.9,
+     "children": []
+    },
+    {
+     "key": "crosshair",
+     "n": "tam_ngam",
+     "t": "e",
+     "rect": [
+      626,
+      316,
+      80,
+      80
+     ],
+     "rot": 0,
+     "s": "text",
+     "sw": 2,
+     "r": "ellipse",
+     "op": 1,
+     "children": []
+    },
+    {
+     "key": "crosshair",
+     "n": "vach",
+     "t": "r",
+     "rect": [
+      665,
+      292,
+      2.5,
+      18
+     ],
+     "rot": 0,
+     "f": "text",
+     "sw": 0,
+     "r": "0",
+     "op": 1,
+     "children": []
+    },
+    {
+     "key": "crosshair",
+     "n": "vach",
+     "t": "r",
+     "rect": [
+      665,
+      402,
+      2.5,
+      18
+     ],
+     "rot": 0,
+     "f": "text",
+     "sw": 0,
+     "r": "0",
+     "op": 1,
+     "children": []
+    },
+    {
+     "key": "crosshair",
+     "n": "vach",
+     "t": "r",
+     "rect": [
+      602,
+      355,
+      18,
+      2.5
+     ],
+     "rot": 0,
+     "f": "text",
+     "sw": 0,
+     "r": "0",
+     "op": 1,
+     "children": []
+    },
+    {
+     "key": "crosshair",
+     "n": "vach",
+     "t": "r",
+     "rect": [
+      712,
+      355,
+      18,
+      2.5
+     ],
+     "rot": 0,
+     "f": "text",
+     "sw": 0,
+     "r": "0",
+     "op": 1,
+     "children": []
+    },
+    {
+     "key": "crosshair",
+     "n": "tam",
+     "t": "e",
+     "rect": [
+      663.5,
+      353.5,
+      5,
+      5
+     ],
+     "rot": 0,
+     "f": "text",
+     "sw": 0,
+     "r": "ellipse",
+     "op": 1,
+     "children": []
+    },
+    {
+     "key": "photo_caption",
+     "n": "nhan_ngay",
+     "t": "b",
+     "rect": [
+      119.4,
+      645.8,
+      243.6,
+      47.2
+     ],
+     "rot": -2,
+     "f": "surface",
+     "s": "border",
+     "sw": 1,
+     "r": "0",
+     "op": 1,
+     "children": [
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        136.6,
+        654.8,
+        112.1,
+        32.7
+       ],
+       "c": "06/11/2026 · ",
+       "ff": "Patrick Hand",
+       "fw": 400,
+       "fs": 24,
+       "col": "text",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        247.7,
+        651.4,
+        98.2,
+        32.2
+       ],
+       "c": "bị gặm 18%",
+       "ff": "Patrick Hand",
+       "fw": 400,
+       "fs": 24,
+       "col": "danger",
+       "al": "left",
+       "rot": 0
+      }
+     ]
+    },
+    {
+     "key": "timer",
+     "n": "",
+     "t": "x",
+     "rect": [
+      1008.6,
+      62.7,
+      137.2,
+      69.2
+     ],
+     "c": "01:48",
+     "ff": "Inter",
+     "fw": 700,
+     "fs": 50,
+     "col": "text",
+     "al": "left",
+     "rot": 0,
+     "children": []
+    },
+    {
+     "key": "kills",
+     "n": "",
+     "t": "x",
+     "rect": [
+      1017,
+      243,
+      23.3,
+      48
+     ],
+     "c": "7",
+     "ff": "Inter",
+     "fw": 700,
+     "fs": 40,
+     "col": "text",
+     "al": "left",
+     "rot": 0,
+     "children": []
+    },
+    {
+     "key": "kills_total",
+     "n": "",
+     "t": "x",
+     "rect": [
+      1040.3,
+      243,
+      56,
+      48
+     ],
+     "c": "/12",
+     "ff": "Inter",
+     "fw": 500,
+     "fs": 40,
+     "col": "text_muted",
+     "al": "left",
+     "rot": 0,
+     "children": []
+    },
+    {
+     "key": "kills_track",
+     "n": "thanh",
+     "t": "b",
+     "rect": [
+      1017,
+      295,
+      204,
+      12
+     ],
+     "rot": 0,
+     "f": "sky_info_tint",
+     "sw": 0,
+     "r": "0",
+     "op": 1,
+     "children": [
+      {
+       "n": "muc",
+       "t": "r",
+       "rect": [
+        1017,
+        295,
+        119,
+        12
+       ],
+       "rot": 0,
+       "f": "primary",
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      }
+     ]
+    },
+    {
+     "key": "kills_bar",
+     "n": "muc",
+     "t": "r",
+     "rect": [
+      1017,
+      295,
+      119,
+      12
+     ],
+     "rot": 0,
+     "f": "primary",
+     "sw": 0,
+     "r": "0",
+     "op": 1,
+     "children": []
+    },
+    {
+     "key": "opp_kills",
+     "n": "",
+     "t": "x",
+     "rect": [
+      1013,
+      375,
+      25.6,
+      48
+     ],
+     "c": "5",
+     "ff": "Inter",
+     "fw": 700,
+     "fs": 40,
+     "col": "text",
+     "al": "left",
+     "rot": 0,
+     "children": []
+    },
+    {
+     "key": "opp_kills_total",
+     "n": "",
+     "t": "x",
+     "rect": [
+      1038.6,
+      375,
+      56,
+      48
+     ],
+     "c": "/12",
+     "ff": "Inter",
+     "fw": 500,
+     "fs": 40,
+     "col": "text_muted",
+     "al": "left",
+     "rot": 0,
+     "children": []
+    },
+    {
+     "key": "opp_track",
+     "n": "thanh",
+     "t": "b",
+     "rect": [
+      1013,
+      427,
+      208,
+      12
+     ],
+     "rot": 0,
+     "f": "sky_info_tint",
+     "sw": 0,
+     "r": "0",
+     "op": 1,
+     "children": [
+      {
+       "n": "muc",
+       "t": "r",
+       "rect": [
+        1013,
+        427,
+        87,
+        12
+       ],
+       "rot": 0,
+       "f": "text_muted",
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      }
+     ]
+    },
+    {
+     "key": "opp_bar",
+     "n": "muc",
+     "t": "r",
+     "rect": [
+      1013,
+      427,
+      87,
+      12
+     ],
+     "rot": 0,
+     "f": "text_muted",
+     "sw": 0,
+     "r": "0",
+     "op": 1,
+     "children": []
+    },
+    {
+     "key": "opp_items",
+     "n": "",
+     "t": "x",
+     "rect": [
+      1013,
+      443,
+      123.6,
+      21.6
+     ],
+     "c": "đã dùng 1 vật phẩm",
+     "ff": "Patrick Hand",
+     "fw": 400,
+     "fs": 18,
+     "col": "text_muted",
+     "al": "left",
+     "rot": 0,
+     "children": []
+    },
+    {
+     "key": "layer",
+     "n": "",
+     "t": "x",
+     "rect": [
+      1099,
+      512.6,
+      47.7,
+      26.4
+     ],
+     "c": "2 / 4",
+     "ff": "Inter",
+     "fw": 700,
+     "fs": 22,
+     "col": "text",
+     "al": "left",
+     "rot": 0,
+     "children": []
+    },
+    {
+     "key": "items",
+     "n": "vat_pham",
+     "t": "b",
+     "rect": [
+      560,
+      654,
+      256.2,
+      34
+     ],
+     "rot": 0,
+     "sw": 0,
+     "r": "0",
+     "op": 1,
+     "children": [
+      {
+       "n": "sticker",
+       "t": "b",
+       "rect": [
+        560,
+        654,
+        122.1,
+        34
+       ],
+       "rot": 0,
+       "f": "surface",
+       "s": "border",
+       "sw": 1,
+       "r": "0",
+       "op": 1
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        571,
+        662,
+        100.1,
+        18
+       ],
+       "c": "1 · THUỐC GIẢI ×1",
+       "ff": "Barlow Condensed",
+       "fw": 700,
+       "fs": 15,
+       "col": "text",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "sticker",
+       "t": "b",
+       "rect": [
+        690.1,
+        654,
+        126.1,
+        34
+       ],
+       "rot": 0,
+       "f": "surface",
+       "s": "border",
+       "sw": 1,
+       "r": "0",
+       "op": 1
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        701.1,
+        662,
+        104.1,
+        18
+       ],
+       "c": "2 · PHÁO SÁNG ×2",
+       "ff": "Barlow Condensed",
+       "fw": 700,
+       "fs": 15,
+       "col": "text",
+       "al": "left",
+       "rot": 0
+      }
+     ]
+    },
+    {
+     "key": "ammo",
+     "n": "",
+     "t": "x",
+     "rect": [
+      998,
+      640,
+      171.8,
+      18
+     ],
+     "c": "SÚNG CHÍNH XÁC · ĐẠN 9/10",
+     "ff": "Barlow Condensed",
+     "fw": 700,
+     "fs": 15,
+     "col": "text",
+     "al": "left",
+     "rot": 0,
+     "children": []
+    },
+    {
+     "key": "head",
+     "n": "",
+     "t": "x",
+     "rect": [
+      998,
+      664,
+      73.8,
+      18
+     ],
+     "c": "● Đầu: tốt",
+     "ff": "Inter",
+     "fw": 500,
+     "fs": 15,
+     "col": "success",
+     "al": "left",
+     "rot": 0,
+     "children": []
+    }
+   ],
+   "hotspots": [
+    {
+     "n": "tab_cap_do",
+     "rect": [
+      66,
+      8,
+      146,
+      34
+     ],
+     "label": "PVP · CẠNH TRANH"
+    }
+   ],
+   "texts": [
+    {
+     "c": "ai diệt hết trước?",
+     "rect": [
+      1024.5,
+      123.3,
+      111.3,
+      29.2
+     ],
+     "ff": "Patrick Hand",
+     "fs": 18
+    },
+    {
+     "c": "BẠN",
+     "rect": [
+      1017,
+      221,
+      25.6,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "NGƯỜI CHƠI 2",
+     "rect": [
+      1013,
+      353,
+      84.1,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "LỚP ĐANG THẤY",
+     "rect": [
+      1099,
+      497,
+      86.3,
+      15.6
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 13
+    },
+    {
+     "c": "Esc: tạm dừng",
+     "rect": [
+      1110,
+      664,
+      101.4,
+      18
+     ],
+     "ff": "Inter",
+     "fs": 15
+    }
+   ]
+  },
+  "moi_09b_hud_hoa_bo": {
+   "size": [
+    1280,
+    720
+   ],
+   "base": {
+    "ngay": "moi_09b_hud_hoa_bo/base_ngay.png",
+    "dem": "moi_09b_hud_hoa_bo/base_dem.png"
+   },
+   "top": {
+    "ngay": "moi_09b_hud_hoa_bo/top_ngay.png",
+    "dem": "moi_09b_hud_hoa_bo/top_dem.png"
+   },
+   "photos": [
+    {
+     "n": "anh_nguoi_choi (ảnh mẫu)",
+     "kind": "viewport",
+     "rect": [
+      66,
+      56,
+      868,
+      552
+     ]
+    }
+   ],
+   "dyn": [
+    {
+     "key": "level_tab",
+     "n": "tab_cap_do",
+     "t": "b",
+     "rect": [
+      66,
+      8,
+      223,
+      34
+     ],
+     "rot": 0,
+     "f": "sky_danger_tint",
+     "sw": 0,
+     "r": "6",
+     "op": 1,
+     "children": [
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        80,
+        14,
+        195,
+        18
+       ],
+       "c": "PVP · SĂN & TRỐN · BẠN LÀ BỌ",
+       "ff": "Barlow Condensed",
+       "fw": 700,
+       "fs": 15,
+       "col": "danger",
+       "al": "left",
+       "rot": 0
+      }
+     ]
+    },
+    {
+     "key": "bugs",
+     "n": "bo_b2",
+     "t": "svg",
+     "rect": [
+      610,
+      198,
+      32,
+      32
+     ],
+     "children": []
+    },
+    {
+     "key": "bugs",
+     "n": "bo_b1",
+     "t": "svg",
+     "rect": [
+      447.5,
+      279.5,
+      41,
+      41
+     ],
+     "children": []
+    },
+    {
+     "key": "bugs",
+     "n": "bo_b4",
+     "t": "svg",
+     "rect": [
+      373,
+      393,
+      64.1,
+      64.1
+     ],
+     "children": []
+    },
+    {
+     "key": "photo_caption",
+     "n": "nhan_ngay",
+     "t": "b",
+     "rect": [
+      119.4,
+      645.8,
+      243.6,
+      47.2
+     ],
+     "rot": -2,
+     "f": "surface",
+     "s": "border",
+     "sw": 1,
+     "r": "0",
+     "op": 1,
+     "children": [
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        136.6,
+        654.8,
+        112.1,
+        32.7
+       ],
+       "c": "06/11/2026 · ",
+       "ff": "Patrick Hand",
+       "fw": 400,
+       "fs": 24,
+       "col": "text",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        247.7,
+        651.4,
+        98.2,
+        32.2
+       ],
+       "c": "bị gặm 18%",
+       "ff": "Patrick Hand",
+       "fw": 400,
+       "fs": 24,
+       "col": "danger",
+       "al": "left",
+       "rot": 0
+      }
+     ]
+    },
+    {
+     "key": "timer",
+     "n": "",
+     "t": "x",
+     "rect": [
+      1004,
+      62.3,
+      146.4,
+      69.8
+     ],
+     "c": "02:05",
+     "ff": "Inter",
+     "fw": 700,
+     "fs": 50,
+     "col": "text",
+     "al": "left",
+     "rot": 0,
+     "children": []
+    },
+    {
+     "key": "exposure",
+     "n": "",
+     "t": "x",
+     "rect": [
+      1017,
+      243,
+      92,
+      48
+     ],
+     "c": "35%",
+     "ff": "Inter",
+     "fw": 700,
+     "fs": 40,
+     "col": "danger",
+     "al": "left",
+     "rot": 0,
+     "children": []
+    },
+    {
+     "key": "exposure_track",
+     "n": "thanh",
+     "t": "b",
+     "rect": [
+      1017,
+      295,
+      204,
+      12
+     ],
+     "rot": 0,
+     "f": "sky_danger_tint",
+     "sw": 0,
+     "r": "0",
+     "op": 1,
+     "children": [
+      {
+       "n": "muc",
+       "t": "r",
+       "rect": [
+        1017,
+        295,
+        71,
+        12
+       ],
+       "rot": 0,
+       "f": "danger",
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      }
+     ]
+    },
+    {
+     "key": "exposure_bar",
+     "n": "muc",
+     "t": "r",
+     "rect": [
+      1017,
+      295,
+      71,
+      12
+     ],
+     "rot": 0,
+     "f": "danger",
+     "sw": 0,
+     "r": "0",
+     "op": 1,
+     "children": []
+    },
+    {
+     "key": "hunter_progress",
+     "n": "",
+     "t": "x",
+     "rect": [
+      998,
+      380,
+      238.4,
+      19.2
+     ],
+     "c": "Thợ săn đã diệt 6/10 bọ thường",
+     "ff": "Inter",
+     "fw": 600,
+     "fs": 16,
+     "col": "text",
+     "al": "left",
+     "rot": 0,
+     "children": []
+    }
+   ],
+   "hotspots": [
+    {
+     "n": "tab_cap_do",
+     "rect": [
+      66,
+      8,
+      223,
+      34
+     ],
+     "label": "PVP · SĂN & TRỐN · BẠN LÀ BỌ"
+    },
+    {
+     "n": "ky_nang_Chui sâu",
+     "rect": [
+      996,
+      414,
+      114,
+      64
+     ],
+     "label": "Q"
+    },
+    {
+     "n": "ky_nang_Ngụy trang",
+     "rect": [
+      1118,
+      414,
+      114,
+      64
+     ],
+     "label": "W"
+    },
+    {
+     "n": "ky_nang_Phun axit",
+     "rect": [
+      996,
+      486,
+      114,
+      64
+     ],
+     "label": "E"
+    },
+    {
+     "n": "ky_nang_Gây mù",
+     "rect": [
+      1118,
+      486,
+      114,
+      64
+     ],
+     "label": "R"
+    },
+    {
+     "n": "ky_nang_Đảo hướng",
+     "rect": [
+      996,
+      558,
+      114,
+      64
+     ],
+     "label": "A"
+    },
+    {
+     "n": "ky_nang_Tạo ảo giác",
+     "rect": [
+      1118,
+      558,
+      114,
+      64
+     ],
+     "label": "S"
+    }
+   ],
+   "texts": [
+    {
+     "c": "bạn",
+     "rect": [
+      450,
+      380,
+      32.7,
+      31.2
+     ],
+     "ff": "Patrick Hand",
+     "fs": 26
+    },
+    {
+     "c": "thợ săn đang ngắm",
+     "rect": [
+      650,
+      250,
+      149.5,
+      26.4
+     ],
+     "ff": "Patrick Hand",
+     "fs": 22
+    },
+    {
+     "c": "sống tới 00:00 là thắng",
+     "rect": [
+      1004.7,
+      121.9,
+      150.8,
+      32
+     ],
+     "ff": "Patrick Hand",
+     "fs": 18
+    },
+    {
+     "c": "ĐỘ LỘ DIỆN",
+     "rect": [
+      1017,
+      221,
+      71,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "đứng yên lâu sẽ bị lộ",
+     "rect": [
+      1017,
+      311,
+      131.7,
+      21.6
+     ],
+     "ff": "Patrick Hand",
+     "fs": 18
+    },
+    {
+     "c": "Q",
+     "rect": [
+      1017,
+      427,
+      7.5,
+      16.8
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 14
+    },
+    {
+     "c": "Chui sâu",
+     "rect": [
+      1007,
+      449.8,
+      63.8,
+      18
+     ],
+     "ff": "Inter",
+     "fs": 15
+    },
+    {
+     "c": "W",
+     "rect": [
+      1140,
+      428,
+      10.7,
+      16.8
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 14
+    },
+    {
+     "c": "Ngụy trang",
+     "rect": [
+      1130,
+      450.8,
+      81.8,
+      18
+     ],
+     "ff": "Inter",
+     "fs": 15
+    },
+    {
+     "c": "E",
+     "rect": [
+      1017,
+      499,
+      7.1,
+      16.8
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 14
+    },
+    {
+     "c": "4s",
+     "rect": [
+      1040.1,
+      499.6,
+      11.7,
+      15.6
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 13
+    },
+    {
+     "c": "Phun axit",
+     "rect": [
+      1007,
+      521.8,
+      68.3,
+      18
+     ],
+     "ff": "Inter",
+     "fs": 15
+    },
+    {
+     "c": "R",
+     "rect": [
+      1139,
+      499,
+      7.6,
+      16.8
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 14
+    },
+    {
+     "c": "Gây mù",
+     "rect": [
+      1129,
+      521.8,
+      55.3,
+      18
+     ],
+     "ff": "Inter",
+     "fs": 15
+    },
+    {
+     "c": "A",
+     "rect": [
+      1017,
+      571,
+      7.8,
+      16.8
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 14
+    },
+    {
+     "c": "9s",
+     "rect": [
+      1040.8,
+      571.6,
+      11,
+      15.6
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 13
+    },
+    {
+     "c": "Đảo hướng",
+     "rect": [
+      1007,
+      593.8,
+      78.7,
+      18
+     ],
+     "ff": "Inter",
+     "fs": 15
+    },
+    {
+     "c": "S",
+     "rect": [
+      1139,
+      571,
+      7.2,
+      16.8
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 14
+    },
+    {
+     "c": "Tạo ảo giác",
+     "rect": [
+      1129,
+      593.8,
+      82.9,
+      18
+     ],
+     "ff": "Inter",
+     "fs": 15
+    },
+    {
+     "c": "Chuột: di chuyển · Q–S: kỹ năng",
+     "rect": [
+      560,
+      660,
+      226.4,
+      18
+     ],
+     "ff": "Inter",
+     "fs": 15
+    }
+   ]
+  },
+  "moi_10_ket_qua_pvp": {
+   "size": [
+    1280,
+    720
+   ],
+   "base": {
+    "ngay": "moi_10_ket_qua_pvp/base_ngay.png",
+    "dem": "moi_10_ket_qua_pvp/base_dem.png"
+   },
+   "top": {
+    "ngay": "moi_10_ket_qua_pvp/top_ngay.png",
+    "dem": "moi_10_ket_qua_pvp/top_dem.png"
+   },
+   "photos": [],
+   "dyn": [
+    {
+     "key": "score_table_0",
+     "n": "bang_diem",
+     "t": "b",
+     "rect": [
+      104,
+      226,
+      432,
+      171.6
+     ],
+     "rot": 0,
+     "sw": 0,
+     "r": "0",
+     "op": 1,
+     "children": [
+      {
+       "n": "dong",
+       "t": "b",
+       "rect": [
+        104,
+        226,
+        432,
+        24
+       ],
+       "rot": 0,
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        104,
+        227.2,
+        139.2,
+        21.6
+       ],
+       "c": "Thời gian còn lại",
+       "ff": "Inter",
+       "fw": 400,
+       "fs": 18,
+       "col": "text",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        509.9,
+        226,
+        26.1,
+        24
+       ],
+       "c": "42",
+       "ff": "Inter",
+       "fw": 700,
+       "fs": 20,
+       "col": "text",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "dong",
+       "t": "b",
+       "rect": [
+        104,
+        260,
+        432,
+        24
+       ],
+       "rot": 0,
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        104,
+        261.2,
+        134.3,
+        21.6
+       ],
+       "c": "Thuốc giải 1 × 5",
+       "ff": "Inter",
+       "fw": 400,
+       "fs": 18,
+       "col": "text",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        509.6,
+        260,
+        26.4,
+        24
+       ],
+       "c": "−5",
+       "ff": "Inter",
+       "fw": 700,
+       "fs": 20,
+       "col": "danger",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "dong",
+       "t": "b",
+       "rect": [
+        104,
+        294,
+        432,
+        24
+       ],
+       "rot": 0,
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        104,
+        295.2,
+        138.6,
+        21.6
+       ],
+       "c": "Pháo sáng 2 × 3",
+       "ff": "Inter",
+       "fw": 400,
+       "fs": 18,
+       "col": "text",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        509.4,
+        294,
+        26.6,
+        24
+       ],
+       "c": "−6",
+       "ff": "Inter",
+       "fw": 700,
+       "fs": 20,
+       "col": "danger",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "ke_tong",
+       "t": "r",
+       "rect": [
+        104,
+        328,
+        432,
+        2
+       ],
+       "rot": 0,
+       "f": "text",
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      },
+      {
+       "n": "tong",
+       "t": "b",
+       "rect": [
+        104,
+        340,
+        432,
+        57.6
+       ],
+       "rot": 0,
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        104,
+        355.6,
+        55,
+        26.4
+       ],
+       "c": "Điểm",
+       "ff": "Inter",
+       "fw": 700,
+       "fs": 22,
+       "col": "text",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        484.3,
+        340,
+        51.7,
+        57.6
+       ],
+       "c": "31",
+       "ff": "Inter",
+       "fw": 700,
+       "fs": 48,
+       "col": "success",
+       "al": "left",
+       "rot": 0
+      }
+     ]
+    },
+    {
+     "key": "score_table_1",
+     "n": "bang_diem",
+     "t": "b",
+     "rect": [
+      656,
+      226,
+      432,
+      137.6
+     ],
+     "rot": 0,
+     "sw": 0,
+     "r": "0",
+     "op": 1,
+     "children": [
+      {
+       "n": "dong",
+       "t": "b",
+       "rect": [
+        656,
+        226,
+        432,
+        24
+       ],
+       "rot": 0,
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        656,
+        227.2,
+        139.2,
+        21.6
+       ],
+       "c": "Thời gian còn lại",
+       "ff": "Inter",
+       "fw": 400,
+       "fs": 18,
+       "col": "text",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        1066.4,
+        226,
+        21.6,
+        24
+       ],
+       "c": "18",
+       "ff": "Inter",
+       "fw": 700,
+       "fs": 20,
+       "col": "text",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "dong",
+       "t": "b",
+       "rect": [
+        656,
+        260,
+        432,
+        24
+       ],
+       "rot": 0,
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        656,
+        261.2,
+        172,
+        21.6
+       ],
+       "c": "Máy quét nhiệt 1 × 8",
+       "ff": "Inter",
+       "fw": 400,
+       "fs": 18,
+       "col": "text",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        1061.4,
+        260,
+        26.6,
+        24
+       ],
+       "c": "−8",
+       "ff": "Inter",
+       "fw": 700,
+       "fs": 20,
+       "col": "danger",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "ke_tong",
+       "t": "r",
+       "rect": [
+        656,
+        294,
+        432,
+        2
+       ],
+       "rot": 0,
+       "f": "text",
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      },
+      {
+       "n": "tong",
+       "t": "b",
+       "rect": [
+        656,
+        306,
+        432,
+        57.6
+       ],
+       "rot": 0,
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        656,
+        321.6,
+        55,
+        26.4
+       ],
+       "c": "Điểm",
+       "ff": "Inter",
+       "fw": 700,
+       "fs": 22,
+       "col": "text",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        1034.9,
+        306,
+        53.1,
+        57.6
+       ],
+       "c": "10",
+       "ff": "Inter",
+       "fw": 700,
+       "fs": 48,
+       "col": "text",
+       "al": "left",
+       "rot": 0
+      }
+     ]
+    }
+   ],
+   "hotspots": [
+    {
+     "n": "tab_CHƠI ĐƠN",
+     "rect": [
+      1166,
+      96,
+      114,
+      58
+     ],
+     "label": "CHƠI ĐƠN"
+    },
+    {
+     "n": "tab_XẾP HẠNG",
+     "rect": [
+      1166,
+      236,
+      114,
+      58
+     ],
+     "label": "XẾP HẠNG"
+    },
+    {
+     "n": "tab_CÀI ĐẶT",
+     "rect": [
+      1166,
+      306,
+      114,
+      58
+     ],
+     "label": "CÀI ĐẶT"
+    },
+    {
+     "n": "tab_PVP",
+     "rect": [
+      1166,
+      166,
+      114,
+      58
+     ],
+     "label": "PVP"
+    },
+    {
+     "n": "nut_Về album",
+     "rect": [
+      740,
+      628,
+      130.3,
+      52
+     ],
+     "label": "Về album"
+    },
+    {
+     "n": "nut_Bảng xếp hạng",
+     "rect": [
+      882.3,
+      628,
+      175.8,
+      52
+     ],
+     "label": "Bảng xếp hạng"
+    },
+    {
+     "n": "nut_Đấu lại",
+     "rect": [
+      1070,
+      628,
+      107.4,
+      52
+     ],
+     "label": "Đấu lại"
+    }
+   ],
+   "texts": [
+    {
+     "c": "CHƠI ĐƠN",
+     "rect": [
+      1192,
+      115.4,
+      63,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "XẾP HẠNG",
+     "rect": [
+      1192,
+      255.4,
+      65.9,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "CÀI ĐẶT",
+     "rect": [
+      1192,
+      325.4,
+      53.6,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "PVP",
+     "rect": [
+      1192,
+      185.4,
+      26.1,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "A",
+     "rect": [
+      120.5,
+      159.2,
+      14.9,
+      24
+     ],
+     "ff": "Inter",
+     "fs": 20
+    },
+    {
+     "c": "anhkhoa",
+     "rect": [
+      164,
+      146,
+      101.6,
+      28.8
+     ],
+     "ff": "Inter",
+     "fs": 24
+    },
+    {
+     "c": "thắng trận này",
+     "rect": [
+      164,
+      174.8,
+      96.4,
+      21.6
+     ],
+     "ff": "Patrick Hand",
+     "fs": 18
+    },
+    {
+     "c": "THẮNG",
+     "rect": [
+      413.2,
+      103.3,
+      115.6,
+      52.3
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 34
+    },
+    {
+     "c": "N",
+     "rect": [
+      672.4,
+      159.2,
+      15.3,
+      24
+     ],
+     "ff": "Inter",
+     "fs": 20
+    },
+    {
+     "c": "Người chơi 2",
+     "rect": [
+      716,
+      146,
+      145.9,
+      28.8
+     ],
+     "ff": "Inter",
+     "fs": 24
+    },
+    {
+     "c": "về nhì",
+     "rect": [
+      716,
+      174.8,
+      38.2,
+      21.6
+     ],
+     "ff": "Patrick Hand",
+     "fs": 18
+    },
+    {
+     "c": "Thời gian còn lại tính riêng cho từng người: lúc diệt xong con bọ cuối, hoặc 0 nếu hết giờ.",
+     "rect": [
+      60,
+      516,
+      1072,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Về album",
+     "rect": [
+      767,
+      643.8,
+      76.3,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Bảng xếp hạng",
+     "rect": [
+      909.3,
+      643.8,
+      121.8,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Đấu lại",
+     "rect": [
+      1096,
+      643.8,
+      55.4,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    }
+   ]
+  },
+  "moi_11_bang_xep_hang": {
+   "size": [
+    1280,
+    720
+   ],
+   "base": {
+    "ngay": "moi_11_bang_xep_hang/base_ngay.png",
+    "dem": "moi_11_bang_xep_hang/base_dem.png"
+   },
+   "top": {
+    "ngay": "moi_11_bang_xep_hang/top_ngay.png",
+    "dem": "moi_11_bang_xep_hang/top_dem.png"
+   },
+   "photos": [],
+   "dyn": [
+    {
+     "key": "podium_2",
+     "n": "ten_2",
+     "t": "b",
+     "rect": [
+      50,
+      392,
+      210,
+      76
+     ],
+     "rot": 0,
+     "sw": 0,
+     "r": "0",
+     "op": 1,
+     "children": [
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        50,
+        392,
+        210,
+        24
+       ],
+       "c": "Người chơi B",
+       "ff": "Inter",
+       "fw": 700,
+       "fs": 20,
+       "col": "text",
+       "al": "center",
+       "rot": 0
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        50,
+        418,
+        210,
+        21.6
+       ],
+       "c": "1.120 điểm",
+       "ff": "Inter",
+       "fw": 400,
+       "fs": 18,
+       "col": "text_muted",
+       "al": "center",
+       "rot": 0
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        50,
+        441.6,
+        210,
+        26.4
+       ],
+       "c": "Thợ Săn Sao Băng",
+       "ff": "Patrick Hand",
+       "fw": 400,
+       "fs": 22,
+       "col": "primary",
+       "al": "center",
+       "rot": 0
+      }
+     ]
+    },
+    {
+     "key": "podium_1",
+     "n": "ten_1",
+     "t": "b",
+     "rect": [
+      260,
+      392,
+      240,
+      76
+     ],
+     "rot": 0,
+     "sw": 0,
+     "r": "0",
+     "op": 1,
+     "children": [
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        260,
+        392,
+        240,
+        24
+       ],
+       "c": "Người chơi A",
+       "ff": "Inter",
+       "fw": 700,
+       "fs": 20,
+       "col": "text",
+       "al": "center",
+       "rot": 0
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        260,
+        418,
+        240,
+        21.6
+       ],
+       "c": "1.240 điểm",
+       "ff": "Inter",
+       "fw": 400,
+       "fs": 18,
+       "col": "text_muted",
+       "al": "center",
+       "rot": 0
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        260,
+        441.6,
+        240,
+        26.4
+       ],
+       "c": "Người Giữ Ký Ức",
+       "ff": "Patrick Hand",
+       "fw": 400,
+       "fs": 22,
+       "col": "warning",
+       "al": "center",
+       "rot": 0
+      }
+     ]
+    },
+    {
+     "key": "podium_3",
+     "n": "ten_3",
+     "t": "b",
+     "rect": [
+      500,
+      392,
+      210,
+      76
+     ],
+     "rot": 0,
+     "sw": 0,
+     "r": "0",
+     "op": 1,
+     "children": [
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        500,
+        392,
+        210,
+        24
+       ],
+       "c": "Người chơi C",
+       "ff": "Inter",
+       "fw": 700,
+       "fs": 20,
+       "col": "text",
+       "al": "center",
+       "rot": 0
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        500,
+        418,
+        210,
+        21.6
+       ],
+       "c": "1.050 điểm",
+       "ff": "Inter",
+       "fw": 400,
+       "fs": 18,
+       "col": "text_muted",
+       "al": "center",
+       "rot": 0
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        500,
+        441.6,
+        210,
+        26.4
+       ],
+       "c": "Mắt Thép",
+       "ff": "Patrick Hand",
+       "fw": 400,
+       "fs": 22,
+       "col": "primary",
+       "al": "center",
+       "rot": 0
+      }
+     ]
+    },
+    {
+     "key": "lb_rows",
+     "n": "danh_sach",
+     "t": "b",
+     "rect": [
+      740,
+      156,
+      400,
+      344
+     ],
+     "rot": 0,
+     "sw": 0,
+     "r": "0",
+     "op": 1,
+     "children": [
+      {
+       "n": "dong_4",
+       "t": "b",
+       "rect": [
+        740,
+        156,
+        400,
+        46
+       ],
+       "rot": 0,
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        750,
+        168.2,
+        30,
+        21.6
+       ],
+       "c": "4",
+       "ff": "Barlow Condensed",
+       "fw": 700,
+       "fs": 18,
+       "col": "text_muted",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        794,
+        164.6,
+        230,
+        28.8
+       ],
+       "c": "Người chơi D",
+       "ff": "Patrick Hand",
+       "fw": 400,
+       "fs": 24,
+       "col": "text",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        1038,
+        167,
+        80,
+        24
+       ],
+       "c": "1000",
+       "ff": "Inter",
+       "fw": 700,
+       "fs": 20,
+       "col": "text",
+       "al": "right",
+       "rot": 0
+      },
+      {
+       "n": "ke",
+       "t": "r",
+       "rect": [
+        740,
+        202,
+        400,
+        1
+       ],
+       "rot": 0,
+       "f": "border",
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      },
+      {
+       "n": "dong_5",
+       "t": "b",
+       "rect": [
+        740,
+        203,
+        400,
+        46
+       ],
+       "rot": 0,
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        750,
+        215.2,
+        30,
+        21.6
+       ],
+       "c": "5",
+       "ff": "Barlow Condensed",
+       "fw": 700,
+       "fs": 18,
+       "col": "text_muted",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        794,
+        211.6,
+        230,
+        28.8
+       ],
+       "c": "Người chơi E",
+       "ff": "Patrick Hand",
+       "fw": 400,
+       "fs": 24,
+       "col": "text",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        1038,
+        214,
+        80,
+        24
+       ],
+       "c": "940",
+       "ff": "Inter",
+       "fw": 700,
+       "fs": 20,
+       "col": "text",
+       "al": "right",
+       "rot": 0
+      },
+      {
+       "n": "ke",
+       "t": "r",
+       "rect": [
+        740,
+        249,
+        400,
+        1
+       ],
+       "rot": 0,
+       "f": "border",
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      },
+      {
+       "n": "dong_6",
+       "t": "b",
+       "rect": [
+        740,
+        250,
+        400,
+        46
+       ],
+       "rot": 0,
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        750,
+        262.2,
+        30,
+        21.6
+       ],
+       "c": "6",
+       "ff": "Barlow Condensed",
+       "fw": 700,
+       "fs": 18,
+       "col": "text_muted",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        794,
+        258.6,
+        230,
+        28.8
+       ],
+       "c": "Người chơi F",
+       "ff": "Patrick Hand",
+       "fw": 400,
+       "fs": 24,
+       "col": "text",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        1038,
+        261,
+        80,
+        24
+       ],
+       "c": "880",
+       "ff": "Inter",
+       "fw": 700,
+       "fs": 20,
+       "col": "text",
+       "al": "right",
+       "rot": 0
+      },
+      {
+       "n": "ke",
+       "t": "r",
+       "rect": [
+        740,
+        296,
+        400,
+        1
+       ],
+       "rot": 0,
+       "f": "border",
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      },
+      {
+       "n": "dong_7",
+       "t": "b",
+       "rect": [
+        740,
+        297,
+        400,
+        46
+       ],
+       "rot": 0,
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        750,
+        309.2,
+        30,
+        21.6
+       ],
+       "c": "7",
+       "ff": "Barlow Condensed",
+       "fw": 700,
+       "fs": 18,
+       "col": "text_muted",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        794,
+        305.6,
+        230,
+        28.8
+       ],
+       "c": "Người chơi G",
+       "ff": "Patrick Hand",
+       "fw": 400,
+       "fs": 24,
+       "col": "text",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        1038,
+        308,
+        80,
+        24
+       ],
+       "c": "820",
+       "ff": "Inter",
+       "fw": 700,
+       "fs": 20,
+       "col": "text",
+       "al": "right",
+       "rot": 0
+      },
+      {
+       "n": "ke",
+       "t": "r",
+       "rect": [
+        740,
+        343,
+        400,
+        1
+       ],
+       "rot": 0,
+       "f": "border",
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      },
+      {
+       "n": "dong_8",
+       "t": "b",
+       "rect": [
+        740,
+        344,
+        400,
+        46
+       ],
+       "rot": 0,
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        750,
+        356.2,
+        30,
+        21.6
+       ],
+       "c": "8",
+       "ff": "Barlow Condensed",
+       "fw": 700,
+       "fs": 18,
+       "col": "text_muted",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        794,
+        352.6,
+        230,
+        28.8
+       ],
+       "c": "Người chơi H",
+       "ff": "Patrick Hand",
+       "fw": 400,
+       "fs": 24,
+       "col": "text",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        1038,
+        355,
+        80,
+        24
+       ],
+       "c": "760",
+       "ff": "Inter",
+       "fw": 700,
+       "fs": 20,
+       "col": "text",
+       "al": "right",
+       "rot": 0
+      },
+      {
+       "n": "ke",
+       "t": "r",
+       "rect": [
+        740,
+        390,
+        400,
+        1
+       ],
+       "rot": 0,
+       "f": "border",
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      },
+      {
+       "n": "dong_9",
+       "t": "b",
+       "rect": [
+        740,
+        391,
+        400,
+        46
+       ],
+       "rot": 0,
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        750,
+        403.2,
+        30,
+        21.6
+       ],
+       "c": "9",
+       "ff": "Barlow Condensed",
+       "fw": 700,
+       "fs": 18,
+       "col": "text_muted",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        794,
+        399.6,
+        230,
+        28.8
+       ],
+       "c": "Người chơi I",
+       "ff": "Patrick Hand",
+       "fw": 400,
+       "fs": 24,
+       "col": "text",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        1038,
+        402,
+        80,
+        24
+       ],
+       "c": "700",
+       "ff": "Inter",
+       "fw": 700,
+       "fs": 20,
+       "col": "text",
+       "al": "right",
+       "rot": 0
+      },
+      {
+       "n": "ke",
+       "t": "r",
+       "rect": [
+        740,
+        437,
+        400,
+        1
+       ],
+       "rot": 0,
+       "f": "border",
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      },
+      {
+       "n": "cach",
+       "t": "r",
+       "rect": [
+        740,
+        438,
+        10,
+        16
+       ],
+       "rot": 0,
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      },
+      {
+       "n": "dong_12",
+       "t": "b",
+       "rect": [
+        740,
+        454,
+        400,
+        46
+       ],
+       "rot": 0,
+       "f": "sky_info_tint",
+       "sw": 0,
+       "r": "0",
+       "op": 1
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        750,
+        466.2,
+        30,
+        21.6
+       ],
+       "c": "12",
+       "ff": "Barlow Condensed",
+       "fw": 700,
+       "fs": 18,
+       "col": "text_muted",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        794,
+        462.6,
+        230,
+        28.8
+       ],
+       "c": "Bạn · anhkhoa",
+       "ff": "Patrick Hand",
+       "fw": 400,
+       "fs": 24,
+       "col": "text",
+       "al": "left",
+       "rot": 0
+      },
+      {
+       "n": "",
+       "t": "x",
+       "rect": [
+        1038,
+        465,
+        80,
+        24
+       ],
+       "c": "640",
+       "ff": "Inter",
+       "fw": 700,
+       "fs": 20,
+       "col": "text",
+       "al": "right",
+       "rot": 0
+      }
+     ]
+    }
+   ],
+   "hotspots": [
+    {
+     "n": "tab_CHƠI ĐƠN",
+     "rect": [
+      1166,
+      96,
+      114,
+      58
+     ],
+     "label": "CHƠI ĐƠN"
+    },
+    {
+     "n": "tab_PVP",
+     "rect": [
+      1166,
+      166,
+      114,
+      58
+     ],
+     "label": "PVP"
+    },
+    {
+     "n": "tab_CÀI ĐẶT",
+     "rect": [
+      1166,
+      306,
+      114,
+      58
+     ],
+     "label": "CÀI ĐẶT"
+    },
+    {
+     "n": "tab_XẾP HẠNG",
+     "rect": [
+      1166,
+      236,
+      114,
+      58
+     ],
+     "label": "XẾP HẠNG"
+    },
+    {
+     "n": "tab_con_CHƠI ĐƠN",
+     "rect": [
+      360,
+      62,
+      102.8,
+      44
+     ],
+     "label": "CHƠI ĐƠN"
+    },
+    {
+     "n": "tab_con_PVP · CẠNH TRANH",
+     "rect": [
+      500,
+      62,
+      164,
+      44
+     ],
+     "label": "PVP · CẠNH TRANH"
+    },
+    {
+     "n": "tab_con_PVP · SĂN & TRỐN",
+     "rect": [
+      700,
+      62,
+      160.8,
+      44
+     ],
+     "label": "PVP · SĂN & TRỐN"
+    }
+   ],
+   "texts": [
+    {
+     "c": "CHƠI ĐƠN",
+     "rect": [
+      1192,
+      115.4,
+      63,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "PVP",
+     "rect": [
+      1192,
+      185.4,
+      26.1,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "CÀI ĐẶT",
+     "rect": [
+      1192,
+      325.4,
+      53.6,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "XẾP HẠNG",
+     "rect": [
+      1192,
+      255.4,
+      65.9,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "Bảng xếp hạng",
+     "rect": [
+      60,
+      50,
+      259.7,
+      43.2
+     ],
+     "ff": "Inter",
+     "fs": 36
+    },
+    {
+     "c": "CHƠI ĐƠN",
+     "rect": [
+      379,
+      73.8,
+      64.8,
+      20.4
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 17
+    },
+    {
+     "c": "PVP · CẠNH TRANH",
+     "rect": [
+      518,
+      73.8,
+      128,
+      20.4
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 17
+    },
+    {
+     "c": "PVP · SĂN & TRỐN",
+     "rect": [
+      718,
+      73.8,
+      124.8,
+      20.4
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 17
+    },
+    {
+     "c": "B",
+     "rect": [
+      141.1,
+      222.8,
+      27.8,
+      50.4
+     ],
+     "ff": "Inter",
+     "fs": 42
+    },
+    {
+     "c": "2",
+     "rect": [
+      69.3,
+      158.1,
+      21.7,
+      35.3
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 28
+    },
+    {
+     "c": "A",
+     "rect": [
+      364.3,
+      188.8,
+      31.4,
+      50.4
+     ],
+     "ff": "Inter",
+     "fs": 42
+    },
+    {
+     "c": "1",
+     "rect": [
+      279.3,
+      124.4,
+      17.4,
+      34.9
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 28
+    },
+    {
+     "c": "C",
+     "rect": [
+      589.5,
+      222.8,
+      31.1,
+      50.4
+     ],
+     "ff": "Inter",
+     "fs": 42
+    },
+    {
+     "c": "3",
+     "rect": [
+      519.3,
+      158.1,
+      21.6,
+      35.3
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 28
+    },
+    {
+     "c": "dữ liệu mẫu",
+     "rect": [
+      60,
+      650,
+      80.2,
+      24
+     ],
+     "ff": "Patrick Hand",
+     "fs": 20
+    }
+   ]
+  },
+  "moi_00_thanh_phan": {
+   "size": [
+    1280,
+    960
+   ],
+   "base": {
+    "ngay": "moi_00_thanh_phan/base_ngay.png",
+    "dem": "moi_00_thanh_phan/base_dem.png"
+   },
+   "top": {
+    "ngay": "moi_00_thanh_phan/top_ngay.png",
+    "dem": "moi_00_thanh_phan/top_dem.png"
+   },
+   "photos": [
+    {
+     "n": "anh (ảnh mẫu)",
+     "kind": "photo",
+     "rect": [
+      74,
+      174,
+      232,
+      148
+     ]
+    },
+    {
+     "n": "anh (ảnh mẫu)",
+     "kind": "photo",
+     "rect": [
+      620,
+      548,
+      200,
+      128
+     ]
+    }
+   ],
+   "dyn": [],
+   "hotspots": [
+    {
+     "n": "nut_Chính",
+     "rect": [
+      60,
+      414,
+      100.2,
+      52
+     ],
+     "label": "Chính"
+    },
+    {
+     "n": "nut_Phụ",
+     "rect": [
+      172.2,
+      414,
+      85.8,
+      52
+     ],
+     "label": "Phụ"
+    },
+    {
+     "n": "nut_Giấy",
+     "rect": [
+      270,
+      414,
+      90.7,
+      52
+     ],
+     "label": "Giấy"
+    },
+    {
+     "n": "nut_Đang khoá",
+     "rect": [
+      372.7,
+      414,
+      139.7,
+      52
+     ],
+     "label": "Đang khoá"
+    },
+    {
+     "n": "tab_ĐANG MỞ",
+     "rect": [
+      620,
+      412,
+      130,
+      58
+     ],
+     "label": "ĐANG MỞ"
+    },
+    {
+     "n": "tab_TAB KHÁC",
+     "rect": [
+      760,
+      412,
+      130,
+      58
+     ],
+     "label": "TAB KHÁC"
+    },
+    {
+     "n": "sticker_Khiên axit",
+     "rect": [
+      60,
+      548,
+      116,
+      128
+     ],
+     "label": "◇"
+    },
+    {
+     "n": "cho_da_boc_Thuốc giải",
+     "rect": [
+      188,
+      548,
+      116,
+      128
+     ]
+    }
+   ],
+   "texts": [
+    {
+     "c": "Thành phần · Protected M",
+     "rect": [
+      60,
+      36,
+      451.9,
+      43.2
+     ],
+     "ff": "Inter",
+     "fs": 36
+    },
+    {
+     "c": "dùng chung cho mọi màn · màu lấy từ token nên tự đổi theo Ngày/Đêm",
+     "rect": [
+      60,
+      84,
+      552.1,
+      26.4
+     ],
+     "ff": "Patrick Hand",
+     "fs": 22
+    },
+    {
+     "c": "TÚI NHỰA + GÓC DÁN",
+     "rect": [
+      60,
+      132,
+      133.6,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "NHÃN DÁN",
+     "rect": [
+      360,
+      132,
+      65.8,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "BỌ ĐÃ DIỆT",
+     "rect": [
+      377.5,
+      174.6,
+      71.6,
+      19.9
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "7",
+     "rect": [
+      376.1,
+      196.6,
+      24.5,
+      48.6
+     ],
+     "ff": "Inter",
+     "fs": 40
+    },
+    {
+     "c": "/12",
+     "rect": [
+      399.4,
+      197.2,
+      57.3,
+      49.5
+     ],
+     "ff": "Inter",
+     "fs": 40
+    },
+    {
+     "c": "TEM ĐỒNG HỒ",
+     "rect": [
+      620,
+      132,
+      86.9,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "01:12",
+     "rect": [
+      643.5,
+      197.5,
+      113.6,
+      62.7
+     ],
+     "ff": "Inter",
+     "fs": 46
+    },
+    {
+     "c": "hết giờ bị trừ điểm",
+     "rect": [
+      645.6,
+      252.4,
+      114.6,
+      28.3
+     ],
+     "ff": "Patrick Hand",
+     "fs": 17
+    },
+    {
+     "c": "TEM ĐÓNG",
+     "rect": [
+      840,
+      132,
+      65.4,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "ĐÃ BẢO VỆ",
+     "rect": [
+      863.8,
+      176.7,
+      183.5,
+      53.3
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 34
+    },
+    {
+     "c": "ĐÃ MẤT",
+     "rect": [
+      884,
+      271.7,
+      129.3,
+      47.4
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 34
+    },
+    {
+     "c": "NÚT",
+     "rect": [
+      60,
+      384,
+      26.1,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "Chính",
+     "rect": [
+      86,
+      429.8,
+      48.2,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Phụ",
+     "rect": [
+      199.2,
+      429.8,
+      31.8,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Giấy",
+     "rect": [
+      297,
+      429.8,
+      36.7,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Đang khoá",
+     "rect": [
+      398.7,
+      429.8,
+      87.7,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "TAB ALBUM",
+     "rect": [
+      620,
+      384,
+      72.2,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "ĐANG MỞ",
+     "rect": [
+      643,
+      431.4,
+      59.5,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "TAB KHÁC",
+     "rect": [
+      782,
+      431.4,
+      65,
+      19.2
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 16
+    },
+    {
+     "c": "NHÃN NHỎ",
+     "rect": [
+      940,
+      384,
+      66.1,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "ĐANG CHỌN",
+     "rect": [
+      950,
+      418,
+      66.4,
+      16.8
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 14
+    },
+    {
+     "c": "CẤP 5 · CHÂU Á",
+     "rect": [
+      950,
+      450.8,
+      87.7,
+      16.8
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 14
+    },
+    {
+     "c": "CẤP 3 · KHÓ",
+     "rect": [
+      951,
+      484.6,
+      68.6,
+      16.8
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 14
+    },
+    {
+     "c": "STICKER VẬT PHẨM",
+     "rect": [
+      60,
+      520,
+      124.6,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "◇",
+     "rect": [
+      81,
+      567.8,
+      18,
+      20.4
+     ],
+     "ff": "Inter",
+     "fs": 17
+    },
+    {
+     "c": "Khiên axit",
+     "rect": [
+      73,
+      599,
+      92,
+      18
+     ],
+     "ff": "Inter",
+     "fs": 15
+    },
+    {
+     "c": "Chặn 1 đòn axit",
+     "rect": [
+      73,
+      621,
+      92,
+      31.2
+     ],
+     "ff": "Inter",
+     "fs": 13
+    },
+    {
+     "c": "TRỌNG SỐ 4",
+     "rect": [
+      73,
+      656.2,
+      64.5,
+      15.6
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 13
+    },
+    {
+     "c": "THANH",
+     "rect": [
+      360,
+      520,
+      43.4,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "MÁU 72",
+     "rect": [
+      360,
+      552,
+      45.5,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "STAMINA 48%",
+     "rect": [
+      360,
+      602,
+      88.2,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "ĐỘ LỘ DIỆN 35%",
+     "rect": [
+      360,
+      652,
+      103.5,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "VẾT GẶM + VỤN",
+     "rect": [
+      620,
+      520,
+      99.4,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "TÂM NGẮM",
+     "rect": [
+      880,
+      520,
+      66,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "BỌ · MỖI CẤP MỘT DÁNG",
+     "rect": [
+      60,
+      716,
+      153,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "Bọ nấp",
+     "rect": [
+      52,
+      846,
+      60.2,
+      21.6
+     ],
+     "ff": "Inter",
+     "fs": 18
+    },
+    {
+     "c": "Dễ",
+     "rect": [
+      52,
+      867.6,
+      19.6,
+      18
+     ],
+     "ff": "Inter",
+     "fs": 15
+    },
+    {
+     "c": "Bọ ngụy trang",
+     "rect": [
+      202,
+      846,
+      122.8,
+      21.6
+     ],
+     "ff": "Inter",
+     "fs": 18
+    },
+    {
+     "c": "Cơ bản",
+     "rect": [
+      202,
+      867.6,
+      50.8,
+      18
+     ],
+     "ff": "Inter",
+     "fs": 15
+    },
+    {
+     "c": "Bọ axit",
+     "rect": [
+      352,
+      846,
+      59.6,
+      21.6
+     ],
+     "ff": "Inter",
+     "fs": 18
+    },
+    {
+     "c": "Khó",
+     "rect": [
+      352,
+      867.6,
+      28,
+      18
+     ],
+     "ff": "Inter",
+     "fs": 15
+    },
+    {
+     "c": "Bọ trăm chân",
+     "rect": [
+      502,
+      846,
+      115.5,
+      21.6
+     ],
+     "ff": "Inter",
+     "fs": 18
+    },
+    {
+     "c": "Xâm thực · Châu Á",
+     "rect": [
+      502,
+      867.6,
+      131.3,
+      18
+     ],
+     "ff": "Inter",
+     "fs": 15
+    },
+    {
+     "c": "CHỮ",
+     "rect": [
+      700,
+      716,
+      25.5,
+      18
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 15
+    },
+    {
+     "c": "Inter · số và chữ thường",
+     "rect": [
+      700,
+      744,
+      272.6,
+      28.8
+     ],
+     "ff": "Inter",
+     "fs": 24
+    },
+    {
+     "c": "BARLOW CONDENSED · NHÃN IN",
+     "rect": [
+      700,
+      782.8,
+      272.7,
+      26.4
+     ],
+     "ff": "Barlow Condensed",
+     "fs": 22
+    },
+    {
+     "c": "Patrick Hand · chữ viết tay bút bi",
+     "rect": [
+      700,
+      819.2,
+      303.3,
+      31.2
+     ],
+     "ff": "Patrick Hand",
+     "fs": 26
+    }
+   ]
+  }
+ },
+ "sprites": {
+  "b1": {
+   "file": "sprites/b1_wk_topdown.png",
+   "name": "Bọ nấp",
+   "levels": [
+    1
+   ]
+  },
+  "b2": {
+   "file": "sprites/b2_wk_topdown.png",
+   "name": "Bọ ngụy trang",
+   "levels": [
+    2
+   ]
+  },
+  "b3": {
+   "file": "sprites/b3_wk_topdown.png",
+   "name": "Bọ axit",
+   "levels": [
+    3
+   ]
+  },
+  "b4": {
+   "file": "sprites/b4_wk_topdown.png",
+   "name": "Bọ trăm chân",
+   "levels": [
+    4,
+    5
+   ]
+  }
+ },
+ "sample_photo": "sample/anh_mau_phong_khach.png"
+}

@@ -1,0 +1,23 @@
+opencv-python>=4.8.0
+mediapipe>=0.10.31
+numpy>=1.24.0
+PyOpenGL>=3.1.6
+glfw>=2.6.0
+pyglm>=2.7.0
+scipy>=1.11.0
+imgui[glfw]>=2.0.0
+pyyaml>=6.0.0
+h5py>=3.10.0
+
+# Optional — per-pixel depth parallax (falls back to flat plane if missing)
+# pip install torch torchvision transformers timm
+torch>=2.0.0
+torchvision>=0.15.0
+transformers>=4.36.0
+# timm is required only by the MiDaS (torch.hub) fallback backend.
+timm>=0.9.0
+
+# Bo sung 11/11: hai thu vien ma nguon co import nhung file nay con thieu
+onnxruntime>=1.17.0
+Pillow>=10.0.0
+opencv-contrib-python>=4.8.0

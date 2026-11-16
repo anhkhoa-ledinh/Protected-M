@@ -1,0 +1,8 @@
+{
+  "webcam_preview_enabled": true,
+  "webcam_preview_corner": "bottom-right",
+  "webcam_preview_scale": 0.18,
+  "webcam_preview_margin_px": 16,
+  "webcam_preview_mirror": true,
+  "webcam_preview_landmarks": true
+}
