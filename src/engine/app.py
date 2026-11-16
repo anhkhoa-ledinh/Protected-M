@@ -73,9 +73,13 @@ class HcpdApplication:
     #: giao diện album, và không được vì thế mà hỏng.
     _album_options = AlbumOptions()
     _album = None
+    #: TASK_pvp_lan_1116 P2: cùng lý do — bản dựng bằng ``__new__`` vẫn phải
+    #: mở webcam thật như hôm nay, trừ khi ``__init__`` nói khác.
+    _no_webcam = False
 
     def __init__(self, config: AppConfig, project_root: Path, *,
-                 demo: bool = False, album: AlbumOptions | None = None) -> None:
+                 demo: bool = False, album: AlbumOptions | None = None,
+                 no_webcam: bool = False) -> None:
         self._config = config
         self._root = project_root
         # TASK_album_ui_1106: giao diện album. ``None`` hoặc ``enabled=False``
@@ -85,6 +89,12 @@ class HcpdApplication:
         # PB-055: demo đọc content.demo.json, không ghi file config nào, chỉ nhận
         # G, T, F6, kéo-thả, F4, Esc (lọc ở GlfwWindow).
         self._demo = bool(demo)
+        # TASK_pvp_lan_1116 P2: khong mo CameraWorker.start() — TrackingWorker
+        # da san co duong lui "khong co khung hinh -> dau mo phong" (xem
+        # ``_hold_or_simulate``/``_simulated_pose``), nen chi can khong bao gio
+        # dua khung hinh that vao la du, khong phai dung lai co che mo phong
+        # rieng.
+        self._no_webcam = bool(no_webcam)
         self._pose_bus = PoseBus()
         self._filters = PoseFilterPipeline(config.filter)
         opt = config.optimization
@@ -1406,7 +1416,8 @@ class HcpdApplication:
                         self._album_options.ui, self._album.state.screen,
                         self._album.state.theme)
         self._window.pump_events()
-        self._camera.start()
+        if not self._no_webcam:
+            self._camera.start()
         self._window.pump_events()
         if self._album_options.is_v3:
             # Không có F4 thì không ai xem ảnh landmark: đừng dựng nó.

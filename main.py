@@ -87,6 +87,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Di qua 23 man v3, luu mot PNG moi man roi thoat",
     )
+    # TASK_pvp_lan_1116 P2: khong mo webcam — dau theo dang mo phong ngay tu
+    # dau. De chay HAI tien trinh game tren CUNG mot may khi kiem PvP: chi
+    # mot tien trinh mo duoc webcam that, tien trinh con lai phai dung co nay.
+    parser.add_argument(
+        "--no-webcam",
+        action="store_true",
+        help="Khong mo webcam that, dung dau mo phong "
+             "(chay hai tien trinh PvP tren cung mot may)",
+    )
     args = parser.parse_args(argv)
     if args.ui_shots and args.ui != "v3":
         parser.error("--ui-shots chi co nghia voi --ui v3 (bo cu dung --album-shots)")
@@ -124,7 +133,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     app = HcpdApplication(
-        config, PROJECT_ROOT, demo=args.demo,
+        config, PROJECT_ROOT, demo=args.demo, no_webcam=args.no_webcam,
         album=AlbumOptions(enabled=args.album, guest=args.album_guest,
                            shots=args.album_shots,
                            seed_leaderboard=args.album_seed_leaderboard,
