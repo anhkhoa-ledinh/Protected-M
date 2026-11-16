@@ -37,22 +37,47 @@ logger = logging.getLogger("pvp_bot")
 COMPETITIVE, HUNT_HIDE = PVP_MODES
 #: How long to wait for one expected message before giving up.
 WAIT_S = 10.0
-#: Hunt & Hide setup window the server told everyone about (task: 20 s) plus
-#: slack — the bot "auto-places" immediately, it does not need the full
-#: window, but a slow server/host should not make it give up early.
-SETUP_WAIT_S = 25.0
+#: Hunt & Hide setup window the server told everyone about (task: 20 s), and
+#: for Competitive, the time for the *other* side (a real game, not this
+#: bot) to bake a never-before-seen photo — depth inference + clustering +
+#: disocclusion fill, which the README documents can take "a minute or
+#: more" on a slow machine, and includes a one-time model download/load the
+#: first time a process bakes anything at all. 25 s was measured to be too
+#: short and stalled real matches during G2 measurement (TASK_pvp_lan_1116);
+#: this is deliberately generous rather than racing the bake.
+SETUP_WAIT_S = 90.0
 
 
 def _tiny_photo() -> tuple[str, str]:
     """A throwaway valid JPEG — just enough to exercise the wire format.
-    ``(jpeg_b64, sha1)``, same shape as ``shared_album._reencode`` output."""
+    ``(jpeg_b64, sha1)``, same shape as ``shared_album._reencode`` output.
+
+    FIXED content, not a fresh random image each call: a different sha1
+    every time this bot hosts means the receiver's bake cache
+    (``assets/cache/maps/<sha1>/``) never hits, forcing a full ~tens-of-
+    seconds depth bake on EVERY match the bot hosts — easily outlasting
+    ``SETUP_WAIT_S`` and stalling the match (observed during G2 measurement,
+    TASK_pvp_lan_1116). A real host resending the same photo on a rematch
+    would hit the cache; this should too.
+
+    A real gradient, not a flat colour: a flat-colour image has no depth
+    cues at all, so if a game ever ends up *hosting* with this photo (it
+    can receive it as a guest in one match and host the next, since
+    there's no "pick a PvP photo" screen yet — see README's Known issues),
+    bug placement finds zero valid spots and the match correctly, but
+    uselessly, aborts. A gradient at least gives the depth model something
+    to split into layers.
+    """
     from PIL import Image
 
-    image = Image.new("RGB", (64, 64), (random.randint(0, 255),
-                                        random.randint(0, 255),
-                                        random.randint(0, 255)))
+    size = 192
+    image = Image.new("RGB", (size, size))
+    pixels = image.load()
+    for y in range(size):
+        for x in range(size):
+            pixels[x, y] = (40 + x, 60 + y // 2, 90)
     buf = io.BytesIO()
-    image.save(buf, "JPEG", quality=80)
+    image.save(buf, "JPEG", quality=85)
     data = buf.getvalue()
     return b64encode(data).decode("ascii"), hashlib.sha1(data).hexdigest()
 

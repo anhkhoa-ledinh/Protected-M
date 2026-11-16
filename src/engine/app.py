@@ -420,6 +420,7 @@ class HcpdApplication:
         self._tick_album_match(now)
         self._tick_pvp(now)
         self._tick_pvp_auto(now)
+        self._tick_pvp_shots(now)
         self._tick_shared_album()
         self._log_album_fps(now)
 
@@ -1446,6 +1447,8 @@ class HcpdApplication:
             "winner": msg.get("winner"), "opp_name": msg.get("opp_name") or "Opponent",
             "rows": msg.get("rows") or [], "opponent_rows": msg.get("opponent_rows") or [],
         }
+        # G2: so sánh được với log của pvp_bot.py mà không cần nhìn màn hình.
+        logger.info("PVP KET QUA: %s", state.last_result)
         self._pvp_active = False
         self._album.game = None
         self._game = None
@@ -1501,13 +1504,90 @@ class HcpdApplication:
         elif state.screen == F.MENU:
             state.go(F.PVP_MODE)
         elif state.screen == F.PVP_MODE:
+            # HCPD_PVP_MODE (tuỳ chọn, P7 report only): đổi mode trước khi
+            # tìm trận — mặc định là mode hiện tại của flow (Competitive).
+            wanted = os.environ.get("HCPD_PVP_MODE")
+            if wanted and wanted in F.PVP_MODES and state.mode != wanted:
+                v3_routes.on_click(state, f"mode_{wanted}", now)
+                return
             # Qua đúng cổng một cú bấm thật đi qua (on_click), không gọi
             # thẳng _pvp_action: _pvp()'s F.start_search() (đổi màn sang
             # PVP_SEARCH) phải chạy, không chỉ phần mạng.
             action = v3_routes.on_click(state, "btn_Find match", now)
             self._pvp_action(action, now)
         elif state.screen == F.PVP_RESULT:
-            state.go(F.PVP_MODE)      # khung sau se tu Find match lai
+            # Đứng lại 2 s trước khi quay lại tìm trận tiếp — không chỉ cho
+            # _tick_pvp_shots kịp chụp (PVP_RESULT biến mất ngay khung đầu
+            # nếu không thì, trước khi hẹn giờ của _tick_pvp_shots tới
+            # lượt), còn để kết quả hiện đủ lâu để đọc được.
+            entered = getattr(self, "_pvp_auto_result_entered_s", None)
+            if entered is None:
+                self._pvp_auto_result_entered_s = now
+            elif now - entered >= 2.0:
+                self._pvp_auto_result_entered_s = None
+                state.go(F.PVP_MODE)
+        else:
+            # Rời PVP_RESULT bằng đường khác (vd mất kết nối) — dọn mốc giờ
+            # để lần SAU vào lại PVP_RESULT tính giờ lại từ đầu, không bị
+            # mốc cũ làm rời màn ngay khung đầu.
+            self._pvp_auto_result_entered_s = None
+
+    def _tick_pvp_shots(self, now: float) -> None:
+        """
+        ``HCPD_PVP_SHOTS=1``: chụp bốn màn PvP cho báo cáo P7, ra
+        ``results/pvp_1116/<man>.png`` — F12 là một phương thức bình
+        thường (``_save_album_shot``), không buộc phải có phím bấm thật,
+        xem ``_album_shots_step`` (đã làm y vậy cho ``--ui-shots``).
+
+        Mỗi màn chụp MỘT lần, sau khi đã đứng yên ở đó một lúc (để HUD
+        kịp cập nhật — "giữa trận" chứ không phải khung đầu tiên trống
+        trơn), và PVP_FOUND chỉ chụp khi đã có tên đối thủ thật.
+        """
+        if os.environ.get("HCPD_PVP_SHOTS") != "1":
+            return
+        F = self._album.flow
+        state = self._album.state
+        screen = state.screen
+        delay_s = {F.PVP_FOUND: 0.5, F.PVP_HUNT: 2.0, F.PVP_HIDE: 2.0,
+                  F.PVP_RESULT: 0.5}.get(screen)
+        if delay_s is None:
+            return
+        taken = getattr(self, "_pvp_shots_taken", None)
+        if taken is None:
+            taken = set()
+            self._pvp_shots_taken = taken
+        if screen in taken:
+            return
+        if getattr(self, "_pvp_shot_last_screen", None) != screen:
+            self._pvp_shot_last_screen = screen
+            self._pvp_shot_entered_s = now
+        if now - getattr(self, "_pvp_shot_entered_s", now) < delay_s:
+            return
+        if screen == F.PVP_FOUND and not state.pvp_opponent_name:
+            return
+        from OpenGL import GL
+
+        GL.glFinish()
+        self._save_pvp_shot(screen)
+        taken.add(screen)
+
+    def _save_pvp_shot(self, screen: str) -> Path:
+        """F12-equivalent to ``results/pvp_1116/<screen>.png`` — a separate
+        destination from ``_save_album_shot``'s ``results/ui_v3_1107/``
+        (that one feeds ``--ui-shots``/``HCPD_V3_LIVE`` tooling; this is
+        only for the PvP gate screenshots)."""
+        from src.ui_album.shots import save_framebuffer
+
+        path = self._root / "results" / "pvp_1116" / f"{screen}.png"
+        self._window.restore_and_focus()
+        self._window.pump_events()
+        width, height = self._window.framebuffer_size()
+        if width < 2 or height < 2:
+            logger.warning("PvP shot bo qua: framebuffer %dx%d", width, height)
+            return path
+        save_framebuffer(path, width, height)
+        logger.info("PvP shot: %s", path)
+        return path
 
     def _start_album_match(self, now: float) -> None:
         """Mở một ván theo cấp đang chọn: số bọ lấy từ bảng cấp."""

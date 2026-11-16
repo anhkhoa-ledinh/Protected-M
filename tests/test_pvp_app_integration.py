@@ -589,11 +589,28 @@ class PvpAutoHookTest(unittest.TestCase):
                                           "mode": app._album.state.mode,
                                           "level": app._album.state.level}])
 
-    def test_result_screen_loops_back_to_find_another_match(self) -> None:
+    def test_result_screen_loops_back_to_find_another_match_after_a_dwell(self) -> None:
+        """A 2s dwell on PVP_RESULT (so _tick_pvp_shots gets a chance to
+        capture it, and a human watching sees the result) before looping
+        back — not an instant same-frame bounce."""
         app = _app()
         app._album.state.screen = F.PVP_RESULT
         app._tick_pvp_auto(0.0)
+        self.assertEqual(app._album.state.screen, F.PVP_RESULT)  # not yet
+        app._tick_pvp_auto(1.0)
+        self.assertEqual(app._album.state.screen, F.PVP_RESULT)  # still not
+        app._tick_pvp_auto(2.1)
         self.assertEqual(app._album.state.screen, F.PVP_MODE)
+
+    def test_result_dwell_timer_resets_if_left_by_another_path(self) -> None:
+        app = _app()
+        app._album.state.screen = F.PVP_RESULT
+        app._tick_pvp_auto(0.0)
+        app._album.state.screen = F.OFFLINE   # left via disconnect, not the loop
+        app._tick_pvp_auto(0.1)
+        app._album.state.screen = F.PVP_RESULT  # back again, later
+        app._tick_pvp_auto(100.0)
+        self.assertEqual(app._album.state.screen, F.PVP_RESULT)  # fresh timer
 
 
 if __name__ == "__main__":

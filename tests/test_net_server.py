@@ -386,6 +386,32 @@ def test_hunt_and_hide_all_dead_means_hunter_wins(server):
     hider.close()
 
 
+def test_hunt_and_hide_time_up_means_hider_wins(server, monkeypatch):
+    """G6's other half: all_dead -> hunter is covered above; this is the
+    "time up -> hider wins" branch. LEVEL_TABLE's durations are all >= 120s
+    (real levels), so the duration is monkeypatched down to make this a
+    fast, deterministic test instead of a multi-minute wait."""
+    import src.net.server as server_mod
+
+    monkeypatch.setitem(server_mod.LEVEL_TABLE, 1,
+                        ("Easy", 6, 0.3, 2, False))  # 0.3s instead of 180s
+    hunter, hider, ma, mb = _join_hunt_hide(server)
+    hunter.send({"t": proto.READY})
+    hider.send({"t": proto.READY})
+    hunter.recv_type(proto.START)
+    hider.recv_type(proto.START)
+    hider.send({"t": proto.BUGS, "bugs": _bugs(2)})
+    hunter.recv_type(proto.START)
+    hider.recv_type(proto.START)
+    # Hunter never shoots — the clock runs out with bugs still alive.
+    end_hunter = hunter.recv_type(proto.END, timeout=3.0)
+    end_hider = hider.recv_type(proto.END, timeout=3.0)
+    assert end_hunter["reason"] == "time_up"
+    assert end_hunter["winner"] == "opp" and end_hider["winner"] == "you"
+    hunter.close()
+    hider.close()
+
+
 # ---- heartbeat disconnect / reconnect / forfeit ---------------------------
 
 def test_opponent_is_notified_when_a_player_disconnects(server):
