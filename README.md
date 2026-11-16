@@ -1,5 +1,7 @@
 # Protected M
 
+![tests](https://github.com/anhkhoa-ledinh/Protected-M/actions/workflows/tests.yml/badge.svg)
+
 **A glasses-free 3D bug hunt for an ordinary laptop screen.**
 
 > ⚠️ **Demo build.** The game is playable end to end, but it still has bugs
