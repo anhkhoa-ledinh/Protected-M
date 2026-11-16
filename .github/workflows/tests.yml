@@ -22,6 +22,12 @@ jobs:
           python-version: "3.13"
           cache: pip
 
-      - run: pip install -r requirements.txt
+      # Pinned, not requirements.txt's unpinned >= — those resolve to
+      # whatever is newest on PyPI at install time (opencv 5.0, mediapipe
+      # 1.2.3, numpy 2.5, transformers 5.x, torch 2.15 as of this writing),
+      # which is not necessarily what the local passing test suite ran
+      # against. requirements-lock.txt is `pip freeze` from the dev venv
+      # the suite is verified green on.
+      - run: pip install -r requirements-lock.txt
 
       - run: python -m pytest -q -ra
