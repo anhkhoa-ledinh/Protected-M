@@ -621,7 +621,7 @@ def _hud_kills(state, flow, game) -> None:
 
 def _hud_pvp_hunter(state, flow, game) -> None:
     total = flow.bugs() if game is None else game.bugs_total
-    found = 0 if game is None else game.bugs_found
+    found = 0 if game is None else getattr(game, "my_kills", 0)
     opponent = 0 if game is None else getattr(game, "bot_found", 0)
     state.texts["kills_you"] = [str(found), f"/{total}"]
     state.texts["kills_opp"] = [str(opponent), f"/{total}"]
@@ -629,7 +629,8 @@ def _hud_pvp_hunter(state, flow, game) -> None:
     state.bars["progress_opp"] = opponent / max(1, total)
     items = 0 if game is None else getattr(game, "bot_items", 0)
     plural = "item" if items == 1 else "items"
-    state.texts["opponent_activity"] = f"Player 2 used {items} {plural}"
+    opp_name = flow.pvp_opponent_name or "Opponent"
+    state.texts["opponent_activity"] = f"{opp_name} used {items} {plural}"
 
 
 def _hud_pvp_bug(state, flow, game) -> None:
@@ -834,20 +835,28 @@ def _pvp_lobby(state, flow, now) -> None:
 
 
 def _pvp_result(state, flow, manifest) -> None:
+    """
+    TASK_pvp_lan_1116: dữ liệu THẬT — ``flow.last_result`` được ``app.py``
+    đổ từ thông điệp ``end`` của server (``winner``/``scores``/``rows``/
+    ``opponent_rows``/``opp_name``), không còn số mô phỏng.
+    """
     screen = F.PVP_RESULT
     result = flow.last_result or {}
-    you = int(result.get("score", 0))
-    opponent = int(result.get("opponent_score", 0))
-    won = you >= opponent
-    state.texts["title"] = "Victory!" if won else "Defeat"
+    you = int(round(float(result.get("score", 0))))
+    opponent = int(round(float(result.get("opponent_score", 0))))
+    winner = result.get("winner")
+    draw = winner == "draw"
+    won = winner == "you" if winner is not None else you >= opponent
+    state.texts["title"] = "Draw" if draw else ("Victory!" if won else "Defeat")
     state.colours["title"] = SAFE if won else DANGER
     state.texts["eyebrow"] = f"PVP · {flow.mode.upper()} · LEVEL {flow.level}"
     name = flow.player or "guest"
     state.texts["you_name"] = name
     state.texts["you_initial"] = _initial(name)
     state.texts["you_score"] = str(you)
-    state.texts["opp_name"] = "Player 2"
-    state.texts["opp_initial"] = "P"
+    opp_name = result.get("opp_name") or "Opponent"
+    state.texts["opp_name"] = opp_name
+    state.texts["opp_initial"] = _initial(opp_name)
     state.texts["opp_score"] = str(opponent)
     state.pills["you_pill"] = ("won this match" if won else "runner-up",
                                "won" if won else "lost")
@@ -861,8 +870,8 @@ def _pvp_result(state, flow, manifest) -> None:
     if record is not None:
         state.sprites["sel:winner"] = _on_target(record,
                                                  "you" if won else "opponent")
-    for side, rows in (("you", _pvp_rows(result, "used")),
-                       ("opp", _pvp_rows(result, "opponent_used"))):
+    for side, rows in (("you", _pvp_rows(result.get("rows"))),
+                       ("opp", _pvp_rows(result.get("opponent_rows")))):
         for index, (label, value, negative) in enumerate(rows):
             _extra_row(state, manifest, screen, f"{side}_row_label#0", index,
                        label)
@@ -872,13 +881,17 @@ def _pvp_result(state, flow, manifest) -> None:
                          (f"{side}_row_label", f"{side}_row_value"), len(rows))
 
 
-def _pvp_rows(result: dict, key: str) -> list:
-    rows = [("Time left", str(int(result.get("time_left", 0))), False)]
-    for item, count in (result.get(key) or {}).items():
-        weight = F.ITEM_WEIGHT.get(item, 0)
-        rows.append((f"{item} {count} × {weight}", f"-{weight * int(count)}",
-                     True))
-    return rows
+#: Hai dòng đầu server luôn gửi trước — "Bugs killed", "Time left"/"Bugs
+#: alive"/"Hunt lasted (s)" — không phải vật phẩm nên không tô đỏ.
+_PVP_FIXED_ROWS = 2
+
+
+def _pvp_rows(rows) -> list:
+    """``result["rows"]``/``["opponent_rows"]`` đã là (nhãn, giá trị) do
+    server tính sẵn (``src/net/server.py:_end_match``) — ở đây chỉ quyết
+    định dòng nào tô đỏ (vật phẩm trừ điểm)."""
+    return [(str(label), str(value), index >= _PVP_FIXED_ROWS)
+            for index, (label, value) in enumerate(rows or ())]
 
 
 # ---- bảng xếp hạng -----------------------------------------------------

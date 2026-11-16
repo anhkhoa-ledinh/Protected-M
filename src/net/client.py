@@ -126,6 +126,29 @@ class PvpClient:
                                         name="pvp-client", daemon=True)
         self._thread.start()
 
+    def connect_auto(self, project_root: Path, *,
+                      discovery_timeout_s: float = 3.0) -> None:
+        """Same as :meth:`connect`, but resolves ``pvp.json``/UDP discovery
+        first — entirely off the caller's thread. The GL thread must never
+        block on :func:`resolve_server`'s up-to-``discovery_timeout_s`` UDP
+        listen, the same reason ``connect`` itself doesn't block on TCP."""
+        if self._thread is not None:
+            return
+        self._stop.clear()
+        self._thread = threading.Thread(
+            target=self._run_auto, args=(project_root, discovery_timeout_s),
+            name="pvp-client", daemon=True)
+        self._thread.start()
+
+    def _run_auto(self, project_root: Path, discovery_timeout_s: float) -> None:
+        # Same "stays non-None until close()" contract as a failed connect()
+        # above — a caller retries by calling close() first, consistently.
+        found = resolve_server(project_root, discovery_timeout_s=discovery_timeout_s)
+        if found is None:
+            self._status("error", "No PvP server found (pvp.json / LAN discovery)")
+            return
+        self._run(*found)
+
     def send(self, msg: dict) -> None:
         """Queue ``msg`` to be sent. Silently dropped if not connected —
         callers that care (e.g. to retry) check :attr:`is_connected`."""

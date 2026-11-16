@@ -98,6 +98,24 @@ class PvpClientConnectTest(unittest.TestCase):
         self.assertFalse(c.is_connected)
         self.assertIsNone(c._thread)
 
+    def test_connect_auto_uses_pvp_json_override_off_the_caller_thread(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cfg = root / "assets" / "config"
+            cfg.mkdir(parents=True)
+            (cfg / "pvp.json").write_text(
+                json.dumps({"server": f"127.0.0.1:{self.server.port}"}),
+                encoding="utf-8")
+            c = self._client()
+            start = time.monotonic()
+            c.connect_auto(root)
+            # connect_auto must return immediately — the 3s discovery
+            # timeout (unused here, override wins) must never block us.
+            self.assertLess(time.monotonic() - start, 0.5)
+            status = _wait_for_type(c, "status")
+            self.assertIsNotNone(status)
+            self.assertEqual(status["status"], "connected")
+
     def test_queue_matches_two_clients(self) -> None:
         host = self._client("Host")
         guest = self._client("Guest")

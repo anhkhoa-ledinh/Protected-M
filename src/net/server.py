@@ -70,13 +70,19 @@ REMATCH_WINDOW_S = 60.0
 def _valid_bug(bug) -> bool:
     if not isinstance(bug, dict):
         return False
-    bug_id, x, y, layer = bug.get("id"), bug.get("x"), bug.get("y"), bug.get("layer")
+    bug_id, x, y, z = bug.get("id"), bug.get("x"), bug.get("y"), bug.get("z")
+    layer = bug.get("layer")
     size_k, camo = bug.get("size_k"), bug.get("camo_rgb")
     if isinstance(bug_id, bool) or not isinstance(bug_id, int) or bug_id < 0:
         return False
     if not isinstance(x, (int, float)) or not isinstance(y, (int, float)):
         return False
     if not (0.0 <= float(x) <= 1.0 and 0.0 <= float(y) <= 1.0):
+        return False
+    # "z": gap-relative depth fraction (src/ui_album/pvp_sync.py) — not in
+    # the task's literal wire list, added so occlusion reconstructs at
+    # roughly the original relative depth. See pvp_sync's module docstring.
+    if not isinstance(z, (int, float)) or not (0.0 <= float(z) <= 1.0):
         return False
     if isinstance(layer, bool) or not isinstance(layer, int) or not (0 <= layer < 8):
         return False
@@ -514,6 +520,7 @@ class Server:
             self._matches[match_id] = match
         for conn in match.players():
             conn.send({"t": proto.MATCHED, "role": match.role_of(conn),
+                       "is_host": conn is match.host,
                        "opponent_name": match.other(conn).name or "Opponent",
                        "mode": mode, "level": level, "room": match_id,
                        "token": conn.token})
@@ -546,6 +553,7 @@ class Server:
                 match.other(conn).send({"t": proto.ERROR, "code": "opponent_reconnected",
                                         "message": "Opponent reconnected."})
                 conn.send({"t": proto.MATCHED, "role": match.role_of(conn),
+                           "is_host": conn is match.host,
                            "opponent_name": match.other(conn).name or "Opponent",
                            "mode": match.mode, "level": match.level,
                            "room": match.id, "token": conn.token, "resumed": True})
@@ -761,7 +769,8 @@ class Server:
                 result = "you" if winner is p else "opp"
             p.send({"t": proto.END, "winner": result, "reason": reason,
                     "scores": {"you": round(scores[p], 1), "opp": round(scores[opp], 1)},
-                    "rows": rows[p], "opp_name": opp.name or "Opponent"})
+                    "rows": rows[p], "opponent_rows": rows[opp],
+                    "opp_name": opp.name or "Opponent"})
             p.match = None
             p.last_match = match
         with self._lock:

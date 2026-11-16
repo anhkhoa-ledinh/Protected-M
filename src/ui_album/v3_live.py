@@ -139,9 +139,14 @@ def apply(name: str, flow, window) -> AlbumMatch | None:
     elif name == "pvp_result":
         flow.level = 3
         flow.mode = F.PVP_MODES[0]
-        flow.last_result = {"score": 31, "opponent_score": 10, "time_left": 42,
-                            "used": {"Antidote": 1, "Flare": 2},
-                            "opponent_used": {"Thermal scan": 1}}
+        flow.last_result = {
+            "score": 31, "opponent_score": 10, "winner": "you",
+            "opp_name": "Player 2",
+            "rows": [["Bugs killed", "3 × 10"], ["Time left", 42],
+                     ["Antidote", 1], ["Flare", 2]],
+            "opponent_rows": [["Bugs killed", "1 × 10"], ["Time left", 10],
+                              ["Thermal scan", 1]],
+        }
         flow.go(F.PVP_RESULT)
     else:
         logger.warning("UI v3 live: khong biet preset %s", name)

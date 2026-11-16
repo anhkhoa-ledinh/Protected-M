@@ -91,10 +91,18 @@ class AlbumMatch:
     ammo_enabled: bool = False
     #: Vết đạn gần nhất: ``(x, y, mốc thời gian, trúng?)`` toạ độ thiết kế.
     shots: list = field(default_factory=list)
-    #: Đối thủ bot của PvP (mô phỏng, như bộ album).
+    #: TASK_pvp_lan_1116: trong PvP thật, ba ô này đổ dữ liệu ĐỐI THỦ lấy từ
+    #: thông điệp server (``killed``/``used_item``/``eye``) — tên giữ
+    #: nguyên "bot_*" dù không còn là bot, để khỏi phải sửa v3_values.py
+    #: (nó chỉ ``getattr(game, "bot_found", 0)``). Ván solo không bao giờ
+    #: đụng tới ba ô này.
     bot_found: int = 0
     bot_items: int = 0
     exposure_pct: float = 0.0
+    #: Số bọ CHÍNH TÔI hạ, xác nhận từ server (``killed.by`` khớp tên mình)
+    #: — khác ``bugs_found``/``state.found`` (đếm CẢ hai bên, vì bọ chết là
+    #: chết trên MÀN của cả hai, bất kể ai hạ).
+    my_kills: int = 0
     #: Mốc phát bắn gần nhất và chỗ bắn — để vẽ chớp đầu nòng/vệt đạn.
     shot_at_s: float = 0.0
     shot_point: tuple = (640.0, 360.0)

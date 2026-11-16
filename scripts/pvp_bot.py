@@ -64,6 +64,7 @@ def _synthetic_bugs(level: int) -> list[dict]:
         "id": i,
         "x": round(random.uniform(0.15, 0.85), 4),
         "y": round(random.uniform(0.15, 0.85), 4),
+        "z": round(random.uniform(0.0, 1.0), 4),
         "layer": random.randint(0, 2),
         "size_k": round(random.uniform(0.6, 1.8), 2),
         "camo_rgb": [round(random.random(), 3) for _ in range(3)],

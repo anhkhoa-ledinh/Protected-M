@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
+import hashlib
 import json
 import logging
 import os
@@ -178,6 +181,25 @@ class HcpdApplication:
         #: "upload" hoặc "random" — ``_tick_shared_album`` đọc kết quả khác
         #: nhau (URL/lỗi so với Path/lỗi) nên phải nhớ việc nào đang chạy.
         self._share_job_kind: str | None = None
+        #: TASK_pvp_lan_1116: kết nối PvP (``src/net/client.py``), và trạng
+        #: thái phiên hiện tại. ``None`` tới khi người chơi bấm Find match /
+        #: Invite / Join lần đầu — PvP không mở socket nào trước đó.
+        self._pvp = None
+        self._pvp_pending: dict | None = None
+        self._pvp_my_name = ""
+        self._pvp_is_host = False
+        self._pvp_photo_sent = False
+        #: Bật khi MÌNH đã bắt đầu tải đúng ảnh của trận này (host: ngay khi
+        #: ``matched`` tới; khách: khi ``photo`` tới) — chặn
+        #: ``_pvp_tick_lobby`` đọc nhầm hình học lớp CŨ (ảnh trước đó, nếu
+        #: còn &gt;= 2 lớp từ phiên solo trước) và gửi ``ready`` quá sớm.
+        self._pvp_photo_ready = False
+        self._pvp_bugs_sent = False
+        self._pvp_bugs_attempted = False
+        self._pvp_ready_sent = False
+        #: Bật khi server gửi ``start`` với bọ thật (khác pha "setup" của
+        #: Hunt & Hide) — ``_album_shoot`` chỉ gửi ``hit`` khi cờ này bật.
+        self._pvp_active = False
 
     def _load_screen_calibration(self, root: Path) -> dict:
         calibration_path = root / "assets" / "config" / "screen.json"
@@ -394,6 +416,7 @@ class HcpdApplication:
         album.tick()
         self._tick_album_automatch(now)
         self._tick_album_match(now)
+        self._tick_pvp(now)
         self._tick_shared_album()
         self._log_album_fps(now)
 
@@ -812,6 +835,14 @@ class HcpdApplication:
             if self._bugs is not None:
                 self._bugs.mark_found(
                     hit, [v / 1000.0 for v in self._game.props[hit]["pos_mm"]])
+            if self._pvp_active and self._pvp is not None:
+                # TASK_pvp_lan_1116: xác nhận trúng do SERVER quyết — đánh
+                # dấu "found" cục bộ ở trên chỉ là phản hồi tức thì, điểm/
+                # ai được tính hạ bọ chỉ chốt khi ``killed`` về (xem
+                # ``_pvp_handle_killed``).
+                from src.net import protocol as proto
+
+                self._pvp.send({"t": proto.HIT, "bug": hit})
             eye = aim.eye_mm
             logger.info("Prop BAN TRUNG #%d%s — eye (%.0f, %.0f, %.0f) mm",
                         hit, " CHI MANG" if crit else "", eye[0], eye[1], eye[2])
@@ -866,6 +897,8 @@ class HcpdApplication:
             mode = "fullscreen" if action == "display_full" else "window"
             if self._window.set_display_mode(mode):
                 self._apply_display_mode(mode)
+        elif action.startswith("pvp_"):
+            self._pvp_action(action, now)
 
     def _tick_album_automatch(self, now: float) -> None:
         """
@@ -961,6 +994,428 @@ class HcpdApplication:
                         "score": match.score()}
             state.go(F.WIN if ended == "win" else F.LOSE)
             self._album.game = None
+
+    # ---- TASK_pvp_lan_1116: PvP over LAN --------------------------------
+    # Network I/O itself never runs here — ``PvpClient`` owns a background
+    # thread (same shape as ``SharedAlbumWorker``); everything below only
+    # ever calls its non-blocking ``send``/``poll``. ``v3_routes._pvp``
+    # only changes screens and returns an ``ACT_PVP_*`` action; the actual
+    # connect/queue/room/ready/hit calls happen here, via ``_pvp_action``.
+
+    def _pvp_connect(self, state) -> None:
+        if self._pvp is not None:
+            return
+        from src.net.client import PvpClient
+
+        self._pvp_my_name = state.player or "guest"
+        self._pvp = PvpClient(self._pvp_my_name)
+        self._pvp.connect_auto(self._root)
+
+    def _pvp_send_when_ready(self, msg: dict) -> None:
+        """Queue a lobby message; flushed by ``_tick_pvp`` once connected.
+
+        ``PvpClient.send`` itself queues to an outbox regardless of
+        connection state, but its background thread sends ``hello`` first
+        only once the socket is up — sending straight through here could
+        race ahead of that handshake and reach the server before ``hello``.
+        """
+        if self._pvp is not None and self._pvp.is_connected:
+            self._pvp.send(msg)
+        else:
+            self._pvp_pending = msg
+
+    def _pvp_action(self, action: str, now: float) -> None:
+        from src.net import protocol as proto
+        from src.ui_album import v3_routes
+
+        state = self._album.state
+        if action == v3_routes.ACT_PVP_FIND:
+            self._pvp_connect(state)
+            self._pvp_send_when_ready({"t": proto.QUEUE, "mode": state.mode,
+                                       "level": state.level})
+        elif action == v3_routes.ACT_PVP_CREATE_ROOM:
+            self._pvp_connect(state)
+            self._pvp_send_when_ready({"t": proto.CREATE_ROOM, "mode": state.mode,
+                                       "level": state.level})
+        elif action == v3_routes.ACT_PVP_JOIN_ROOM:
+            self._pvp_connect(state)
+            self._pvp_send_when_ready({"t": proto.JOIN_ROOM,
+                                       "code": state.join_typed})
+        elif action == v3_routes.ACT_PVP_CANCEL:
+            if self._pvp is not None and self._pvp.is_connected:
+                self._pvp.send({"t": proto.CANCEL})
+            self._pvp_leave_match("cancel")
+        elif action == v3_routes.ACT_PVP_REMATCH:
+            if self._pvp is not None and self._pvp.is_connected:
+                self._pvp.send({"t": proto.REMATCH})
+                self._album.flow.say(state, "Waiting for a rematch...")
+        elif action == v3_routes.ACT_PVP_RECONNECT:
+            if self._pvp is not None:
+                self._pvp.close()
+                self._pvp = None
+            self._pvp_connect(state)
+
+    def _pvp_leave_match(self, reason: str = "left") -> None:
+        """Dọn phiên PvP hiện tại (huỷ/rời/lỗi) — KHÔNG đóng kết nối, chỉ
+        dọn trạng thái trận. ``reason`` chỉ để log."""
+        state = self._album.state
+        state.pvp_role = state.pvp_token = state.pvp_match_id = ""
+        state.pvp_opponent_name = ""
+        state.pvp_started = False
+        self._pvp_is_host = False
+        self._pvp_photo_sent = False
+        self._pvp_photo_ready = False
+        self._pvp_bugs_sent = False
+        self._pvp_bugs_attempted = False
+        self._pvp_ready_sent = False
+        self._pvp_active = False
+        self._album.game = None
+        self._game, self._game_planes = None, ()
+        self._renderer.set_props([])
+        logger.info("PvP: roi tran (%s)", reason)
+
+    def _tick_pvp(self, now: float) -> None:
+        """Nhịp mỗi khung: rút hộp thư ``PvpClient`` — không bao giờ chặn."""
+        if self._pvp is None:
+            return
+        if self._pvp_pending is not None and self._pvp.is_connected:
+            self._pvp.send(self._pvp_pending)
+            self._pvp_pending = None
+        for msg in self._pvp.poll():
+            self._pvp_handle(msg, now)
+        self._pvp_tick_lobby(now)
+
+    def _pvp_handle(self, msg: dict, now: float) -> None:
+        from src.net import client as pvp_client_mod
+        from src.net import protocol as proto
+
+        t = msg.get("t")
+        if t == pvp_client_mod.STATUS:
+            self._pvp_handle_status(msg, now)
+        elif t == proto.ERROR:
+            self._pvp_handle_error(msg, now)
+        elif t == proto.ROOM:
+            self._album.state.room_code = str(msg.get("code", ""))
+        elif t == proto.MATCHED:
+            self._pvp_handle_matched(msg, now)
+        elif t == proto.PHOTO:
+            self._pvp_handle_photo(msg, now)
+        elif t == proto.START:
+            self._pvp_handle_start(msg, now)
+        elif t == proto.KILLED:
+            self._pvp_handle_killed(msg, now)
+        elif t == proto.TICK:
+            self._pvp_handle_tick(msg, now)
+        elif t == proto.END:
+            self._pvp_handle_end(msg, now)
+        elif t == proto.EYE:
+            self._pvp_handle_eye(msg, now)
+
+    def _pvp_handle_status(self, msg: dict, now: float) -> None:
+        F = self._album.flow
+        state = self._album.state
+        status = msg.get("status")
+        if status == "error":
+            F.say(state, f"PvP: {msg.get('message') or 'could not connect'}", 6.0)
+        elif status == "disconnected":
+            if state.screen in (F.PVP_SEARCH, F.PVP_INVITE, F.PVP_FOUND,
+                                F.PVP_HUNT, F.PVP_HIDE):
+                state.offline_since_s = now
+                state.go(F.OFFLINE)
+
+    def _pvp_handle_error(self, msg: dict, now: float) -> None:
+        F = self._album.flow
+        state = self._album.state
+        code = msg.get("code")
+        message = str(msg.get("message") or "") or "PvP error"
+        if code == "version_mismatch":
+            F.say(state, message, 10.0)
+            if self._pvp is not None:
+                self._pvp.close()
+                self._pvp = None
+            state.go(F.PVP_MODE)
+        elif code == "room_not_found":
+            F.say(state, message, 5.0)
+        else:
+            F.say(state, message, 6.0)
+
+    def _pvp_handle_matched(self, msg: dict, now: float) -> None:
+        F = self._album.flow
+        state = self._album.state
+        state.mode = str(msg.get("mode") or state.mode)
+        try:
+            state.level = int(msg.get("level", state.level))
+        except (TypeError, ValueError):
+            pass
+        state.pvp_role = str(msg.get("role") or "")
+        state.pvp_token = str(msg.get("token") or "")
+        state.pvp_match_id = str(msg.get("room") or "")
+        state.pvp_opponent_name = str(msg.get("opponent_name") or "Opponent")
+        state.pvp_started = False
+        self._pvp_is_host = bool(msg.get("is_host"))
+        self._pvp_photo_sent = False
+        self._pvp_photo_ready = False
+        self._pvp_bugs_sent = False
+        self._pvp_bugs_attempted = False
+        self._pvp_ready_sent = False
+        self._pvp_active = False
+        state.found_at_s = now
+        state.go(F.PVP_FOUND)
+        F.say(state, f"{state.pvp_opponent_name} is splitting layers…", 30.0)
+        if self._pvp_is_host:
+            photo_path = (Path(state.photo) if state.photo
+                         else self._content.resolved_media_path(self._root))
+            self._try_load_media(photo_path, now)
+            self._pvp_photo_ready = True
+            self._pvp_send_photo(photo_path)
+
+    def _pvp_send_photo(self, path: Path) -> None:
+        """Host gửi ảnh cho khách — re-encode cùng luật ``shared_album._reencode``
+        (nén lại, bỏ EXIF); không bao giờ gửi file gốc thẳng ra mạng."""
+        if self._pvp_photo_sent or self._pvp is None:
+            return
+        from src.net import protocol as proto
+
+        data = shared_album._reencode(path)
+        if data is None:
+            self._album.flow.say(self._album.state,
+                                 "Could not read the photo to send.")
+            return
+        self._pvp.send({"t": proto.PHOTO,
+                        "jpeg_b64": base64.b64encode(data).decode("ascii"),
+                        "sha1": hashlib.sha1(data).hexdigest()})
+        self._pvp_photo_sent = True
+
+    def _pvp_handle_photo(self, msg: dict, now: float) -> None:
+        """Khách nhận ảnh: lưu dưới ``assets/cache/pvp/<sha1 CỤC BỘ>.jpg`` —
+        tên file không bao giờ dựng từ ``sha1`` của xa, chỉ dùng CÁI MÌNH
+        TỰ TÍNH LẠI sau khi giải mã, đúng luật "never build a file path
+        from remote data"."""
+        state = self._album.state
+        jpeg_b64, remote_sha1 = msg.get("jpeg_b64"), msg.get("sha1")
+        if not isinstance(jpeg_b64, str) or not isinstance(remote_sha1, str):
+            return
+        try:
+            data = base64.b64decode(jpeg_b64, validate=True)
+        except (ValueError, binascii.Error):
+            logger.warning("PvP photo: base64 hong — bo qua")
+            return
+        local_sha1 = hashlib.sha1(data).hexdigest()
+        if local_sha1 != remote_sha1.lower():
+            logger.warning("PvP photo: sha1 khong khop — bo qua")
+            return
+        cache_dir = self._root / "assets" / "cache" / "pvp"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        path = cache_dir / f"{local_sha1}.jpg"
+        path.write_bytes(data)
+        state.photo = path
+        self._try_load_media(path, now)
+        self._pvp_photo_ready = True
+
+    def _pvp_tick_lobby(self, now: float) -> None:
+        """Trong ``PVP_FOUND``: chờ tách lớp xong, đặt bọ (nếu mình là
+        người đặt) rồi báo ``ready``. Chạy mỗi khung tới khi server gửi
+        ``start`` (``state.pvp_started`` bật)."""
+        from src.net import protocol as proto
+
+        F = self._album.flow
+        state = self._album.state
+        if state.screen != F.PVP_FOUND or state.pvp_started or not state.pvp_match_id:
+            return
+        if not self._pvp_photo_ready:
+            return                       # chua bat dau tai DUNG anh cua tran nay
+        if self._renderer.waiting_for_depth:
+            return
+        if len(self._renderer.layer_records()) < 2:
+            return                       # chua co gi de bake (vd con cho anh)
+        is_placer = ((state.mode == F.PVP_MODES[0] and self._pvp_is_host)
+                    or (state.mode == F.PVP_MODES[1] and state.pvp_role == "hider"))
+        if is_placer and not self._pvp_bugs_attempted:
+            self._pvp_bugs_attempted = True
+            if not self._pvp_place_bugs(now):
+                F.say(state, "This photo can't hide any bugs for PvP — "
+                             "pick another one.", 8.0)
+                if self._pvp is not None:
+                    self._pvp.send({"t": proto.CANCEL})
+                self._pvp_leave_match("no_bugs")
+                state.go(F.PVP_MODE)
+                return
+            self._pvp_bugs_sent = True
+        if is_placer and not self._pvp_bugs_sent:
+            return                       # dat bo that bai nhung chua roi man (hiem)
+        if not self._pvp_ready_sent:
+            if self._pvp is not None:
+                self._pvp.send({"t": proto.READY})
+            self._pvp_ready_sent = True
+
+    def _pvp_place_bugs(self, now: float) -> bool:
+        """Đặt bọ (host ở Competitive, hider ở Hunt & Hide): CÙNG thuật
+        toán solo (``_start_prop_game`` + ``filter_props`` +
+        ``assign_bug_sizes``/``assign_bug_camo``), rồi đổi sang dạng mạng
+        (``pvp_sync``) và gửi ``bugs`` cho server. ``False`` nếu ảnh không
+        giấu được con nào."""
+        from src.ui_album.viewport_filter import filter_props
+        from src.ui_album.bugs import assign_bug_camo, assign_bug_sizes
+        from src.ui_album import pvp_sync
+        from src.net import protocol as proto
+
+        F = self._album.flow
+        state = self._album.state
+        count = F.LEVEL_TABLE[state.level][1]
+        self._start_prop_game(count=count * 3)
+        if self._game is None or not self._game.props:
+            return False
+        rest = self._rest_eye or (
+            float(self._content.overscan_design_eye_mm[0]),
+            float(self._content.overscan_design_eye_mm[1]), 450.0)
+        glass, centre = self._glass_mm()
+        kept, _outside = filter_props(self._game.props, rest, count, glass,
+                                      self._viewport_rect(F.PVP_HUNT), centre)
+        if not kept:
+            return False
+        self._game.props = kept
+        self._game.found = [False] * len(kept)
+        self._game.visible_since_s = [None] * len(kept)
+        seed_key = Path(self._content.content_path).name or "unknown"
+        assign_bug_sizes(self._game.props, seed_key)
+        photo_rgb = self._photo_rgb_for_camo()
+        if photo_rgb is not None:
+            assign_bug_camo(self._game.props, photo_rgb, rest, glass, centre)
+        self._renderer.set_props([])
+        if self._bugs is not None:
+            self._bugs.reset()
+        wire = pvp_sync.bugs_to_wire(self._game.props, self._game_planes)
+        if not wire or self._pvp is None:
+            return False
+        self._pvp.send({"t": proto.BUGS, "bugs": wire})
+        return True
+
+    def _pvp_handle_start(self, msg: dict, now: float) -> None:
+        from src.ui_album import pvp_sync
+        from src.ui_album.game_bridge import (
+            DEFAULT_SPEC, WEAPONS_SPEC, start_match,
+        )
+
+        F = self._album.flow
+        state = self._album.state
+        self._game_planes = layer_planes(self._renderer.layer_records())
+        bugs = msg.get("bugs") or []
+        if not bugs:
+            # Hunt & Hide: đây là pha "setup" (bugs rỗng) — chỉ bắt đầu đếm
+            # giờ đặt bọ của hider, chưa vào trận.
+            if state.mode == F.PVP_MODES[1] and state.pvp_role == "hider":
+                state.pvp_setup_deadline_s = now + 20.0  # SETUP_S (src/net/server.py)
+            return
+        radius = float(self._content.game_prop_radius_mm)
+        props = pvp_sync.bugs_from_wire(bugs, self._game_planes, radius)
+        found = [False] * len(props)
+        for index, prop in enumerate(props):
+            if prop is None:
+                # Không neo được vào lớp cục bộ (khác số lớp hai máy — hiếm
+                # với cùng ảnh/config): coi như đã chết, không vẽ không bắn.
+                props[index] = {"pos_mm": (0.0, 0.0, -100000.0),
+                                "radius_mm": 0.0, "size_k": 0.0,
+                                "camo_rgb": (0.5, 0.5, 0.5), "reveal_axis": "x",
+                                "reveal_450_mm": 0.0, "reveal_330_mm": 0.0}
+                found[index] = True
+        self._game = GameState(image="pvp", props=props, tracking_on=True,
+                               started_at_s=now, found=found)
+        self._game_layers_revision = self._renderer.layers_revision
+        self._renderer.set_props(prop_items(self._game, radius))
+        if self._bugs is not None:
+            self._bugs.reset()
+        weapon = state.weapon_name() or F.WEAPONS[0]
+        match = start_match(state.level, self._game, weapon, list(state.items),
+                            F.ITEM_WEIGHT)
+        match.layer_total = len(self._renderer.layer_records())
+        spec = WEAPONS_SPEC.get(weapon, DEFAULT_SPEC)
+        match.ammo_enabled = True
+        match.mag_size = spec.mag
+        match.rounds_left = spec.mag
+        match.fire_interval_s = spec.fire_s
+        match.reload_s = spec.reload_s
+        self._album.game = match
+        self._pvp_active = True
+        state.pvp_started = True
+        state.found_at_s = now          # dem nguoc 3s cua v3_flow.update() tu day
+
+    def _pvp_handle_killed(self, msg: dict, now: float) -> None:
+        match = self._album.game
+        if match is None or self._game is None:
+            return
+        bug_id = msg.get("bug")
+        if (isinstance(bug_id, bool) or not isinstance(bug_id, int)
+                or not (0 <= bug_id < len(self._game.props))):
+            return
+        if not self._game.found[bug_id]:
+            self._game.found[bug_id] = True
+            prop = self._game.props[bug_id]
+            self._renderer.set_prop_found(bug_id)
+            if self._bugs is not None and prop is not None:
+                self._bugs.mark_found(bug_id,
+                                      [v / 1000.0 for v in prop["pos_mm"]])
+        if msg.get("late"):
+            return
+        if msg.get("by") == self._pvp_my_name:
+            match.my_kills += 1
+        else:
+            match.bot_found += 1
+
+    def _pvp_handle_tick(self, msg: dict, now: float) -> None:
+        """Đồng hồ đếm ngược server là CHUẨN — tự sửa trôi mỗi giây thay vì
+        cộng dồn lệch dần theo đồng hồ cục bộ."""
+        match = self._album.game
+        if match is None:
+            return
+        try:
+            time_left = float(msg.get("time_left", match.time_left_s))
+        except (TypeError, ValueError):
+            return
+        match.started_s = time.perf_counter() - (match.seconds - time_left)
+
+    def _pvp_handle_end(self, msg: dict, now: float) -> None:
+        F = self._album.flow
+        state = self._album.state
+        scores = msg.get("scores") or {}
+        state.last_result = {
+            "score": scores.get("you", 0), "opponent_score": scores.get("opp", 0),
+            "winner": msg.get("winner"), "opp_name": msg.get("opp_name") or "Opponent",
+            "rows": msg.get("rows") or [], "opponent_rows": msg.get("opponent_rows") or [],
+        }
+        self._pvp_active = False
+        self._album.game = None
+        self._game = None
+        self._renderer.set_props([])
+        state.go(F.PVP_RESULT)
+
+    def _pvp_handle_eye(self, msg: dict, now: float) -> None:
+        """Hunt & Hide: mắt của hunter tới 10 Hz — hider tính % bọ còn sống
+        đang lộ ra trước mắt đó, CỤC BỘ bằng hình học lớp của chính mình
+        (``hidden_props.is_visible``), không phải server tính hộ."""
+        state = self._album.state
+        match = self._album.game
+        if (match is None or self._game is None
+                or state.pvp_role != "hider"):
+            return
+        x, y, z = msg.get("x"), msg.get("y"), msg.get("z")
+        if not all(isinstance(v, (int, float)) for v in (x, y, z)):
+            return
+        from src.content.hidden_props import _nearer, is_visible
+
+        eye = (float(x), float(y), float(z))
+        radius = float(self._content.game_prop_radius_mm)
+        alive = [i for i in range(len(self._game.props))
+                if not self._game.found[i] and self._game.props[i] is not None]
+        if not alive:
+            match.exposure_pct = 0.0
+            return
+        visible = 0
+        for index in alive:
+            pos_mm = self._game.props[index]["pos_mm"]
+            nearer = _nearer(self._game_planes, pos_mm[2] / 1000.0)
+            if is_visible(eye, pos_mm, radius, nearer):
+                visible += 1
+        match.exposure_pct = 100.0 * visible / len(alive)
 
     def _start_album_match(self, now: float) -> None:
         """Mở một ván theo cấp đang chọn: số bọ lấy từ bảng cấp."""

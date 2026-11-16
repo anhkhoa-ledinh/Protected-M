@@ -77,7 +77,7 @@ class FakeClient:
 
 
 def _bugs(n: int = 3) -> list[dict]:
-    return [{"id": i, "x": 0.1 * i, "y": 0.2, "layer": 0, "size_k": 1.0,
+    return [{"id": i, "x": 0.1 * i, "y": 0.2, "z": 0.5, "layer": 0, "size_k": 1.0,
               "camo_rgb": [0.5, 0.5, 0.5]} for i in range(n)]
 
 
@@ -168,6 +168,7 @@ def test_create_and_join_room_by_code(server):
     mb = b.recv_type(proto.MATCHED)
     assert ma["level"] == 2 and mb["level"] == 2
     assert ma["role"] == "host" and mb["role"] == "guest"
+    assert ma["is_host"] is True and mb["is_host"] is False
     a.close()
     b.close()
 
@@ -189,6 +190,10 @@ def test_hunt_and_hide_assigns_hunter_to_the_room_creator(server):
     ma = a.recv_type(proto.MATCHED)
     mb = b.recv_type(proto.MATCHED)
     assert ma["role"] == "hunter" and mb["role"] == "hider"
+    # "is_host" is independent of the hunter/hider label — the room creator
+    # is host regardless of mode (app.py uses it to decide who sends the
+    # photo, since Hunt & Hide's "role" alone can't say that).
+    assert ma["is_host"] is True and mb["is_host"] is False
     a.close()
     b.close()
 
@@ -279,6 +284,11 @@ def test_tick_counts_down_and_all_dead_ends_the_match_with_scores(server):
     assert end_a["winner"] == "you" and end_b["winner"] == "opp"
     assert end_a["scores"]["you"] > end_b["scores"]["you"]
     assert any(row[0] == "Bugs killed" for row in end_a["rows"])
+    # Each side's result screen needs the OTHER side's row breakdown too
+    # (PVP_RESULT draws both columns) — the server must send it, not just
+    # "your own" rows.
+    assert end_a["opponent_rows"] == end_b["rows"]
+    assert end_b["opponent_rows"] == end_a["rows"]
     host.close()
     guest.close()
 
