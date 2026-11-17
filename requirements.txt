@@ -5,7 +5,12 @@ PyOpenGL>=3.1.6
 glfw>=2.6.0
 pyglm>=2.7.0
 scipy>=1.11.0
-imgui[glfw]>=2.0.0
+# imgui[glfw] removed: optional, only for the sandbox F1 debug overlay
+# (src/renderer/debug_overlay.py, which already falls back to a plain
+# textured-quad HUD on ImportError). No wheel for Python 3.12+ on PyPI, and
+# building from source needs MSVC Build Tools — install it yourself with
+# `pip install imgui[glfw]` if you want the F1 overlay and have the build
+# tools.
 pyyaml>=6.0.0
 h5py>=3.10.0
 

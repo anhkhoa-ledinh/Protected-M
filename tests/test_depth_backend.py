@@ -7,6 +7,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+import pytest
 
 from src.config.schema import ContentSettings
 from src.content.depth_estimator import (
@@ -61,9 +62,19 @@ class TestOnnxMatchesTorch(unittest.TestCase):
 
     Chạy cả hai engine thật nên test này nặng (nạp 2 model + 2 lượt inference);
     bỏ qua khi không có file .onnx (file nằm trong ``artifacts/``, gitignored).
+
+    TASK_ci_1116: cả hai backend đều gọi ``AutoImageProcessor.from_pretrained``
+    cho CÙNG model id (xem ``_OnnxRuntimeBackend``'s docstring) — thiếu file
+    .onnx không phải lý do duy nhất để bỏ qua; model HF chưa có trong cache
+    cục bộ (CI không bao giờ được tải nó) cũng phải bỏ qua, không phải lỗi.
     """
 
+    @pytest.fixture(autouse=True)
+    def _inject_model_files(self, model_files):
+        self.model_files = model_files
+
     def test_onnx_matches_torch_on_fixture_image(self) -> None:
+        self.model_files.require_depth_anything()
         bgr = cv2.imread(str(FIXTURE), cv2.IMREAD_COLOR)
         self.assertIsNotNone(bgr, f"Khong doc duoc anh fixture: {FIXTURE}")
         rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)

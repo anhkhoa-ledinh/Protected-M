@@ -1,5 +1,7 @@
 # Protected M
 
+![tests](https://github.com/anhkhoa-ledinh/Protected-M/actions/workflows/tests.yml/badge.svg)
+
 **A glasses-free 3D bug hunt for an ordinary laptop screen.**
 
 > ⚠️ **Demo build.** The game is playable end to end, but it still has bugs
@@ -65,8 +67,14 @@ cd Protected-M
 
 py -3.13 -m venv .venv
 .venv\Scripts\activate
-pip install -r requirements.txt
+pip install -r requirements-lock.txt
 ```
+
+`requirements-lock.txt` pins exact versions (CI installs from it too, so the
+test suite runs against the same versions locally and in Actions). To pick
+up newer dependency versions instead, use `requirements.txt` (unpinned
+`>=`) and regenerate the lock with `pip freeze > requirements-lock.txt`
+once the suite is green again.
 
 Then check these assets:
 
@@ -336,6 +344,10 @@ python main.py --demo     :: presentation mode: only G, T, F4, F6, Esc
 | `T` | Head tracking on/off |
 | `+` / `−` | Virtual viewing distance |
 | `Esc` | Quit |
+
+`F1`'s debug overlay uses `imgui[glfw]`, not in `requirements.txt` (no
+wheel for Python 3.12+); without it, `F1` shows a plainer textured-quad
+HUD instead.
 
 ---
 

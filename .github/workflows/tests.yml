@@ -1,0 +1,33 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: windows-latest
+    env:
+      # The app is Windows-only (.bat launchers, winsound, ctypes.windll),
+      # so a Linux runner would test the wrong platform.
+      HF_HUB_OFFLINE: "1"
+      # CI must never download models (Depth Anything / LaMa weights are
+      # not committed to git) — tests/conftest.py's model_files fixture
+      # skips anything that needs them instead of fetching them here.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      # Pinned, not requirements.txt's unpinned >= — those resolve to
+      # whatever is newest on PyPI at install time (opencv 5.0, mediapipe
+      # 1.2.3, numpy 2.5, transformers 5.x, torch 2.15 as of this writing),
+      # which is not necessarily what the local passing test suite ran
+      # against. requirements-lock.txt is `pip freeze` from the dev venv
+      # the suite is verified green on.
+      - run: pip install -r requirements-lock.txt
+
+      - run: python -m pytest -q -ra
