@@ -411,6 +411,7 @@ docs/                   Technical documentation (docs/KY_THUAT_HE_THONG.md is in
 - **Hole filling:** [LaMa](https://github.com/advimman/lama) (Suvorov et al., 2022), ONNX export by [Carve](https://huggingface.co/Carve/LaMa-ONNX) (Apache-2.0).
 - **Projection:** R. Kooima, *Generalized Perspective Projection* (2009).
 - **Bug sprites:** [Top-down Alien Bug Sprites](https://whiteknightstudios.itch.io/top-down-bug-sprites) by W_K_Studio (CC0).
+- **Hit/UI effects:** rendered from [Sakuga VFX](https://github.com/finktheartist/sakuga-vfx) by Justin Finkelman (MIT), recoloured to the ui_v3 palette.
 - **Fonts** in the UI packs are under the SIL Open Font License.
 
 Built as an undergraduate thesis project (HCPD, KLCN164).

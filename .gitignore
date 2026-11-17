@@ -42,6 +42,11 @@ docs/HCPD_FOR_CLAUDE.md
 # file PNG của bộ này, nên phải mở ngoại lệ hẳn ra đây.
 !assets/ui_v3/**/*.png
 
+# TASK_ui_sakuga_1117: hiệu ứng Sakuga đã nướng sẵn (sheets/ + words/), bên
+# thứ ba MIT — cũng phải mở ngoại lệ giống assets/ui_v3 ở trên, nếu không
+# luật `*.png` xoá sạch 41 file atlas/chữ của bộ này.
+!assets/fx/**/*.png
+
 # ─── Cấu hình riêng từng máy / từng người ─────────────────────────────────
 # user.json chứa face_scale đo riêng cho khuôn mặt của một người. Commit lên
 # thì người khác clone về sẽ chạy với hiệu chỉnh của người kia, và Z sai mà

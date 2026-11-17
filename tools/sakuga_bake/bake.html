@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>html,body{margin:0;background:transparent;overflow:hidden}</style>
+<script>
+// Deterministic randomness: the core uses Math.random, so seed it before the core loads.
+(function () {
+  const q = new URLSearchParams(location.search);
+  let a = (parseInt(q.get('seed') || '1', 10) * 2654435761) >>> 0;
+  Math.random = function () { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+})();
+</script>
+<script src="vendor/core.js"></script>
+<script>
+const fx = window.SakugaFX, P = fx.P;
+// Protected M v3 palette (assets/ui_v3/manifest.json "colors"): paper white, soft blue shadow, primary_dark line, health red accent, ink.
+Object.assign(P, { fill: '#ffffff', shade: '#BCD3EE', line: '#2A5A93', accent: '#E8676B', ink: '#24415F', sfx: ['#24415F', '#ffffff'] });
+const { rnd, later, burst, shards, puff, ticks, wob, slash, lines, ring, donut, kira, sfx } = fx;
+const PI = Math.PI, INK = '#24415F', ACC = '#E8676B';
+
+// Each recipe draws around (x, y) in design px (1280x720 basis). Words are NOT drawn here: the game draws them
+// itself from words/*.png with the same spring as core.js sfx(), so they stay sharp and cost no sheet frames.
+// A recipe returns its word cues so they end up in fx.json.
+const R = {
+  hit_kill(x, y) {
+    burst(x, y, { r: 70, spikes: 15, life: 0.42 });
+    shards(x, y, { n: 9, speed: 240, size: 8, life: 0.9, arc: 6.28, grav: 300 });
+    for (const [dx, dy] of [[-1, -0.6], [1, -1], [-1, 0.9], [1, 1]]) puff(x + dx * 40, y + dy * 22, { size: rnd(10, 14), n: 5, vx: dx * 42, vy: dy * 28 - 6, life: rnd(0.7, 0.95) });
+    ticks(x - 78, y - 56, { dir: -2.4, n: 2, r: 4, len: 20, life: 0.45 }); ticks(x + 86, y - 48, { dir: -0.7, n: 2, r: 4, len: 20, life: 0.45 });
+    return [{ word: 'don', style: 'ink', at: 0, dx: 14, dy: -92, size: 150, rot: -0.12, life: 1.0 }];
+  },
+  hit_crit(x, y) {
+    slash(x + 6, y + 2, { len: 170, ang: -0.42, thick: 15, life: 0.5 }); slash(x - 8, y + 12, { len: 120, ang: 2.72, thick: 8, life: 0.55 });
+    burst(x, y, { r: 92, spikes: 17, life: 0.48 });
+    shards(x, y, { n: 12, speed: 290, size: 9, life: 0.95, arc: 6.28, grav: 300 });
+    lines(x - 40, y + 30, { n: 6, dir: 2.75, len: 60, spread: 14 });
+    for (const [dx, dy] of [[-1, -0.5], [1, -1], [-1, 0.9], [1, 1]]) puff(x + dx * 52, y + dy * 26, { size: rnd(12, 16), n: 5, vx: dx * 46, vy: dy * 30 - 6, life: rnd(0.75, 1.05) });
+    later(380, () => kira(x + 40, y - 40, { r: 11 }));
+    return [{ word: 'don', style: 'crit', at: 0, dx: 16, dy: -104, size: 190, rot: -0.12, life: 1.05 }];
+  },
+  hit_block(x, y) {   // the shot hit a nearer layer, not the bug
+    puff(x, y, { size: 8, n: 3, vy: -10, life: 0.45 });
+    ring(x, y + 4, { rx: 22, ry: 8, life: 0.32, w: 3 });
+    ticks(x, y - 8, { dir: -PI / 2, n: 3, r: 4, len: 11, fan: 0.6, life: 0.32 });
+    return [];
+  },
+  ui_confirm(x, y) {   // primary button released (button ~220x56 centred on x, y)
+    burst(x, y, { r: 88, spikes: 17, life: 0.48 });
+    shards(x, y, { n: 10, speed: 250, size: 8, life: 0.9, arc: 6.28, grav: 300 });
+    for (const [dx, dy] of [[-1, -0.5], [1, -1], [-1, 0.9], [1, 1]]) puff(x + dx * 116, y + dy * 24, { size: rnd(12, 16), n: 5, vx: dx * 46, vy: dy * 30 - 6, life: rnd(0.75, 1.0) });
+    later(200, () => { wob(x - 118, y, { dir: -1 }); wob(x + 118, y, { dir: 1 });
+      donut(x + 6, y - 44, { r: 26, vx: 22, vy: -52, life: 1.1 }); later(90, () => donut(x + 54, y - 50, { r: 16, vx: 34, vy: -40, life: 1.0 })); });
+    return [{ word: 'don', style: 'ink', at: 0, dx: 10, dy: -84, size: 140, rot: -0.12, life: 1.0 }];
+  },
+  ui_tap(x, y) {   // secondary button / plain click
+    ticks(x, y - 34, { dir: -PI / 2, n: 3, r: 4, len: 14, fan: 0.5, life: 0.4 });
+    wob(x - 118, y, { dir: -1, r: 10, life: 0.3 }); wob(x + 118, y, { dir: 1, r: 10, life: 0.3 });
+    return [];
+  },
+  star_pop(x, y) {
+    puff(x, y + 14, { size: 5, n: 2, life: 0.4 });
+    ticks(x, y, { dir: -PI / 2, n: 9, r: 20, len: 17, fan: 0.698, life: 0.55 });
+    later(300, () => kira(x - 22, y - 30, { r: 8 }));
+    return [{ word: 'pon', style: 'hollow', at: 0, dx: 20, dy: -56, size: 92, rot: 0.08, life: 0.85 }];
+  },
+  star_five(x, y) {
+    burst(x, y, { r: 46, life: 0.4 }); shards(x, y, { n: 6, size: 5, arc: 6.28 });
+    puff(x, y + 14, { size: 5, n: 2, life: 0.4 });
+    ticks(x, y, { dir: -PI / 2, n: 9, r: 20, len: 26, fan: 0.698, life: 0.55 });
+    later(300, () => kira(x - 22, y - 30, { r: 8 }));
+    return [{ word: 'pon', style: 'hollow', at: 0, dx: 20, dy: -56, size: 120, rot: 0.08, life: 0.85 }];
+  },
+  toast_in(x, y) {   // toast (~320x56) has just landed, centred on x, y
+    const w = 320, h = 56;
+    lines(x - w / 2 - 4, y, { n: 9, dir: PI, len: 70, spread: 18, life: 0.4 });
+    for (const u of [-0.5, -0.36, -0.2]) puff(x + w * u, y + h / 2 + 4, { size: rnd(8, 12), n: 4, vx: -rnd(10, 30), vy: -8, life: rnd(0.7, 1) });
+    puff(x + w / 2 + 8, y + 10, { size: 7, n: 3, vx: 20, life: 0.6 });
+    shards(x - w / 2, y + 12, { n: 4, size: 4, dir: PI + 0.5, arc: 1.6 }); ticks(x + 30, y + h / 2 + 12, { dir: 0.5, n: 2, r: 4, len: 16 });
+    wob(x + w / 2 + 6, y, { dir: 1 });
+    return [{ word: 'zuza', style: 'dotted', at: 0, dx: -34, dy: -58, size: 124, rot: -0.1, life: 0.95 }];
+  },
+  load_done(x, y) {   // the layer-split bar reached 100 %; x, y = right end of the bar
+    burst(x - 60, y, { r: 92, spikes: 15, life: 0.5 }); burst(x - 50, y, { r: 40, life: 0.3 });
+    shards(x - 50, y, { n: 11, speed: 270, size: 7, life: 0.9, arc: 6.28 });
+    for (let i = 0; i < 7; i++) { const a = i / 7 * 6.28 + rnd(0.5); puff(x - 60 + Math.cos(a) * 70, y + Math.sin(a) * 34, { size: rnd(8, 13), n: 4, vx: Math.cos(a) * 46, vy: Math.sin(a) * 30 - 8, life: rnd(0.6, 1) }); }
+    return [{ word: 'don', style: 'ink', at: 0, dx: -86, dy: -62, size: 170, rot: -0.12, life: 1.05 }];
+  },
+  load_edge(x, y) {   // one gust behind the leading edge of the bar while it fills; the game replays variants
+    puff(x - 14, y - 6, { size: 5, n: 2, vx: -70, vy: -4, life: 0.55 });
+    lines(x - 20, y - 4, { n: 2, dir: PI, len: 40, spread: 5, life: 0.3 });
+    later(260, () => puff(x - 10, y - 10, { size: 4, n: 2, vx: -60, vy: -8, life: 0.45 }));
+    return [];
+  },
+};
+window.runRecipe = (name, x, y) => { fx.paused = true; return R[name](x, y); };
+window.recipes = Object.keys(R);
+
+// Word art: core.js keeps the traced paths private, so paint them through sfx() on a hidden page instead (see bake.mjs).
+</script>
+</head><body></body></html>
