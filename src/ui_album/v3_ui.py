@@ -427,6 +427,11 @@ class V3UI:
             self._fx_pvp_result_spawned = False
 
     def _step_loading_fx(self, state, dt: float) -> None:
+        # Mỗi "đã spawn" dưới đây chỉ CHỐT khi ``spawn_fx`` trả True — sheet
+        # chưa kịp decode (lần đầu vào màn, cache nguội) thì thử lại đúng
+        # khung sau, không bỏ cuộc sau một lần trượt (từng là lỗi thật: cờ
+        # "đã spawn" chốt trước khi biết kết quả, nên lần đầu lạnh cache là
+        # mất hẳn hiệu ứng đó, không bao giờ thử lại).
         pct = max(0.0, min(1.0, float(state.bars.get("progress", 0.0))))
         bar_x = _LOAD_BAR_X0 + _LOAD_BAR_W * pct
         if self.state.screen == F.LOADING and 0.0 < pct < 1.0:
@@ -435,50 +440,67 @@ class V3UI:
                 self._fx_load_edge_elapsed = 0.0
                 self.spawn_fx("load_edge", bar_x, _LOAD_BAR_Y)
             if not self._fx_gogo_spawned and 0.30 < pct < 0.90:
-                self._fx_gogo_spawned = True
                 word_x = max(_GOGO_X_RANGE[0], min(_GOGO_X_RANGE[1], bar_x))
-                self.spawn_fx_word("gogo", "ink", word_x, _GOGO_Y, size=150.0,
-                                  rot=-0.08, life=2.9)
+                if self.spawn_fx_word("gogo", "ink", word_x, _GOGO_Y, size=150.0,
+                                      rot=-0.08, life=2.9):
+                    self._fx_gogo_spawned = True
         if not self._fx_load_done_spawned and pct >= 1.0:
-            self._fx_load_done_spawned = True
-            self.spawn_fx("load_done", *_LOAD_DONE_XY)
+            if self.spawn_fx("load_done", *_LOAD_DONE_XY):
+                self._fx_load_done_spawned = True
         step_dots = state.pips.get("step_dots")
         if isinstance(step_dots, (list, tuple)):
             done = sum(1 for flag in step_dots if flag)
-            for index in range(self._fx_last_step_done, min(done, len(_STEP_DOT_X))):
-                self.spawn_fx("star_pop", _STEP_DOT_X[index], _STEP_DOT_Y,
-                             words=False)
-            self._fx_last_step_done = done
+            index = self._fx_last_step_done
+            while index < min(done, len(_STEP_DOT_X)):
+                if not self.spawn_fx("star_pop", _STEP_DOT_X[index], _STEP_DOT_Y,
+                                     words=False):
+                    break               # chua decode xong: thu lai khung sau
+                index += 1
+            self._fx_last_step_done = index
 
     def _step_tilt_fx(self) -> None:
         checks = tuple(self.state.tilt_checks())
         last = self._fx_last_tilt_checks
-        if last is not None:
-            for index, done in enumerate(checks):
-                if done and not last[index]:
-                    self.spawn_fx("star_pop", _TILT_STAR_X,
-                                 _TILT_STAR_Y0 + _TILT_STAR_DY * index, words=False)
-        self._fx_last_tilt_checks = checks
+        if last is None:
+            # Lần đầu sau khi vào TILT: chỉ lấy làm MỐC, không nổ sao cho
+            # dấu nào đã xong từ trước (quay lại màn này sau một lần mất
+            # mạng chẳng hạn) — đúng nghĩa "chỉ khi CHUYỂN sang xong".
+            self._fx_last_tilt_checks = checks
+            return
+        new_last = list(last)
+        for index, done in enumerate(checks):
+            if not done:
+                continue
+            if last[index] or self.spawn_fx(
+                    "star_pop", _TILT_STAR_X,
+                    _TILT_STAR_Y0 + _TILT_STAR_DY * index, words=False):
+                new_last[index] = True
+            # else: chua decode xong, giu False de thu lai khung sau.
+        self._fx_last_tilt_checks = tuple(new_last)
 
     def _step_win_fx(self, state, now: float) -> None:
         if not self._fx_win_star_spawned:
-            self._fx_win_star_spawned = True
-            self.spawn_fx("star_five", *_WIN_SCORE_XY)
+            if self.spawn_fx("star_five", *_WIN_SCORE_XY):
+                self._fx_win_star_spawned = True
         if (not self._fx_rank_up_spawned and "rank_up" in state.sprites
                 and now - self._fx_win_entered_t >= _RANK_UP_DELAY_S):
-            self._fx_rank_up_spawned = True
             record = self.manifest.sprite(F.WIN, "rank_up")
             if record is not None:
                 rect = record["rect"]
-                self.spawn_fx("star_pop", rect[0] + rect[2] * 0.5,
-                             rect[1] + rect[3] * 0.5, words=False)
+                if self.spawn_fx("star_pop", rect[0] + rect[2] * 0.5,
+                                 rect[1] + rect[3] * 0.5, words=False):
+                    self._fx_rank_up_spawned = True
 
     def _step_pvp_result_fx(self, state) -> None:
         if self._fx_pvp_result_spawned:
             return
-        self._fx_pvp_result_spawned = True
-        if "crown" in state.sprites:
-            self.spawn_fx("star_five", *_PVP_CROWN_XY)
+        if "crown" not in state.sprites:
+            # Thua/hoà: không có hiệu ứng, và KHÔNG có gì để spawn nên
+            # không cần thử lại — chốt luôn, khỏi gọi lại mỗi khung.
+            self._fx_pvp_result_spawned = True
+            return
+        if self.spawn_fx("star_five", *_PVP_CROWN_XY):
+            self._fx_pvp_result_spawned = True
 
     def _step_toast_fx(self, state, screen: str) -> None:
         until = self.state.message_until_s

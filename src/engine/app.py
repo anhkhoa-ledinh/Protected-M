@@ -392,10 +392,19 @@ class HcpdApplication:
         mắt nghỉ, mở ván) làm ở đây — xem ``src/ui_album/routes.py``.
         """
         album = self._album
-        album.mouse = album.design_mouse(*self._window.cursor_pos())
-        if self._album_options.is_v3:
+        sakuga_shots = os.environ.get("HCPD_UI_SHOTS_1117") == "1"
+        if not sakuga_shots:
+            # TASK_ui_sakuga_1117: lượt chụp 20 ảnh tự đặt ``album.mouse``
+            # cho từng bước (hover_*/press_*) — con trỏ OS thật ghi đè lên
+            # đúng mỗi khung thì KHÔNG BAO GIỜ thấy hover, bất kể bước nào
+            # (``album.mouse`` luôn là vị trí chuột thật, không phải vị trí
+            # hotspot bước đó muốn trỏ tới).
+            album.mouse = album.design_mouse(*self._window.cursor_pos())
+        if self._album_options.is_v3 and not sakuga_shots:
             # TASK_ui_sakuga_1117 Phase 5: press feedback needs HOLD state,
             # not just the edge-triggered clicks ``pop_clicks()`` gives.
+            # (``sakuga_shots`` mode sets its OWN ``album.mouse_down`` per
+            # step — same reasoning as ``album.mouse`` above.)
             album.mouse_down = self._window.is_mouse_down()
         for char in self._window.pop_typed():
             album.key(char)
@@ -413,7 +422,10 @@ class HcpdApplication:
             self._album_action("rest_eye", now)
         if input_state.screenshot:
             self._save_album_shot()
-        if not self._v3_live:
+        if not self._v3_live and os.environ.get("HCPD_UI_SHOTS_1117") != "1":
+            # TASK_ui_sakuga_1117: lượt chụp 20 ảnh tự đặt face_seen/tilt_*
+            # cho từng bước (tilt_face/left/right/done) — tracker thật ghi
+            # đè lên đúng y mỗi khung thì bốn ảnh đó không bao giờ khác nhau.
             album.state.face_seen = bool(self._tracking.face_detected)
             album.state.tracker_simulated = not bool(
                 self._tracking.tracker_available)
@@ -421,6 +433,7 @@ class HcpdApplication:
             self._tick_v3_input(input_state, now)
         album.tick()
         self._tick_album_automatch(now)
+        self._tick_fx_bench(now)
         self._tick_album_match(now)
         self._tick_pvp(now)
         self._tick_pvp_auto(now)
@@ -954,12 +967,56 @@ class HcpdApplication:
             return
         self._start_album_match(now)
 
+    def _tick_fx_bench(self, now: float) -> None:
+        """
+        Móc đo ``HCPD_FX_BENCH=1`` (dùng cùng ``HCPD_ALBUM_AUTOMATCH=1``):
+        4 phát/giây trong 20 giây trên ``PLAY``, xoay vòng giết/chí mạng/hụt
+        — qua ĐÚNG API Sakuga thật (``spawn_hit_fx``/``spawn_miss_fx``),
+        không giả bằng cách bắn thật (ngắm trúng/hụt không kiểm soát được) —
+        rồi ghi khung hình để tính FPS median (TASK_ui_sakuga_1117 G2).
+        """
+        if os.environ.get("HCPD_FX_BENCH") != "1" or not self._album_options.is_v3:
+            return
+        F = self._album.flow
+        if self._album.state.screen != F.PLAY:
+            return
+        if not hasattr(self, "_fx_bench_start"):
+            self._fx_bench_start = now
+            self._fx_bench_last_shot = now
+            self._fx_bench_last_frame_t = now
+            self._fx_bench_frame_times: list = []
+            self._fx_bench_cycle = 0
+            return
+        self._fx_bench_frame_times.append(now - self._fx_bench_last_frame_t)
+        self._fx_bench_last_frame_t = now
+        if now - self._fx_bench_last_shot >= 0.25:        # 4 phat/s
+            self._fx_bench_last_shot += 0.25
+            kind = self._fx_bench_cycle % 3
+            self._fx_bench_cycle += 1
+            if kind == 0:
+                self._album.spawn_hit_fx(False)
+            elif kind == 1:
+                self._album.spawn_hit_fx(True)
+            else:
+                self._album.spawn_miss_fx()
+        if now - self._fx_bench_start >= 20.0:
+            times = sorted(self._fx_bench_frame_times)
+            n = len(times)
+            median_dt = times[n // 2] if n else 0.0
+            fps = (1.0 / median_dt) if median_dt > 0.0 else 0.0
+            logger.info("FX_BENCH: %d khung trong 20s, FPS median %.1f, "
+                        "khung cham nhat %.1f ms", n, fps,
+                        max(times) * 1000.0 if times else 0.0)
+            self._window.request_close()
+
     def _tick_album_match(self, now: float) -> None:
         """Nhịp của màn tách lớp và của ván đang chơi."""
         F = self._album.flow
 
         if self._album_options.shots or self._album_options.ui_shots:
             return          # lượt chụp: kế hoạch màn là của _album_shots_step
+        if os.environ.get("HCPD_UI_SHOTS_1117") == "1":
+            return          # TASK_ui_sakuga_1117: _tick_sakuga_shots so sanh man
         if self._v3_live:
             return          # U3: màn và ván do preset đặt, đừng nhịp đè lên
         state = self._album.state
@@ -1767,6 +1824,197 @@ class HcpdApplication:
         save_framebuffer(path, width, height)
         return path
 
+    # ---- TASK_ui_sakuga_1117 G5: 20 ảnh hover/press/focus/tilt/fx --------
+    def _sakuga_shot_plan(self) -> list:
+        """20 bước, mỗi bước ``(tên file, setup(), số khung giữ trước khi
+        chụp)``. ``setup()`` chỉ chạy Ở KHUNG ĐẦU của bước — sau đó nhịp
+        bình thường (``album.tick()``/``draw()``) tự chạy tiếp, đúng như
+        người chơi thật đứng yên ở trạng thái đó."""
+        F = self._album.flow
+        # HOVER_HOLD: đủ để spring hover/press ổn định (k=420,d=26 lắng
+        # trong vài chục khung). AUTO_FX_HOLD: cho hiệu ứng tự spawn qua
+        # ``_step_fx_triggers`` (loading/toast/win/primary) đủ thời gian
+        # decode+spawn (~0,3-0,5s) VẪN còn sống khi chụp (đời hiệu ứng
+        # 0,4-1,3s) — khác FX_HOLD cũ 150 khung (~4s ở 37fps), đủ lâu để
+        # MỌI hiệu ứng chết hẳn trước khi chụp (ba ảnh fx_kill/fx_crit/
+        # fx_miss ra giống hệt nhau lúc kiểm — xem báo cáo G5).
+        HOVER_HOLD, AUTO_FX_HOLD = 90, 25
+
+        def hotspot_rect(screen, name):
+            from src.ui_album.v3 import hotspot_rect as _rect
+
+            for hotspot in self._album.manifest.screens[screen].get(
+                    "hotspots", ()):
+                if hotspot["n"] == name:
+                    return _rect(screen, hotspot)
+            return None
+
+        def hover_at(screen, name, press=False):
+            def setup():
+                self._album.state.go(screen)
+                self._album.state.focus = None
+                rect = hotspot_rect(screen, name)
+                if rect is not None:
+                    self._album.mouse = (rect[0] + rect[2] * 0.5,
+                                         rect[1] + rect[3] * 0.5)
+                self._album.mouse_down = press
+            return setup
+
+        def focus_at(screen, name):
+            def setup():
+                self._album.state.go(screen)
+                self._album.mouse = (-1000.0, -1000.0)
+                self._album.mouse_down = False
+                self._album.state.focus = name
+            return setup
+
+        def tilt_state(face, left, right):
+            def setup():
+                self._album.state.go(F.TILT)
+                self._album.state.face_seen = face
+                self._album.state.tilt_left_done = left
+                self._album.state.tilt_right_done = right
+                self._album.mouse = (-1000.0, -1000.0)
+            return setup
+
+        def fx_shot(screen, name, point, **kwargs):
+            def setup():
+                self._album.state.go(screen)
+                self._album.mouse = (-1000.0, -1000.0)
+                self._fx_shot_pending = (name, point, kwargs)
+            return setup
+
+        def loading_state(pct):
+            def setup():
+                self._album.state.go(F.LOADING)
+                self._album.state.pipeline_pct = pct
+                self._album.state.layer_count = 4
+                self._album.mouse = (-1000.0, -1000.0)
+            return setup
+
+        def primary_click(screen):
+            def setup():
+                self._album.state.go(screen)
+                self._album.mouse = (-1000.0, -1000.0)
+                self._album.submit()
+            return setup
+
+        def toast_shot():
+            def setup():
+                self._album.state.go(F.MENU)
+                self._album.mouse = (-1000.0, -1000.0)
+                F.say(self._album.state, "Reloading")
+            return setup
+
+        def win_shot():
+            def setup():
+                self._album.state.last_result = {
+                    "found": 3, "total": 3, "score": 120,
+                    "time_left": 10, "used": {}}
+                self._album.state.go(F.WIN)
+                self._album.mouse = (-1000.0, -1000.0)
+            return setup
+
+        return [
+            ("hover_tab_solo", hover_at(F.MENU, "tab_Solo"), HOVER_HOLD),
+            ("hover_display_full", hover_at(F.SETTINGS, "display_full"), HOVER_HOLD),
+            ("hover_link_guest", hover_at(F.SIGN_IN, "link_guest"), HOVER_HOLD),
+            ("hover_level_row_2", hover_at(F.LEVELS, "level_row_2"), HOVER_HOLD),
+            ("hover_btn_sign_in", hover_at(F.SIGN_IN, "btn_Sign in"), HOVER_HOLD),
+            ("hover_slider", hover_at(F.SETTINGS, "slider"), HOVER_HOLD),
+            ("press_btn_sign_in", hover_at(F.SIGN_IN, "btn_Sign in", press=True), HOVER_HOLD),
+            ("focus_field_user", focus_at(F.SIGN_IN, "field_user"), HOVER_HOLD),
+            ("tilt_face", tilt_state(False, False, False), HOVER_HOLD),
+            ("tilt_left", tilt_state(True, False, False), HOVER_HOLD),
+            ("tilt_right", tilt_state(True, True, False), HOVER_HOLD),
+            ("tilt_done", tilt_state(True, True, True), HOVER_HOLD),
+            # fx_kill/crit/miss dùng cơ chế chờ KHÔNG GIỚI HẠN riêng
+            # (``_fx_shot_pending`` trong ``_tick_sakuga_shots``) — số ở đây
+            # bị bỏ qua cho ba bước này.
+            ("fx_kill", fx_shot(F.PLAY, "hit_kill", (640.0, 360.0)), 0),
+            ("fx_crit", fx_shot(F.PLAY, "hit_crit", (640.0, 360.0)), 0),
+            ("fx_miss", fx_shot(F.PLAY, "hit_block", (640.0, 360.0)), 0),
+            ("fx_loading_50", loading_state(50.0), AUTO_FX_HOLD),
+            ("fx_loading_done", loading_state(100.0), AUTO_FX_HOLD),
+            ("fx_button_primary", primary_click(F.SETTINGS), AUTO_FX_HOLD),
+            ("fx_toast", toast_shot(), AUTO_FX_HOLD),
+            ("fx_win", win_shot(), AUTO_FX_HOLD),
+        ]
+
+    #: fx_kill/crit/miss: once ``_fx_shot_pending`` finally spawns (texture
+    #: decode is unbounded — depends on disk/CPU), hold this many MORE
+    #: frames so the capture lands mid-animation, not frame 0.
+    _FX_PENDING_POST_FRAMES = 8
+
+    def _tick_sakuga_shots(self) -> None:
+        """``HCPD_UI_SHOTS_1117=1``: chạy ``_sakuga_shot_plan`` rồi thoát —
+        20 ảnh vào ``results/ui_sakuga_1117/`` (TASK_ui_sakuga_1117 G5).
+
+        ``_sakuga_shot_started`` (KHÔNG phải ``hold == 0``) là cờ "đã gọi
+        ``setup()`` cho bước này chưa" — dùng ``hold`` làm cờ đó từng là
+        lỗi thật: trong lúc CHỜ ``_fx_shot_pending`` (có thể nhiều khung),
+        ``hold`` đứng ở 0, nên ``setup()`` bị gọi lại MỖI KHUNG, ghi đè
+        ``_fx_shot_pending`` vừa chốt ``None`` trở lại y lúc đầu — kẹt vô
+        hạn ở bước ``fx_kill`` (texture đã lên GPU từ lâu, vẫn không bao
+        giờ chụp được vì cờ chốt xong bị xoá lại đúng khung sau đó).
+        """
+        from OpenGL import GL
+
+        if self._window.is_iconified():
+            return
+        plan = self._sakuga_shot_plan()
+        index = getattr(self, "_sakuga_shot_index", 0)
+        if index >= len(plan):
+            return
+        stem, setup, hold_frames = plan[index]
+        if not getattr(self, "_sakuga_shot_started", False):
+            setup()
+            self._sakuga_shot_started = True
+            self._sakuga_shot_hold = 0
+            self._sakuga_shot_post = None
+        pending = getattr(self, "_fx_shot_pending", None)
+        if pending is not None:
+            name, point, kwargs = pending
+            if self._album.spawn_fx(name, point[0], point[1], **kwargs):
+                self._fx_shot_pending = None
+                self._sakuga_shot_post = 0
+            return      # moi spawn xong (chua du khung de chup) HOAC van
+                        # cho decode — ca hai deu chua san sang chup ngay.
+        post = getattr(self, "_sakuga_shot_post", None)
+        if post is not None:
+            post += 1
+            self._sakuga_shot_post = post
+            ready = post >= self._FX_PENDING_POST_FRAMES
+        else:
+            hold = getattr(self, "_sakuga_shot_hold", 0) + 1
+            self._sakuga_shot_hold = hold
+            ready = hold >= hold_frames
+        if not ready:
+            return
+        GL.glFinish()
+        self._save_sakuga_shot(stem)
+        self._sakuga_shot_started = False
+        self._sakuga_shot_hold = 0
+        self._sakuga_shot_post = None
+        self._fx_shot_pending = None
+        self._sakuga_shot_index = index + 1
+        if self._sakuga_shot_index >= len(plan):
+            logger.info("Sakuga UI shots: xong %d anh", len(plan))
+            self._window.request_close()
+
+    def _save_sakuga_shot(self, stem: str) -> None:
+        from src.ui_album.shots import save_framebuffer
+
+        self._window.restore_and_focus()
+        self._window.pump_events()
+        width, height = self._window.framebuffer_size()
+        if width < 2 or height < 2:
+            logger.warning("Sakuga shot bo qua: framebuffer %dx%d", width, height)
+            return
+        path = self._root / "results" / "ui_sakuga_1117" / f"{stem}.png"
+        save_framebuffer(path, width, height)
+        logger.info("Sakuga UI shot: %s (%dx%d)", path, width, height)
+
     def _begin_rest_measure(self, now: float) -> None:
         """Phím G: đo mắt nghỉ 2 giây thay vì đặt vật ngay."""
         if len(self._renderer.layer_records()) < 2:
@@ -2285,6 +2533,8 @@ class HcpdApplication:
                         self._album_shots_step()
                     elif os.environ.get("HCPD_V3_LIVE") == "1":
                         self._tick_v3_live_shots()
+                    elif os.environ.get("HCPD_UI_SHOTS_1117") == "1":
+                        self._tick_sakuga_shots()
                 else:
                     scene()
                 self._window.swap_buffers()
