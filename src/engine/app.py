@@ -899,6 +899,12 @@ class HcpdApplication:
         if shot is None:
             return True          # hết băng hoặc đang nạp: nuốt cú bấm
         hit, crit = shot
+        if self._album_options.is_v3:
+            # TASK_game_feel_1118 P4: kick/tracer/shake/hit marker/crit
+            # impact for THIS shot — every outcome (hit, crit, miss) gets
+            # it; only a hit gets a marker, only a crit gets the impact
+            # frame too (``ShotFeel.on_shot`` itself decides which).
+            self._album.register_shot(hit >= 0, crit)
         if hit >= 0:
             self._renderer.set_prop_found(hit)
             if self._bugs is not None:

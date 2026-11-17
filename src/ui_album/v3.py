@@ -29,6 +29,15 @@ from PIL import Image, ImageDraw
 from src.renderer.shader import ShaderProgram
 from src.ui_album.fonts import FontBook
 from src.ui_album.manifest import letterbox
+from src.ui_album.shot_feel import (CRIT_IMPACT_COL,
+                                    HITMARK_ANGLES_DEG, HITMARK_COL,
+                                    HITMARK_CRIT_COL, HITMARK_CRIT_SCALE,
+                                    HITMARK_INNER_PX, HITMARK_LIFE_S,
+                                    HITMARK_OUTER_PX, HITMARK_OUTLINE_COL,
+                                    HITMARK_OUTLINE_PX, HITMARK_WIDTH_PX,
+                                    TRACER_CORE_COL, TRACER_CORE_FRACTION,
+                                    TRACER_EDGE_COL, TRACER_LIFE_S,
+                                    TRACER_TARGET_WIDTH_PX)
 from src.ui_album.textures import TextureCache, load_rgba, upload_rgba
 
 logger = logging.getLogger(__name__)
@@ -1084,7 +1093,8 @@ class V3State:
                  "hover", "focus", "caret", "alpha", "shot", "message", "wrap",
                  "extra", "mirror", "aim", "shots", "aim_ready", "confirm",
                  "text_rect", "fx_on", "fx_draw", "selected", "pressed",
-                 "hover_fx")
+                 "hover_fx", "aim_kick_scale", "tracers", "hit_markers",
+                 "crit_impact_alpha", "scene_shake")
 
     def __init__(self) -> None:
         #: ``key`` → chuỗi (thay run đầu) hoặc danh sách chuỗi (thay từng run).
@@ -1162,6 +1172,18 @@ class V3State:
         #: across frames; ``V3State`` itself does not) — ``None`` means
         #: "no hover feedback this frame" (``shot_state``'s screenshots).
         self.hover_fx = None
+        #: TASK_game_feel_1118 P4 — all five default to "nothing kicked/
+        #: shaking/marked right now"; ``v3_ui.py`` fills them in on
+        #: PLAY/PVP_HUNT from its persistent ``ShotFeel``.
+        self.aim_kick_scale: float = 1.0
+        #: ``[(muzzle, target, age_s, muzzle_width_px), ...]``.
+        self.tracers: list = []
+        #: ``[(x, y, age_s, crit), ...]``.
+        self.hit_markers: list = []
+        self.crit_impact_alpha: float = 0.0
+        #: Design-px ``(dx, dy)`` the 3D scene viewport and the fx layer
+        #: are shifted by — HUD panels/text never move with it.
+        self.scene_shake: tuple = (0.0, 0.0)
 
 
 def shot_state(manifest: V3Manifest, screen: str) -> V3State:
@@ -1251,6 +1273,10 @@ def draw_screen(painter: V3Painter, manifest: V3Manifest, screen: str,
     painter.layer(full, record.get("base"))
     _draw_photos(painter, manifest, record, state)
     painter.layer(full, record.get("top"))
+    # TASK_game_feel_1118 P4: the crit impact frame sits here — under
+    # every HUD element below AND under the ``hit_crit`` Sakuga burst
+    # (drawn with ``state.fx_draw()``, near the end of this function).
+    _draw_crit_impact(painter, state)
     _draw_bars(painter, record, state)
     _draw_pips(painter, record, state)
     _draw_pills(painter, record, state)
@@ -1258,7 +1284,9 @@ def draw_screen(painter: V3Painter, manifest: V3Manifest, screen: str,
     _draw_texts(painter, record, state)
     _draw_choose_photo_extra(painter, screen, state)
     _draw_shots(painter, state)
+    _draw_tracers(painter, state)
     _draw_aim(painter, state)
+    _draw_hit_markers(painter, state)
     _draw_rings(painter, manifest, screen, record, state)
     _draw_toast(painter, state, screen)
     # TASK_ui_sakuga_1117: above HUD/toast (so a hit's burst reads clearly
@@ -1289,7 +1317,13 @@ def _draw_photos(painter, manifest, record, state) -> None:
             if state.shot:
                 painter.fill(rect, rgba("#%02X%02X%02X" % SHOT_VIEWPORT_RGB))
             elif state.viewport_draw is not None:
-                state.viewport_draw(rect)
+                # TASK_game_feel_1118 P4: screen shake moves the 3D scene
+                # viewport (this rect) and the fx layer only — never the
+                # HUD, so it stays readable while the scene shakes.
+                dx, dy = state.scene_shake
+                shaken = (rect[0] + dx, rect[1] + dy, rect[2], rect[3]) \
+                    if (dx or dy) else rect
+                state.viewport_draw(shaken)
 
 
 def _cover_texture(painter, rect, entry, mirror: bool = False) -> None:
@@ -1523,16 +1557,94 @@ def _draw_aim(painter, state) -> None:
     # Chưa hồi xong: bốn nhánh dạt ra và nhạt bớt, rồi khép lại dần.
     spread = AIM_RECOIL * (1.0 - ready)
     fade = AIM_DIM + (1.0 - AIM_DIM) * ready
+    # TASK_game_feel_1118 P4: crosshair kick — a ``Spring`` kicked out to
+    # the weapon's scale on every shot, settling back to 1.0. Scales the
+    # whole cross (arm length AND thickness) around its own centre.
+    kick = max(0.1, float(getattr(state, "aim_kick_scale", 1.0)))
     for base, grow in ((AIM_EDGE_COL, AIM_EDGE), (AIM_COL, 0.0)):
         alpha = (0.85 if grow else 1.0) * fade
         colour = rgba(base, alpha)
-        half = AIM_THICK * 0.5 + grow
-        inner = AIM_GAP + spread - grow
-        outer = AIM_ARM + spread + grow
+        half = (AIM_THICK * 0.5 + grow) * kick
+        inner = (AIM_GAP + spread - grow) * kick
+        outer = (AIM_ARM + spread + grow) * kick
         painter.fill((x - outer, y - half, outer - inner, half * 2.0), colour)
         painter.fill((x + inner, y - half, outer - inner, half * 2.0), colour)
         painter.fill((x - half, y - outer, half * 2.0, outer - inner), colour)
         painter.fill((x - half, y + inner, half * 2.0, outer - inner), colour)
+
+
+def _flat_quad(painter, corners, colour) -> None:
+    """A flat-coloured arbitrary quad — ``quad_corners`` with the painter's
+    cached 1x1 white texture, same trick as ``fill()`` uses for axis-
+    aligned rects."""
+    entry = painter.cache.white()
+    if entry:
+        painter.quad_corners(corners, entry[0], colour)
+
+
+def _draw_tracers(painter, state) -> None:
+    """TASK_game_feel_1118 P4: a tapered streak from the muzzle to the
+    crosshair, white core over a dark edge, fading over its 0.07 s life.
+    Fixed to the HUD (muzzle is the weapon icon) — unaffected by shake."""
+    if state.shot:
+        return
+    for muzzle, target, age, width_px in state.tracers:
+        if age >= TRACER_LIFE_S:
+            continue
+        fade = 1.0 - age / TRACER_LIFE_S
+        mx, my = muzzle
+        tx, ty = target
+        dx, dy = tx - mx, ty - my
+        length = math.hypot(dx, dy) or 1.0
+        nx, ny = -dy / length, dx / length
+        for col, fraction in ((TRACER_EDGE_COL, 1.0), (TRACER_CORE_COL,
+                                                        TRACER_CORE_FRACTION)):
+            hw_m = width_px * 0.5 * fraction
+            hw_t = TRACER_TARGET_WIDTH_PX * 0.5 * fraction
+            corners = ((mx + nx * hw_m, my + ny * hw_m),
+                      (tx + nx * hw_t, ty + ny * hw_t),
+                      (tx - nx * hw_t, ty - ny * hw_t),
+                      (mx - nx * hw_m, my - ny * hw_m))
+            _flat_quad(painter, corners, rgba(col, fade))
+
+
+def _draw_hit_markers(painter, state) -> None:
+    """TASK_game_feel_1118 P4: four ticks at 45° around the crosshair on a
+    hit, outlined, fading over 0.18 s — bigger and ``#E8676B`` on a crit."""
+    if state.shot:
+        return
+    for x, y, age, crit in state.hit_markers:
+        if age >= HITMARK_LIFE_S:
+            continue
+        fade = 1.0 - age / HITMARK_LIFE_S
+        scale = HITMARK_CRIT_SCALE if crit else 1.0
+        inner, outer = HITMARK_INNER_PX * scale, HITMARK_OUTER_PX * scale
+        width, outline = HITMARK_WIDTH_PX * scale, HITMARK_OUTLINE_PX * scale
+        core_col = HITMARK_CRIT_COL if crit else HITMARK_COL
+        for col, half_w in ((HITMARK_OUTLINE_COL, (width + 2.0 * outline) * 0.5),
+                            (core_col, width * 0.5)):
+            colour = rgba(col, fade)
+            for angle_deg in HITMARK_ANGLES_DEG:
+                angle = math.radians(angle_deg)
+                dx, dy = math.cos(angle), math.sin(angle)
+                nx, ny = -dy, dx
+                x0, y0 = x + dx * inner, y + dy * inner
+                x1, y1 = x + dx * outer, y + dy * outer
+                corners = ((x0 + nx * half_w, y0 + ny * half_w),
+                          (x1 + nx * half_w, y1 + ny * half_w),
+                          (x1 - nx * half_w, y1 - ny * half_w),
+                          (x0 - nx * half_w, y0 - ny * half_w))
+                _flat_quad(painter, corners, colour)
+
+
+def _draw_crit_impact(painter, state) -> None:
+    """TASK_game_feel_1118 P4: 0.05 s full-scene flash on a crit — placed
+    (by ``draw_screen``'s call order) under the HUD and under the
+    ``hit_crit`` Sakuga burst, so the burst pops against it."""
+    if state.shot or state.crit_impact_alpha <= 0.0:
+        return
+    painter.fill((0.0, 0.0, DESIGN_SIZE[0], DESIGN_SIZE[1]),
+                rgba(CRIT_IMPACT_COL, state.crit_impact_alpha))
 
 
 def _draw_rings(painter, manifest, screen, record, state) -> None:

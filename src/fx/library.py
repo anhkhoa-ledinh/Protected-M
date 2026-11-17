@@ -463,7 +463,7 @@ class FxLibrary:
         player.clear(lambda name: not _in_scope(name, effect_names, word_pairs))
 
     # ---- drawing -----------------------------------------------------
-    def draw(self, painter, player: FxPlayer) -> None:
+    def draw(self, painter, player: FxPlayer, offset: tuple = (0.0, 0.0)) -> None:
         """Draw every live effect's current frame/words. Silently skips
         any command whose texture isn't resident yet.
 
@@ -472,12 +472,18 @@ class FxLibrary:
         ``dx``/``dy`` pushed past it), and without a clip it draws into
         the black letterbox bars either side of the canvas at non-16:9
         window sizes.
+
+        ``offset``: TASK_game_feel_1118 P4's screen shake moves the fx
+        layer (along with the 3D scene viewport, elsewhere) but never the
+        HUD — every corner is shifted by this design-px ``(dx, dy)``
+        before drawing; ``(0.0, 0.0)`` (the default) is a no-op.
         """
         if self.disabled_reason:
             return
         commands = player.draw_list()
         if not commands:
             return
+        dx, dy = offset
         GL.glEnable(GL.GL_SCISSOR_TEST)
         GL.glScissor(*painter.viewport_px((0.0, 0.0, DESIGN_SIZE[0], DESIGN_SIZE[1])))
         try:
@@ -486,7 +492,10 @@ class FxLibrary:
                 if entry is None:
                     continue
                 texture, _width, _height = entry
-                painter.quad_corners(command.corners, texture,
+                corners = command.corners
+                if dx or dy:
+                    corners = tuple((px + dx, py + dy) for px, py in corners)
+                painter.quad_corners(corners, texture,
                                      tint=(1.0, 1.0, 1.0, command.alpha), uv=command.uv)
         finally:
             GL.glDisable(GL.GL_SCISSOR_TEST)

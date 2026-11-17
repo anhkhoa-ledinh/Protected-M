@@ -21,6 +21,7 @@ from src.fx.player import FxPlayer
 from src.fx.spec import load_spec
 from src.ui_album import v3_routes, v3_values
 from src.ui_album import v3_flow as F
+from src.ui_album.shot_feel import ShotFeel
 from src.ui_album.v3 import V3Manifest, V3Painter, draw_screen, hit_test, shot_state
 from src.ui_album.v3_hover import HoverFx, cursor_for
 
@@ -95,6 +96,10 @@ class V3UI:
         self._window = window
         self._hover_fx = HoverFx()
         self._hover_last_t: float | None = None
+        #: TASK_game_feel_1118 P4: crosshair kick/tracer/shake/hit marker/
+        #: crit impact — survives the whole session, like ``_hover_fx``.
+        self._shot_feel = ShotFeel()
+        self._shot_feel.shake_enabled = _prefs.screen_shake_enabled(root)
         #: Khung webcam đã lên GPU: ô ``camera`` của màn cài đặt / thử nghiêng.
         self._camera_entry = None
         self._camera_token = None
@@ -294,6 +299,7 @@ class V3UI:
         dt = 0.0 if self._hover_last_t is None else max(0.0, now - self._hover_last_t)
         self._hover_last_t = now
         self._hover_fx.step(self.state.screen, self.hover(), dt)
+        self._shot_feel.step(dt)
         if self._fx_enabled:
             fx_dt = 0.0 if self._fx_last_t is None else max(0.0, now - self._fx_last_t)
             self._fx_last_t = now
@@ -341,13 +347,25 @@ class V3UI:
             if self._window is not None:
                 self._window.set_cursor_shape(cursor_for(name, state.hover, state))
             self._step_fx_triggers(state, time.perf_counter())
+            if name in (F.PLAY, F.PVP_HUNT):
+                # TASK_game_feel_1118 P4: kick/tracer/hit marker/impact
+                # frame stay fixed to the HUD; only the scene viewport
+                # rect (below) and the fx layer (``offset=`` below) move
+                # with shake — see ``shot_feel.py``'s module docstring.
+                state.aim_kick_scale = self._shot_feel.kick_scale
+                state.tracers = self._shot_feel.tracers
+                state.hit_markers = self._shot_feel.hit_markers
+                state.crit_impact_alpha = self._shot_feel.crit_impact_alpha
+                state.scene_shake = self._shot_feel.shake_offset
         if self._fx_enabled:
             if name != self._fx_screen:
                 self._fx_library.enter_screen(name, self._fx_player)
                 self._fx_screen = name
             self._fx_library.pump()
             state.fx_on = True
-            state.fx_draw = lambda: self._fx_library.draw(self.painter, self._fx_player)
+            shake = state.scene_shake
+            state.fx_draw = lambda: self._fx_library.draw(
+                self.painter, self._fx_player, offset=shake)
         self.painter.bind_screen(name, v3_values.extra_files(self.manifest,
                                                              name, state))
         self.painter.begin()
@@ -407,6 +425,16 @@ class V3UI:
             return
         mx, my = self.mouse
         self.spawn_fx("hit_block", mx, my)
+
+    # ---- shooting feel (TASK_game_feel_1118 P4) ---------------------------
+    def register_shot(self, hit: bool, crit: bool) -> None:
+        """Crosshair kick/tracer/shake/hit marker/crit impact for a shot
+        that just resolved (``app.py``'s ``_album_shoot``, AFTER
+        ``game_bridge.fire()`` — this never influences that result, only
+        reacts to it). Independent of Sakuga fx — runs even with
+        ``HCPD_NO_FX=1``."""
+        self._shot_feel.on_shot(self.state.weapon_name(), self.mouse,
+                                hit=hit, crit=crit)
 
     # ---- per-tick/per-screen fx triggers (TASK_ui_sakuga_1117 Phase 6) ----
     def _step_fx_triggers(self, state, now: float) -> None:

@@ -102,6 +102,34 @@ def test_draw_skips_commands_whose_texture_is_not_resident(gl_context, spec):
     player.step(1.0 / spec.fps)
     library.draw(painter, player)
     assert len(calls) == 1
+
+
+def test_draw_offset_shifts_every_corner(gl_context, spec):
+    """TASK_game_feel_1118 P4: screen shake moves the fx layer — every
+    corner of every command shifts by ``offset``."""
+    library = FxLibrary(spec)
+    library.check_capability()
+    player = FxPlayer(spec, seed=0)
+    calls = []
+
+    class FakePainter:
+        def quad_corners(self, corners, *a, **kw):
+            calls.append(corners)
+
+        def viewport_px(self, rect):
+            return (0, 0, 1280, 720)
+
+    painter = FakePainter()
+    assert _wait(lambda: library.try_spawn(player, "ui_tap", 1.0, 1.0, words=False),
+                library)
+    player.step(1.0 / spec.fps)
+    library.draw(painter, player)
+    plain_corners = calls[0]
+    calls.clear()
+    library.draw(painter, player, offset=(5.0, -3.0))
+    shifted_corners = calls[0]
+    for (px, py), (sx, sy) in zip(plain_corners, shifted_corners):
+        assert (sx, sy) == pytest.approx((px + 5.0, py - 3.0))
     library.release()
 
 

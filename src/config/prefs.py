@@ -27,6 +27,12 @@ PREFS_NAME = "user_prefs.json"
 #: without touching the user's own prefs file.
 NO_FX_ENV = "HCPD_NO_FX"
 
+#: Env override for screen shake (TASK_game_feel_1118 P4) — same idea as
+#: ``NO_FX_ENV``, always wins over the "screen_shake" prefs key. Disables
+#: screen shake AND the crit impact frame; crosshair kick, tracer and hit
+#: marker are unaffected.
+NO_SHAKE_ENV = "HCPD_NO_SHAKE"
+
 FULLSCREEN, WINDOW = "fullscreen", "window"
 
 #: Cửa sổ mặc định và trần dưới (D1.4).
@@ -43,9 +49,11 @@ def prefs_path(root: Path) -> Path:
 
 
 def load(root: Path) -> dict:
-    """``{"display": ..., "window_rect": [x, y, w, h] | None, "fx": bool}``."""
+    """``{"display": ..., "window_rect": [x, y, w, h] | None, "fx": bool,
+    "screen_shake": bool}``."""
     path = prefs_path(root)
-    out = {"display": FULLSCREEN, "window_rect": None, "fx": True}
+    out = {"display": FULLSCREEN, "window_rect": None, "fx": True,
+           "screen_shake": True}
     if not path.exists():
         return out
     try:
@@ -64,22 +72,27 @@ def load(root: Path) -> dict:
         except (TypeError, ValueError):
             out["window_rect"] = None
     out["fx"] = bool(payload.get("fx", True))
+    out["screen_shake"] = bool(payload.get("screen_shake", True))
     return out
 
 
-def save(root: Path, display: str, window_rect=None, fx: bool | None = None) -> None:
+def save(root: Path, display: str, window_rect=None, fx: bool | None = None,
+         screen_shake: bool | None = None) -> None:
     """Ghi lại tuỳ chọn. Lỗi ghi chỉ log, không làm hỏng lượt chạy.
 
-    ``fx=None`` giữ nguyên khoá "fx" đang có trên đĩa (hoặc True nếu chưa
-    có) — chỗ gọi hiện tại chỉ biết về display/window_rect, không được vì
-    thế mà xoá tuỳ chọn fx người dùng tự tay thêm vào.
+    ``fx=None``/``screen_shake=None`` giữ nguyên khoá đang có trên đĩa (hoặc
+    True nếu chưa có) — chỗ gọi hiện tại chỉ biết về display/window_rect,
+    không được vì thế mà xoá tuỳ chọn người dùng tự tay thêm vào.
     """
     path = prefs_path(root)
+    current = load(root)
     if fx is None:
-        fx = load(root)["fx"]
+        fx = current["fx"]
+    if screen_shake is None:
+        screen_shake = current["screen_shake"]
     payload = {"display": display if display in (FULLSCREEN, WINDOW) else FULLSCREEN,
                "window_rect": list(window_rect) if window_rect else None,
-               "fx": bool(fx)}
+               "fx": bool(fx), "screen_shake": bool(screen_shake)}
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
@@ -93,6 +106,14 @@ def fx_enabled(root: Path) -> bool:
     if os.environ.get(NO_FX_ENV):
         return False
     return load(root)["fx"]
+
+
+def screen_shake_enabled(root: Path) -> bool:
+    """Screen shake + crit impact frame on? ``HCPD_NO_SHAKE=1`` always
+    wins; otherwise the "screen_shake" prefs key (default True)."""
+    if os.environ.get(NO_SHAKE_ENV):
+        return False
+    return load(root)["screen_shake"]
 
 
 def default_rect(monitor_pos, monitor_size) -> list[int]:
