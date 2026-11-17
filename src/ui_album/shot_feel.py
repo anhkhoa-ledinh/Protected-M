@@ -49,6 +49,14 @@ CRIT_IMPACT_S = 0.05
 CRIT_IMPACT_COL = "#24415F"
 CRIT_IMPACT_ALPHA = 0.55
 
+#: TASK_game_feel_1118 P5: full-auto bloom — visual only, Heavy-mag gun
+#: only. Each consecutive auto shot raises the crosshair's RESTING scale
+#: (the kick spring's own ``.to``, so one spring does both jobs) by this
+#: much, capped at this scale; releasing the trigger drops it straight
+#: back to the normal resting scale and lets the same spring pull it in.
+BLOOM_STEP = 0.04
+BLOOM_CAP_SCALE = 1.3
+
 
 @dataclass(frozen=True)
 class TracerSpec:
@@ -136,6 +144,9 @@ class ShotFeel:
         #: frame; kick, tracer and hit marker are unaffected (P4's own
         #: off-switch rule).
         self.shake_enabled = True
+        #: P5: current bloom SCALE (not a delta) — the kick spring's
+        #: resting point while the Heavy-mag trigger is held.
+        self._bloom_scale = KICK_REST_SCALE
 
     # ---- per-shot ----------------------------------------------------------
     def on_shot(self, weapon_name: str, crosshair: tuple, *, hit: bool,
@@ -158,6 +169,19 @@ class ShotFeel:
             self._hit_markers.append(_HitMarker(x, y, bool(crit)))
             if crit and self.shake_enabled:
                 self._crit_impact_age = 0.0
+
+    # ---- full-auto bloom (TASK_game_feel_1118 P5, Heavy-mag gun only) -----
+    def add_bloom(self) -> None:
+        """Call once per consecutive auto shot while the trigger is held."""
+        self._bloom_scale = min(BLOOM_CAP_SCALE, self._bloom_scale + BLOOM_STEP)
+        self._kick.to = self._bloom_scale
+
+    def release_bloom(self) -> None:
+        """Call once the trigger is released — drops straight back to the
+        normal resting scale; the kick spring pulls the displayed scale
+        in from there, same as it does after any ordinary shot."""
+        self._bloom_scale = KICK_REST_SCALE
+        self._kick.to = KICK_REST_SCALE
 
     def _spawn_tracers(self, tracer: TracerSpec, crosshair: tuple) -> None:
         mx, my = MUZZLE_XY

@@ -436,6 +436,15 @@ class V3UI:
         self._shot_feel.on_shot(self.state.weapon_name(), self.mouse,
                                 hit=hit, crit=crit)
 
+    def bump_auto_bloom(self) -> None:
+        """TASK_game_feel_1118 P5: one more consecutive Heavy-mag auto
+        shot — called right after ``register_shot`` for that shot."""
+        self._shot_feel.add_bloom()
+
+    def release_auto_bloom(self) -> None:
+        """The full-auto trigger was just released."""
+        self._shot_feel.release_bloom()
+
     # ---- per-tick/per-screen fx triggers (TASK_ui_sakuga_1117 Phase 6) ----
     def _step_fx_triggers(self, state, now: float) -> None:
         """Effects that fire on a STATE TRANSITION rather than a discrete

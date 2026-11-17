@@ -97,6 +97,11 @@ class HcpdApplication:
         # tự vẽ).
         self._last_scene = None
         self._drawing = False
+        # TASK_game_feel_1118 P5: full-auto (Heavy-mag gun) — tracks
+        # whether the PREVIOUS frame's trigger-held check fired, so
+        # releasing the button is detected exactly once (see
+        # ``_tick_auto_fire``).
+        self._heavy_mag_was_held = False
         # PB-055: demo đọc content.demo.json, không ghi file config nào, chỉ nhận
         # G, T, F6, kéo-thả, F4, Esc (lọc ở GlfwWindow).
         self._demo = bool(demo)
@@ -426,6 +431,7 @@ class HcpdApplication:
             if self._album_shoot(now):
                 continue                     # đang trong trận: bấm = bắn
             self._album_action(album.click(), now)
+        self._tick_auto_fire(now)
         if input_state.album_centre:
             self._album_action("rest_eye", now)
         if input_state.screenshot:
@@ -929,6 +935,34 @@ class HcpdApplication:
         elif self._album_options.is_v3:
             self._album.spawn_miss_fx()
         return True
+
+    def _tick_auto_fire(self, now: float) -> None:
+        """
+        TASK_game_feel_1118 P5: full-auto for the Heavy-mag gun only.
+
+        The first shot of a burst already happened through the normal
+        click path (``pop_clicks()`` above, same frame). This fires AGAIN
+        every subsequent frame the left button is still held, as long as
+        ``match.ready_to_fire(now)`` holds and the gun isn't reloading —
+        checked BEFORE calling ``_album_shoot`` (which calls ``fire()``),
+        so an unready frame never even logs "Bam co dan". Releasing the
+        gun — button up, weapon switch, or leaving the match screen — any
+        of those ends the bloom bump started below.
+        """
+        if not self._album_options.is_v3:
+            return
+        F = self._album.flow
+        match = self._album.game
+        firing = (match is not None
+                 and self._album.state.screen in (F.PLAY, F.PVP_HUNT)
+                 and match.weapon_name == "Heavy-mag gun"
+                 and bool(self._album.mouse_down))
+        if firing and match.ready_to_fire(now) and not match.reloading(now):
+            if self._album_shoot(now):
+                self._album.bump_auto_bloom()
+        elif self._heavy_mag_was_held and not firing:
+            self._album.release_auto_bloom()
+        self._heavy_mag_was_held = firing
 
     def _album_action(self, action: str, now: float) -> None:
         """Thực hiện một hành động mà giao diện album yêu cầu."""
