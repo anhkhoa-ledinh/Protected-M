@@ -453,6 +453,13 @@ class V3Manifest:
     def sample_photo(self) -> Path | None:
         return self.path(self.data.get("sample_photo"))
 
+    def text(self, screen: str, key: str) -> dict | None:
+        """Bản ghi text ``key`` của màn ``screen``; ``None`` nếu không có."""
+        for record in self.screens.get(screen, {}).get("texts", ()):
+            if record["key"] == key:
+                return record
+        return None
+
     def sprite(self, screen: str, key: str) -> dict | None:
         """Bản ghi sprite ``key`` của màn ``screen``; ``None`` nếu không có."""
         for record in self.screens.get(screen, {}).get("sprites", ()):

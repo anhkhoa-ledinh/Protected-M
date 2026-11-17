@@ -26,6 +26,47 @@ from src.ui_album.v3_hover import HoverFx, cursor_for
 
 logger = logging.getLogger(__name__)
 
+#: TASK_ui_sakuga_1117 Phase 6 — hotspot names/prefixes that get a plain
+#: ``ui_tap`` on click (the PRIMARY button of the screen gets
+#: ``ui_confirm`` instead; anything not listed here gets nothing —
+#: fields/slider/dropdown/dropzone/switch/links/icons/recent_memory
+#: already have Phase 5's hover/press feedback, a tap on top would be
+#: noise on a text-entry/drag control).
+_UI_TAP_PREFIXES = ("btn_", "tab_", "seg_", "mode_", "display_", "theme_",
+                    "level_row_", "weapon_", "sticker_", "slot_")
+_UI_TAP_EXACT = frozenset({"leave", "continue"})
+#: A tap on something this tall/wide shows at the CLICK point, not the
+#: hotspot centre (a 300px-wide ``mode_`` card, or the full-screen
+#: ``continue`` hotspot) — centred would land far from where the player
+#: actually looked.
+_UI_TAP_BIG_HEIGHT_PX, _UI_TAP_BIG_WIDTH_PX = 100.0, 360.0
+
+#: "kills" counter text per screen, the wordless star_pop's anchor on
+#: every kill. ``PVP_HIDE`` has none — the hider doesn't shoot.
+_KILL_STAR_TEXT = {F.PLAY: "kills", F.PVP_HUNT: "kills_you"}
+
+#: Loading screen (``_step_loading_fx``): the progress bar's own design-px
+#: span, so the edge/word effects track the fill exactly.
+_LOAD_BAR_X0, _LOAD_BAR_W, _LOAD_BAR_Y = 48.0, 1184.0, 665.0
+_LOAD_EDGE_INTERVAL_S = 0.25
+_LOAD_DONE_XY = (1232.0, 665.0)
+_GOGO_X_RANGE = (200.0, 1080.0)
+_GOGO_Y = 600.0
+_STEP_DOT_X = (53.0, 349.0, 645.0, 941.0)
+_STEP_DOT_Y = 687.0
+
+#: Tilt checklist marker centres (Phase 2's ``CHECK_ROWS_Y`` is the row's
+#: TEXT baseline; this is the task's own, slightly different, marker-glyph
+#: centre — kept as its own constant rather than reusing one for the other).
+_TILT_STAR_X, _TILT_STAR_Y0, _TILT_STAR_DY = 783.0, 497.0, 32.0
+
+_WIN_SCORE_XY = (1084.0, 370.0)
+_PVP_CROWN_XY = (640.0, 50.0)
+_RANK_UP_DELAY_S = 0.5
+
+_TOAST_XY = (640.0, 648.0)
+_TOAST_PHOTOS_XY = (640.0, 596.0)
+
 
 class V3UI:
     """Giao diện v3 gắn vào một cửa sổ GLFW đã có context."""
@@ -76,6 +117,22 @@ class V3UI:
                 self._fx_player = FxPlayer(spec)
                 self._fx_library = FxLibrary(spec)
 
+        # TASK_ui_sakuga_1117 Phase 6: bookkeeping for the per-tick/
+        # per-screen fx triggers (loading bar, tilt checklist, toast,
+        # WIN/PVP_RESULT entry) — see ``_step_fx_triggers``.
+        self._fx_trigger_last_t: float | None = None
+        self._fx_trigger_screen: str | None = None
+        self._fx_load_edge_elapsed = 0.0
+        self._fx_gogo_spawned = False
+        self._fx_load_done_spawned = False
+        self._fx_last_step_done = 0
+        self._fx_last_tilt_checks: tuple | None = None
+        self._fx_last_message_until = 0.0
+        self._fx_win_entered_t: float | None = None
+        self._fx_win_star_spawned = False
+        self._fx_rank_up_spawned = False
+        self._fx_pvp_result_spawned = False
+
     def initialize(self) -> None:
         self.painter.initialize()
         if self._fx_enabled and not self._fx_library.check_capability():
@@ -111,17 +168,82 @@ class V3UI:
 
     def click(self) -> str:
         """Bấm chuột trái tại vị trí hiện tại; trả hành động cho app."""
-        action = v3_routes.on_click(self.state, self.hover(),
-                                    time.perf_counter(), self.mouse)
-        self.pending = action
-        return action
+        return self._click(self.hover())
 
     def activate(self, name: str) -> str:
         """Kích hoạt một hotspot CỤ THỂ (phím tắt U/R…), bỏ qua vị trí chuột."""
+        return self._click(name)
+
+    def _click(self, name: str | None) -> str:
+        """``on_click`` + (TASK_ui_sakuga_1117 Phase 6) a ui_tap/ui_confirm
+        burst at the hotspot's PRE-click position — captured before
+        ``on_click`` runs, since it may change ``self.state.screen`` out
+        from under a post-click lookup."""
+        if not name:
+            self.pending = ""
+            return ""
+        screen = self.state.screen
+        in_dialog = bool(self.state.shared_album_pending)
+        rect = self._click_rect(screen, name, in_dialog)
+        is_primary = (not in_dialog and
+                     name == v3_routes.primary_button(self.manifest, self.state))
+        pre_items = list(self.state.items) if hasattr(self.state, "items") else None
         action = v3_routes.on_click(self.state, name, time.perf_counter(),
                                     self.mouse)
         self.pending = action
+        self._spawn_click_fx(name, screen, rect, in_dialog, is_primary, pre_items)
         return action
+
+    def _click_rect(self, screen: str, name: str, in_dialog: bool):
+        if in_dialog:
+            from src.ui_album.v3 import CONFIRM_NO_RECT, CONFIRM_YES_RECT
+
+            return {"btn_confirm_yes": CONFIRM_YES_RECT,
+                   "btn_confirm_no": CONFIRM_NO_RECT}.get(name)
+        from src.ui_album.v3 import hotspot_rect
+
+        for hotspot in self.manifest.screens[screen].get("hotspots", ()):
+            if hotspot["n"] == name:
+                return hotspot_rect(screen, hotspot)
+        return None
+
+    def _slot_rect(self, screen: str, index: int):
+        name = f"slot_empty_{index + 1}"
+        for hotspot in self.manifest.screens[screen].get("hotspots", ()):
+            if hotspot["n"] == name:
+                return hotspot["rect"]
+        return None
+
+    def _spawn_click_fx(self, name: str, screen: str, rect, in_dialog: bool,
+                        is_primary: bool, pre_items) -> None:
+        if not self._fx_enabled:
+            return
+        if in_dialog:
+            if name in ("btn_confirm_yes", "btn_confirm_no") and rect is not None:
+                self.spawn_fx("ui_tap", rect[0] + rect[2] * 0.5,
+                             rect[1] + rect[3] * 0.5)
+            return
+        if rect is not None:
+            cx, cy = rect[0] + rect[2] * 0.5, rect[1] + rect[3] * 0.5
+            if is_primary:
+                self.spawn_fx("ui_confirm", cx, cy)
+            elif name in _UI_TAP_EXACT or any(
+                    name.startswith(p) for p in _UI_TAP_PREFIXES):
+                big = (rect[3] > _UI_TAP_BIG_HEIGHT_PX or
+                      rect[2] > _UI_TAP_BIG_WIDTH_PX)
+                x, y = self.mouse if big else (cx, cy)
+                self.spawn_fx("ui_tap", x, y)
+        # Vật phẩm vừa được GẮN (không phải BỎ RA) vào một ô loadout — sao
+        # bật ở Ô NÓ VỪA VÀO, không phải ở chính con sticker đã bấm.
+        if name.startswith("sticker_") and pre_items is not None:
+            item = name[len("sticker_"):]
+            if item not in pre_items and item in self.state.items:
+                index = self.state.items.index(item)
+                slot_rect = self._slot_rect(screen, index)
+                if slot_rect is not None:
+                    sx = slot_rect[0] + slot_rect[2] * 0.5
+                    sy = slot_rect[1] + slot_rect[3] * 0.5
+                    self.spawn_fx("star_pop", sx, sy, words=False)
 
     def key(self, char: str) -> None:
         F.type_char(self.state, char)
@@ -139,8 +261,7 @@ class V3UI:
         name = v3_routes.primary_button(self.manifest, self.state)
         if not name:
             return ""
-        return v3_routes.on_click(self.state, name, time.perf_counter(),
-                                  self.mouse)
+        return self._click(name)
 
     def back(self) -> str:
         """Esc = lùi một bước."""
@@ -207,6 +328,7 @@ class V3UI:
                 state.viewport_draw = lambda rect: self._scene(rect, scene_draw)
             if self._window is not None:
                 self._window.set_cursor_shape(cursor_for(name, state.hover, state))
+            self._step_fx_triggers(state, time.perf_counter())
         if self._fx_enabled:
             if name != self._fx_screen:
                 self._fx_library.enter_screen(name, self._fx_player)
@@ -237,6 +359,134 @@ class V3UI:
     @property
     def fx_enabled(self) -> bool:
         return self._fx_enabled
+
+    def spawn_hit_fx(self, crit: bool) -> None:
+        """A LOCAL shot just killed a bug (``app.py``'s ``_album_shoot``,
+        only ever called for the player's own shots — never an
+        opponent's) — hit_kill/hit_crit at the crosshair, plus a wordless
+        star_pop over this screen's kill counter, if it has one."""
+        if not self._fx_enabled:
+            return
+        mx, my = self.mouse
+        self.spawn_fx("hit_crit" if crit else "hit_kill", mx, my)
+        key = _KILL_STAR_TEXT.get(self.state.screen)
+        if key is not None:
+            spec = self.manifest.text(self.state.screen, key)
+            if spec is not None:
+                rect = spec["rect"]
+                self.spawn_fx("star_pop", rect[0] + rect[2] * 0.5,
+                             rect[1] + rect[3] * 0.5, words=False)
+
+    def spawn_miss_fx(self) -> None:
+        """A local shot missed — hit_block at the crosshair."""
+        if not self._fx_enabled:
+            return
+        mx, my = self.mouse
+        self.spawn_fx("hit_block", mx, my)
+
+    # ---- per-tick/per-screen fx triggers (TASK_ui_sakuga_1117 Phase 6) ----
+    def _step_fx_triggers(self, state, now: float) -> None:
+        """Effects that fire on a STATE TRANSITION rather than a discrete
+        click/shot — loading bar, tilt checklist, a new toast, entering
+        WIN/PVP_RESULT. Reads ``state`` (this frame's already-computed
+        ``v3_values.state_for`` output) so it never re-derives business
+        logic (win rank, pipeline step, ...) that already lives there."""
+        if not self._fx_enabled:
+            return
+        dt = (0.0 if self._fx_trigger_last_t is None
+             else max(0.0, now - self._fx_trigger_last_t))
+        self._fx_trigger_last_t = now
+        screen = self.state.screen
+        if screen != self._fx_trigger_screen:
+            self._on_fx_trigger_screen_enter(screen, now)
+            self._fx_trigger_screen = screen
+        if screen in (F.LOADING, F.LOADING_READY):
+            self._step_loading_fx(state, dt)
+        elif screen == F.TILT:
+            self._step_tilt_fx()
+        elif screen == F.WIN:
+            self._step_win_fx(state, now)
+        elif screen == F.PVP_RESULT:
+            self._step_pvp_result_fx(state)
+        if screen not in (F.PLAY, F.PVP_HUNT, F.PVP_HIDE):
+            self._step_toast_fx(state, screen)
+
+    def _on_fx_trigger_screen_enter(self, screen: str, now: float) -> None:
+        if screen == F.LOADING:
+            self._fx_load_edge_elapsed = 0.0
+            self._fx_gogo_spawned = False
+            self._fx_load_done_spawned = False
+            self._fx_last_step_done = 0
+        if screen == F.TILT:
+            self._fx_last_tilt_checks = None
+        if screen == F.WIN:
+            self._fx_win_entered_t = now
+            self._fx_win_star_spawned = False
+            self._fx_rank_up_spawned = False
+        if screen == F.PVP_RESULT:
+            self._fx_pvp_result_spawned = False
+
+    def _step_loading_fx(self, state, dt: float) -> None:
+        pct = max(0.0, min(1.0, float(state.bars.get("progress", 0.0))))
+        bar_x = _LOAD_BAR_X0 + _LOAD_BAR_W * pct
+        if self.state.screen == F.LOADING and 0.0 < pct < 1.0:
+            self._fx_load_edge_elapsed += dt
+            if self._fx_load_edge_elapsed >= _LOAD_EDGE_INTERVAL_S:
+                self._fx_load_edge_elapsed = 0.0
+                self.spawn_fx("load_edge", bar_x, _LOAD_BAR_Y)
+            if not self._fx_gogo_spawned and 0.30 < pct < 0.90:
+                self._fx_gogo_spawned = True
+                word_x = max(_GOGO_X_RANGE[0], min(_GOGO_X_RANGE[1], bar_x))
+                self.spawn_fx_word("gogo", "ink", word_x, _GOGO_Y, size=150.0,
+                                  rot=-0.08, life=2.9)
+        if not self._fx_load_done_spawned and pct >= 1.0:
+            self._fx_load_done_spawned = True
+            self.spawn_fx("load_done", *_LOAD_DONE_XY)
+        step_dots = state.pips.get("step_dots")
+        if isinstance(step_dots, (list, tuple)):
+            done = sum(1 for flag in step_dots if flag)
+            for index in range(self._fx_last_step_done, min(done, len(_STEP_DOT_X))):
+                self.spawn_fx("star_pop", _STEP_DOT_X[index], _STEP_DOT_Y,
+                             words=False)
+            self._fx_last_step_done = done
+
+    def _step_tilt_fx(self) -> None:
+        checks = tuple(self.state.tilt_checks())
+        last = self._fx_last_tilt_checks
+        if last is not None:
+            for index, done in enumerate(checks):
+                if done and not last[index]:
+                    self.spawn_fx("star_pop", _TILT_STAR_X,
+                                 _TILT_STAR_Y0 + _TILT_STAR_DY * index, words=False)
+        self._fx_last_tilt_checks = checks
+
+    def _step_win_fx(self, state, now: float) -> None:
+        if not self._fx_win_star_spawned:
+            self._fx_win_star_spawned = True
+            self.spawn_fx("star_five", *_WIN_SCORE_XY)
+        if (not self._fx_rank_up_spawned and "rank_up" in state.sprites
+                and now - self._fx_win_entered_t >= _RANK_UP_DELAY_S):
+            self._fx_rank_up_spawned = True
+            record = self.manifest.sprite(F.WIN, "rank_up")
+            if record is not None:
+                rect = record["rect"]
+                self.spawn_fx("star_pop", rect[0] + rect[2] * 0.5,
+                             rect[1] + rect[3] * 0.5, words=False)
+
+    def _step_pvp_result_fx(self, state) -> None:
+        if self._fx_pvp_result_spawned:
+            return
+        self._fx_pvp_result_spawned = True
+        if "crown" in state.sprites:
+            self.spawn_fx("star_five", *_PVP_CROWN_XY)
+
+    def _step_toast_fx(self, state, screen: str) -> None:
+        until = self.state.message_until_s
+        if not state.message or until == self._fx_last_message_until:
+            return
+        self._fx_last_message_until = until
+        x, y = _TOAST_PHOTOS_XY if screen == F.PHOTOS else _TOAST_XY
+        self.spawn_fx("toast_in", x, y)
 
     def _scene(self, rect, scene_draw) -> None:
         """

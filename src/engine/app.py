@@ -843,6 +843,11 @@ class HcpdApplication:
             if self._bugs is not None:
                 self._bugs.mark_found(
                     hit, [v / 1000.0 for v in self._game.props[hit]["pos_mm"]])
+            if self._album_options.is_v3:
+                # TASK_ui_sakuga_1117 Phase 6: LOCAL hit only — this path
+                # never runs for the opponent's kills, so no extra guard
+                # is needed to keep their shots silent here.
+                self._album.spawn_hit_fx(crit)
             if self._pvp_active and self._pvp is not None:
                 # TASK_pvp_lan_1116: xác nhận trúng do SERVER quyết — đánh
                 # dấu "found" cục bộ ở trên chỉ là phản hồi tức thì, điểm/
@@ -854,6 +859,8 @@ class HcpdApplication:
             eye = aim.eye_mm
             logger.info("Prop BAN TRUNG #%d%s — eye (%.0f, %.0f, %.0f) mm",
                         hit, " CHI MANG" if crit else "", eye[0], eye[1], eye[2])
+        elif self._album_options.is_v3:
+            self._album.spawn_miss_fx()
         return True
 
     def _album_action(self, action: str, now: float) -> None:
