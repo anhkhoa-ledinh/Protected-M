@@ -59,39 +59,271 @@ FOCUS_PX, FOCUS_INSET = 2.5, 3.0
 #: không gian thiết kế). Không có trường bán kính nào trong manifest.
 FIELD_CORNER_RADIUS_PX = 15.0
 
-#: TASK_shared_album_1111 Phase 1: hotspot nào cũng có thể nhận vòng hover/
-#: focus (``_draw_rings`` lặp hết ``hotspots[]``), mà sửa 03:xx ("man chọn
-#: cấp — thẻ bo góc hiện viền vuông") cho thấy lỗi không chỉ ở ô nhập. Không
-#: có trường bán kính trong manifest nên đo trực tiếp trên ``base.png`` của
-#: từng loại — cùng cách đo FIELD_CORNER_RADIUS_PX ở trên (quét hàng, tìm
-#: hàng đầu mà mép bo chạm hẳn vào cạnh rect, đổi ảnh ×1,5 -> thiết kế):
-#: - ``btn_*`` (``v3_01a_sign_in``: "Sign in" ~9-12 px, "Create album" ~13 px;
-#:   ``v3_03_level_select``: "Back" ~10 px, "Next: choose a photo" ~12 px).
-#: - ``level_row_*`` / ``weapon_*`` (hàng/thẻ danh sách — cùng kiểu bo, đo
-#:   ``v3_03_level_select``: level_row_1 ~18-19 px; ``v3_05_loadout``:
-#:   weapon_Precision gun ~19 px).
-#: ``switch_*`` không cần đo: nó là một viên nhộng, bán kính luôn bằng nửa
-#: chiều cao của chính hotspot đó (tính trong ``_ring_radius``).
-#: Các loại còn lại (tab_, link_, icon_, sticker_, slot_, dropzone, dropdown_,
-#: slider, display_, mode_, seg_, theme_, footer_, continue/leave/sign_out/
-#: recent_memory...) không có art tĩnh trong ``base.png`` để đo (vẽ bằng
-#: sprite động hoặc không có nền) — giữ bán kính 0 (khung vuông như hôm nay,
-#: đúng với art của chúng, không phải một lựa chọn bỏ qua).
 BTN_CORNER_RADIUS_PX = 12.0
 ROW_CORNER_RADIUS_PX = 18.0
 
+#: TASK_ui_sakuga_1117 Bug B — ``_ring_radius`` trả 0 (khung vuông) cho MỌI
+#: hotspot ngoài năm tiền tố trên, kể cả những cái CÓ bo góc thật trên bản vẽ
+#: (viên nhộng ``tab_Solo``, đoạn bo ``display_full``) hoặc là chữ/liên kết
+#: (``link_guest`` — khung vuông kéo dài hết cả thẻ). Thay bằng một bảng
+#: DỨT ĐIỂM, phủ hết mọi hotspot trong bản kê, không rơi về 0 một cách im
+#: lặng — tên lạ thì ``hotspot_shape`` ném lỗi ngay.
+#:
+#: Bán kính đo trực tiếp trên ``base.png`` bằng ``measure_corner_radius_px``
+#: (quét hàng y=0 của rect, giải phương trình đường tròn (x-r)²+(y-r)²=r²
+#: — xem hàm đó). ``sticker_``/``slot_`` không có thẻ nền trong ``base.png``
+#: (vẽ bằng sprite PNG riêng lúc chạy — xem ``item_tile:*``); đo trên chính
+#: sprite PNG đó (``measure_alpha_radius``) thay vì base.png.
+#:
+#: Số đo (thiết kế px, làm tròn — báo cáo P2 có số thật):
+#: - ``btn_``: 13,3–15,7 tại các hàng thử — giữ 12 (giá trị ĐÃ DÙNG, không
+#:   lệch quá ±2-3 px so với số đo mới, và nhiều nút đã khớp gần đúng ~12-13).
+#: - ``level_row_``/``weapon_``: đo ĐÚNG 18.0 — khớp hằng cũ.
+#: - ``field_``: đo 14,67 — khớp hằng cũ (15) trong 0,33 px.
+#: - ``sticker_``: ~26 (sprite PNG, rìa mờ vì có đổ bóng).
+#: - ``slot_``: ~25 (sprite PNG, cùng lý do).
+#: - ``mode_``: ~24,7.
+#: - ``dropzone``: đo ĐÚNG 18.0.
+#: - ``recent_memory``: ~13,3.
+#: - ``dropdown_``: ~9,3.
+STICKER_CORNER_RADIUS_PX = 26.0
+SLOT_CORNER_RADIUS_PX = 25.0
+MODE_CORNER_RADIUS_PX = 25.0
+DROPZONE_CORNER_RADIUS_PX = 18.0
+RECENT_MEMORY_CORNER_RADIUS_PX = 13.0
+DROPDOWN_CORNER_RADIUS_PX = 9.0
 
-def _ring_radius(name: str, rect) -> float:
-    """Bán kính bo góc của vòng hover/focus quanh hotspot ``name``."""
-    if name.startswith("field_"):
-        return FIELD_CORNER_RADIUS_PX
-    if name.startswith("btn_"):
-        return BTN_CORNER_RADIUS_PX
-    if name.startswith("level_row_") or name.startswith("weapon_"):
-        return ROW_CORNER_RADIUS_PX
-    if name.startswith("switch_"):
+
+class HotspotShape:
+    """Hình vòng hover/focus của một hotspot. ``kind`` là một trong
+    ``rounded|pill|circle|underline|thumb|none``; ``radius`` chỉ có nghĩa
+    với ``rounded`` (``pill``/``circle`` tự tính từ rect lúc vẽ)."""
+
+    __slots__ = ("kind", "radius")
+
+    def __init__(self, kind: str, radius: float = 0.0) -> None:
+        self.kind = kind
+        self.radius = radius
+
+    def __repr__(self) -> str:
+        return f"HotspotShape({self.kind!r}, {self.radius!r})"
+
+    def __eq__(self, other) -> bool:
+        return (isinstance(other, HotspotShape) and self.kind == other.kind
+                and self.radius == other.radius)
+
+
+def _rounded(radius: float) -> HotspotShape:
+    return HotspotShape("rounded", radius)
+
+
+#: Tên CHÍNH XÁC (không phải tiền tố) — mỗi tên chỉ có một hotspot, không có
+#: hậu tố thay đổi (khác ``btn_Sign in``/``btn_Create album``/...).
+_EXACT_SHAPES: dict[str, HotspotShape] = {
+    "continue": HotspotShape("none"),
+    "dropzone": _rounded(DROPZONE_CORNER_RADIUS_PX),
+    "recent_memory": _rounded(RECENT_MEMORY_CORNER_RADIUS_PX),
+    "sign_out": HotspotShape("underline"),
+    "leave": HotspotShape("underline"),
+    "slider": HotspotShape("thumb"),
+    "footer_link": HotspotShape("underline"),
+    "icon_show_password": HotspotShape("circle"),
+}
+
+#: Tiền tố — nhiều hotspot cùng kiểu, khác hậu tố (``btn_Sign in``,
+#: ``level_row_1``, ``mode_Competitive``...). Thứ tự không quan trọng: mỗi
+#: tên chỉ khớp đúng MỘT tiền tố trong bản kê hiện tại.
+_PREFIX_SHAPES: tuple[tuple[str, HotspotShape], ...] = (
+    ("btn_", _rounded(BTN_CORNER_RADIUS_PX)),
+    ("level_row_", _rounded(ROW_CORNER_RADIUS_PX)),
+    ("weapon_", _rounded(ROW_CORNER_RADIUS_PX)),
+    ("field_", _rounded(FIELD_CORNER_RADIUS_PX)),
+    ("sticker_", _rounded(STICKER_CORNER_RADIUS_PX)),
+    ("slot_", _rounded(SLOT_CORNER_RADIUS_PX)),
+    ("mode_", _rounded(MODE_CORNER_RADIUS_PX)),
+    ("dropdown_", _rounded(DROPDOWN_CORNER_RADIUS_PX)),
+    ("tab_", HotspotShape("pill")),
+    ("seg_", HotspotShape("pill")),
+    ("display_", HotspotShape("pill")),
+    ("theme_", HotspotShape("pill")),
+    ("switch_", HotspotShape("pill")),
+    ("link_", HotspotShape("underline")),
+)
+
+#: Hotspot phủ từ ngần này phần trăm diện tích thiết kế (1280×720) trở lên
+#: thì không vẽ vòng nào, bất kể tên — ``continue`` (cả màn) là ví dụ, nhưng
+#: luật tính theo DIỆN TÍCH chứ không chỉ theo tên, phòng khi có hotspot
+#: to khác sau này.
+FULL_SCREEN_RING_AREA_FRACTION = 0.5
+
+
+def hotspot_shape(name: str, rect) -> HotspotShape:
+    """
+    Hình vòng hover/focus của hotspot ``name`` — KHÔNG rơi về 0 một cách im
+    lặng. Tên không khớp tiền tố/tên nào trong bảng thì NÉM LỖI ngay, để lộ
+    ra sớm (hotspot mới trong bản kê mà quên thêm vào bảng) thay vì âm thầm
+    vẽ khung vuông sai như lỗi cũ.
+    """
+    width, height = float(rect[2]), float(rect[3])
+    if width * height >= FULL_SCREEN_RING_AREA_FRACTION * DESIGN_SIZE[0] * DESIGN_SIZE[1]:
+        return HotspotShape("none")
+    shape = _EXACT_SHAPES.get(name)
+    if shape is not None:
+        return shape
+    for prefix, candidate in _PREFIX_SHAPES:
+        if name.startswith(prefix):
+            return candidate
+    raise ValueError(
+        f"hotspot_shape: khong co trong HOTSPOT_SHAPES: {name!r} "
+        "(them vao _EXACT_SHAPES/_PREFIX_SHAPES trong src/ui_album/v3.py)")
+
+
+def _ring_draw_radius(shape: HotspotShape, rect) -> float | None:
+    """
+    Bán kính để vẽ vòng NGAY BÂY GIỜ (Phase 2) — ``rounded``/``pill``/
+    ``circle`` vẫn vẽ khung bo tròn như hôm nay, chỉ đúng bán kính hơn.
+    ``underline``/``thumb``/``none`` trả ``None`` (không vẽ khung vuông sai
+    nữa); hình vẽ RIÊNG của chúng (gạch dưới, quầng tròn con trượt...) là
+    việc của Phase 5 (``src/ui_album/v3_hover.py``).
+    """
+    if shape.kind == "rounded":
+        return shape.radius
+    if shape.kind == "pill":
         return float(rect[3]) * 0.5
-    return 0.0
+    if shape.kind == "circle":
+        return min(float(rect[2]), float(rect[3])) * 0.5
+    return None
+
+
+def measure_corner_radius_px(image, rect, image_scale: float,
+                              probe_y: int = 0) -> float | None:
+    """
+    Bán kính bo góc trái-trên của ``rect`` (px thiết kế), đo trên ``image``
+    (PIL, đã ``convert("RGB")``). ``None`` nếu không phát hiện được góc bo
+    (hình vuông, hoặc không đủ dữ liệu để quét).
+
+    Phương pháp: màu "trong" lấy ở CÙNG HÀNG với điểm quét nhưng giữa rect
+    (tránh chữ/icon giữa tâm), màu "ngoài" lấy đúng điểm góc ``(rect.x,
+    rect.y)`` (luôn ở ngoài mọi góc bo thật). Qua giữa hai màu đó là biên
+    hình; tại hàng ``probe_y``, điểm biên ``(x, probe_y)`` nằm trên đường
+    tròn tâm ``(r, r)`` bán kính ``r``, nên
+    ``r² - 2r(x+y) + (x²+y²) = 0`` → ``r = (x+y) + sqrt(2xy)``
+    (nghiệm dương; ``probe_y=0`` thì đơn giản còn ``r = x``).
+    """
+    px = image.load()
+    ix, iy, iw, ih = (round(v * image_scale) for v in rect)
+    outside = px[ix, iy]
+    inside = px[ix + iw // 2, iy + probe_y]
+
+    def dist(c1, c2) -> int:
+        return sum(abs(a - b) for a, b in zip(c1, c2))
+
+    max_scan = min(iw, ih) // 2 + 6
+    x_at_y = None
+    for dx in range(max_scan):
+        if dist(px[ix + dx, iy + probe_y], inside) < dist(px[ix + dx, iy + probe_y], outside):
+            x_at_y = dx
+            break
+    if x_at_y is None:
+        return None
+    x, y = float(x_at_y), float(probe_y)
+    s = x + y
+    disc = s * s - (x * x + y * y)
+    if disc < 0:
+        return None
+    return (s + math.sqrt(disc)) / image_scale
+
+
+def measure_alpha_radius_px(image, image_scale: float) -> float | None:
+    """
+    Bán kính bo góc trái-trên của ``image`` (PIL RGBA, đã CẮT ĐÚNG khung
+    sprite — vd ``sprites/v3_05_loadout__sticker_Flare.png``), đo bằng kênh
+    alpha thay vì màu: dùng cho sprite vẽ lúc chạy, không nằm trong
+    ``base.png`` (``sticker_``/``slot_`` — xem ghi chú trên
+    ``STICKER_CORNER_RADIUS_PX``).
+
+    Các sprite này có viền đổ bóng mờ quanh thẻ, nên quét hàng ĐẦU TIÊN có
+    alpha ≥ 250 ở đâu đó (chắc chắn là thẻ đặc, không phải quầng bóng mờ)
+    làm hàng ``y=0`` cục bộ, rồi lấy điểm đầu tiên alpha > 127 trên hàng đó
+    làm bán kính (công thức rút gọn ở ``probe_y=0``: ``r = x``).
+    """
+    px = image.load()
+    w, h = image.size
+    local_y0 = None
+    for y in range(h):
+        if any(px[x, y][3] >= 250 for x in range(w)):
+            local_y0 = y
+            break
+    if local_y0 is None:
+        return None
+    for x in range(w):
+        if px[x, local_y0][3] > 127:
+            return x / image_scale
+    return None
+
+
+def measure_ink_bounds(image, rect, image_scale: float, threshold: int = 150):
+    """
+    Hộp bao các điểm ảnh KHÔNG PHẢI nền trong ``rect`` (px thiết kế tuyệt
+    đối, cùng hệ toạ độ với ``rect``) — dùng để đo đúng bề rộng CHỮ của một
+    liên kết, thay vì cả ô bấm rộng hơn nhiều (Bug C).
+
+    Nền lấy theo màu PHỔ BIẾN NHẤT trong ``rect`` (chữ luôn chiếm ít diện
+    tích hơn nền). Ngưỡng 150 (tổng |hiệu| ba kênh RGB) cố ý cao — biên khử
+    răng cưa giữa nền-thẻ-trắng và nền-trang-xanh-nhạt chỉ lệch ~30-60, còn
+    chữ (xanh đậm #24415F-ish) lệch nền trắng ~396; 150 tách rõ chữ thật
+    khỏi nhiễu viền thẻ mà không cần biết trước màu chữ.
+
+    ``None`` nếu không có điểm nào vượt ngưỡng (rect trống/toàn nền).
+    """
+    px = image.load()
+    ix, iy, iw, ih = (round(v * image_scale) for v in rect)
+    from collections import Counter
+
+    counts = Counter(px[ix + x, iy + y] for y in range(ih) for x in range(iw))
+    bg = counts.most_common(1)[0][0]
+
+    def dist(c) -> int:
+        return sum(abs(a - b) for a, b in zip(c, bg))
+
+    min_x = min_y = max_x = max_y = None
+    for y in range(ih):
+        for x in range(iw):
+            if dist(px[ix + x, iy + y]) > threshold:
+                min_x = x if min_x is None else min(min_x, x)
+                max_x = x if max_x is None else max(max_x, x)
+                min_y = y if min_y is None else min(min_y, y)
+                max_y = y if max_y is None else max(max_y, y)
+    if min_x is None:
+        return None
+    x0 = rect[0] + min_x / image_scale
+    y0 = rect[1] + min_y / image_scale
+    x1 = rect[0] + (max_x + 1) / image_scale
+    y1 = rect[1] + (max_y + 1) / image_scale
+    return (x0, y0, x1 - x0, y1 - y0)
+
+
+#: TASK_ui_sakuga_1117 Bug C — ``link_guest`` (và các ô liên kết khác) có hộp
+#: bấm rộng bằng CẢ THẺ, nên bấm vào khoảng trắng cũng đăng nhập khách. Đè
+#: hộp bấm bằng (biên mực CHỮ đo trên ``base.png`` + 8 px mỗi bên NGANG),
+#: giữ nguyên y/chiều cao gốc của bản kê — lỗi chỉ ở BỀ RỘNG, không phải
+#: chiều cao (``measure_ink_bounds`` cho số thật, xem báo cáo P2).
+#: Khoá ``(màn, tên)`` vì ``footer_link`` hiện chữ khác nhau tuỳ màn.
+LINK_HIT_RECTS: dict[tuple[str, str], tuple[float, float, float, float]] = {
+    ("v3_01a_sign_in", "link_forgot"): (692.0, 404.0, 134.0, 17.0),
+    ("v3_01c_sign_in_error", "link_forgot"): (692.0, 404.0, 134.0, 17.0),
+    ("v3_01a_sign_in", "link_guest"): (591.0, 626.0, 98.0, 16.0),
+    ("v3_01c_sign_in_error", "footer_link"): (593.0, 626.0, 96.0, 16.0),
+    ("v3_01b_sign_up", "footer_link"): (537.0, 578.0, 206.0, 16.0),
+    ("v3_02a_menu", "sign_out"): (1167.0, 49.0, 63.0, 15.0),
+}
+
+
+def hotspot_rect(screen: str, hotspot: dict):
+    """``rect`` thật của ``hotspot`` — đè bởi ``LINK_HIT_RECTS`` nếu có
+    (Bug C); mọi nơi đọc rect của hotspot (bắt click, vẽ vòng) phải đi qua
+    đây, không đọc thẳng ``hotspot["rect"]``."""
+    return LINK_HIT_RECTS.get((screen, hotspot["n"]), hotspot["rect"])
 
 #: Tâm ngắm: một dấu ``+`` nhỏ, tính bằng pixel thiết kế.
 #:
@@ -817,7 +1049,8 @@ class V3State:
     __slots__ = ("texts", "colours", "hidden", "sprites", "borrowed", "bars",
                  "pips", "pills", "photo", "camera_tex", "viewport_draw",
                  "hover", "focus", "caret", "alpha", "shot", "message", "wrap",
-                 "extra", "mirror", "aim", "shots", "aim_ready", "confirm")
+                 "extra", "mirror", "aim", "shots", "aim_ready", "confirm",
+                 "text_rect")
 
     def __init__(self) -> None:
         #: ``key`` → chuỗi (thay run đầu) hoặc danh sách chuỗi (thay từng run).
@@ -866,6 +1099,11 @@ class V3State:
         #: cần ba ô và số dòng thay đổi — chỗ lặp lại nằm ở đây, không phải
         #: trong manifest.
         self.extra: list = []
+        #: TASK_ui_sakuga_1117 bug A: ``key`` → ``rect`` đặt chỗ khác cho MỘT
+        #: chữ sẵn có trong bản vẽ (khác ``extra``, vốn dùng khi cần NHIỀU
+        #: bản của cùng một kiểu chữ). ``check_hint`` cần đúng việc này: dời
+        #: theo hàng đang hỏi, giữ nguyên kiểu chữ/x.
+        self.text_rect: dict = {}
 
 
 def shot_state(manifest: V3Manifest, screen: str) -> V3State:
@@ -963,7 +1201,7 @@ def draw_screen(painter: V3Painter, manifest: V3Manifest, screen: str,
     _draw_choose_photo_extra(painter, screen, state)
     _draw_shots(painter, state)
     _draw_aim(painter, state)
-    _draw_rings(painter, record, state)
+    _draw_rings(painter, screen, record, state)
     _draw_toast(painter, state, screen)
     _draw_confirm_dialog(painter, state)
 
@@ -1090,7 +1328,7 @@ def _draw_texts(painter, record, state) -> None:
         runs = _runs_for(spec, state)
         texts = _texts_for(spec, state)
         alpha = float(state.alpha.get(key, 1.0))
-        rect = [float(v) for v in spec["rect"]]
+        rect = [float(v) for v in state.text_rect.get(key, spec["rect"])]
         if spec.get("wrap") and state.wrap:
             line_h = float(spec.get("line_h") or rect[3])
             lines = _wrap_lines(painter, runs, texts, rect[2])
@@ -1230,13 +1468,21 @@ def _draw_aim(painter, state) -> None:
         painter.fill((x - half, y + inner, half * 2.0, outer - inner), colour)
 
 
-def _draw_rings(painter, record, state) -> None:
+def _draw_rings(painter, screen, record, state) -> None:
     """Vòng hover và vòng focus — lớp cuối, sau mọi thứ (README mục 9)."""
     if state.shot:
         return
     for hotspot in record.get("hotspots", ()):
-        name, rect = hotspot["n"], hotspot["rect"]
-        radius = _ring_radius(name, rect)
+        name = hotspot["n"]
+        rect = hotspot_rect(screen, hotspot)
+        shape = hotspot_shape(name, rect)
+        radius = _ring_draw_radius(shape, rect)
+        if radius is None:
+            # TASK_ui_sakuga_1117 Bug B: underline/thumb/none không còn vẽ
+            # khung vuông sai nữa (lỗi "thanh mỏng kéo hết cả thẻ" dưới
+            # "Play as guest") — hình vẽ RIÊNG của chúng là việc của Phase 5
+            # (src/ui_album/v3_hover.py).
+            continue
         if name == state.focus:
             ring_rect = (rect[0] - FOCUS_INSET, rect[1] - FOCUS_INSET,
                         rect[2] + 2 * FOCUS_INSET, rect[3] + 2 * FOCUS_INSET)
@@ -1255,7 +1501,7 @@ def hit_test(manifest: V3Manifest, screen: str, design_x: float,
              design_y: float) -> str | None:
     """Tên hotspot dưới con trỏ; ``None`` nếu không có."""
     for hotspot in manifest.screens[screen].get("hotspots", ()):
-        x, y, w, h = hotspot["rect"]
+        x, y, w, h = hotspot_rect(screen, hotspot)
         if x <= design_x <= x + w and y <= design_y <= y + h:
             return hotspot["n"]
     return None

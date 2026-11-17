@@ -459,6 +459,12 @@ def _tilt(state, flow, manifest) -> None:
         if kind == "current":
             state.colours[key] = PRIMARY
             state.texts["check_hint"] = hints[index]
+            # TASK_ui_sakuga_1117 bug A: bản vẽ khoá "check_hint" ở y=549
+            # (hàng "Tilt right"); dời theo hàng ĐANG hỏi, giữ nguyên x.
+            hint_spec = _spec(manifest, screen, "check_hint")
+            if hint_spec is not None:
+                hx, _hy, hw, hh = hint_spec["rect"]
+                state.text_rect["check_hint"] = (hx, CHECK_ROWS_Y[index], hw, hh)
         elif kind == "todo":
             state.colours[key] = MUTED
         else:
@@ -471,21 +477,29 @@ def _tilt(state, flow, manifest) -> None:
 #: Ba hàng dấu kiểm (``screens[].notes`` của màn thử nghiêng).
 CHECK_ROWS_Y = (486.0, 518.0, 550.0)
 
+#: TASK_ui_sakuga_1117 bug A — mỗi biến thể (``check:done``/``current``/
+#: ``todo``) được XUẤT ở một hàng gốc khác nhau trong bản vẽ, không phải cả
+#: ba ở hàng 0 như code cũ giả định (``done`` ở hàng 0 = 486, còn
+#: ``current``/``todo`` ở hàng 2 = 550). Dời sai thì ``current``/``todo``
+#: lệch xuống dưới đúng khoảng ``550 - CHECK_ROWS_Y[hàng đích]``.
+CHECK_VARIANT_ANCHOR_Y = {"done": 486.0, "current": 550.0, "todo": 550.0}
+
 
 def _check_row(state, manifest, screen, index, kind, marker) -> None:
     """
     Dấu kiểm của hàng ``index``: một trong ``done|current|todo``.
 
-    Bản vẽ xuất ba dấu ở **cùng** hàng đầu (chúng là ba biến thể, không phải
-    ba hàng), nên hàng 2 và 3 dịch theo nhịp ghi trong ``screens[].notes``.
+    Đặt theo CHÍNH gốc của biến thể đang dùng
+    (``CHECK_VARIANT_ANCHOR_Y[kind]``), không phải luôn tính từ hàng 0 —
+    ``done`` neo ở 486, ``current``/``todo`` neo ở 550.
     """
     record = manifest.sprite(screen, f"check:{kind}")
     if record is None:
         return
-    shift = CHECK_ROWS_Y[index] - CHECK_ROWS_Y[0]
     rect = record["rect"]
+    y = rect[1] + (CHECK_ROWS_Y[index] - CHECK_VARIANT_ANCHOR_Y[kind])
     state.borrowed[f"check#{index}"] = (
-        screen, f"check:{kind}", (rect[0], rect[1] + shift, rect[2], rect[3]))
+        screen, f"check:{kind}", (rect[0], y, rect[2], rect[3]))
     _ = marker
 
 
