@@ -192,6 +192,9 @@ class GlfwWindow:
                              if prefs.get("window_rect") else None)
         #: D2: ai cần biết khi cửa sổ dời chỗ / đổi cỡ (mặt phẳng Kooima).
         self._geometry_listener = None
+        #: TASK_game_feel_1118 P1: ai vẽ lại NGAY khi GLFW báo cửa sổ cần
+        #: vẽ lại (đang kéo cạnh — modal loop, main loop không chạy tới).
+        self._refresh_handler = None
         self._logged_dpi = False
         self._window = None
         #: TASK_ui_sakuga_1117 Phase 5: con trỏ OS theo hình — tạo một lần
@@ -263,6 +266,12 @@ class GlfwWindow:
         # dùng viewport cũ.
         GL.glViewport(0, 0, vw, vh)
         logger.info("Framebuffer resized to %dx%d — viewport %dx%d", width, height, vw, vh)
+        # TASK_game_feel_1118 P1: hình học Kooima (D2) phải theo kịp TRƯỚC
+        # khi vẽ lại — gọi ở đây phòng khi GLFW báo framebuffer-size trước
+        # window-size (``_on_window_size`` tự nó cũng gọi, idempotent).
+        self._notify_geometry()
+        if self._refresh_handler is not None:
+            self._refresh_handler()
 
     @property
     def should_close(self) -> bool:
@@ -593,6 +602,17 @@ class GlfwWindow:
             self._cursors[kind] = cursor
         glfw.set_cursor(self._window, cursor)
         self._cursor_shape = kind
+
+    # ---- P1: vẽ lại khi cửa sổ cần (đang kéo cạnh) -----------------------
+    def set_refresh_handler(self, fn) -> None:
+        """``fn()`` vẽ lại cửa sổ NGAY LẬP TỨC — gọi từ GLFW
+        (``glfw.set_window_refresh_callback``, báo khi cửa sổ cần vẽ lại —
+        kéo cạnh chẳng hạn) và từ cuối ``_on_framebuffer_size`` (sau khi
+        viewport + hình học Kooima D2 đã cập nhật), để giao diện bắt kịp
+        kích thước thật trong suốt lúc kéo, không chỉ sau khi thả chuột."""
+        self._refresh_handler = fn
+        if self._window is not None:
+            glfw.set_window_refresh_callback(self._window, lambda _w: fn())
 
     # ---- D2: hình chữ nhật vật lý của cửa sổ ---------------------------
     def set_geometry_listener(self, listener) -> None:

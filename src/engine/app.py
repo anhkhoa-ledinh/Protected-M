@@ -89,6 +89,14 @@ class HcpdApplication:
         # = không đổi một hành vi nào so với hôm nay.
         self._album_options = album or AlbumOptions()
         self._album = None
+        # TASK_game_feel_1118 P1: closure ``scene`` của khung vẽ GẦN NHẤT
+        # (chụp sẵn pose/khung webcam lúc đó) — ``_draw_frame_only`` dùng
+        # lại y hệt lúc cửa sổ cần vẽ lại giữa chừng kéo cạnh, vì nó
+        # KHÔNG được tự đọc webcam/pose mới. ``_drawing`` chặn vẽ lồng
+        # nhau (refresh trong lúc refresh, hoặc trong lúc main loop đang
+        # tự vẽ).
+        self._last_scene = None
+        self._drawing = False
         # PB-055: demo đọc content.demo.json, không ghi file config nào, chỉ nhận
         # G, T, F6, kéo-thả, F4, Esc (lọc ở GlfwWindow).
         self._demo = bool(demo)
@@ -760,6 +768,46 @@ class HcpdApplication:
                 self._album_draw_errors = seen
                 logger.exception("Album: loi ve mot khung (%s) — bo qua", key)
 
+    def _draw_frame_only(self, scene) -> None:
+        """
+        TASK_game_feel_1118 P1: vẽ ĐÚNG MỘT khung ở cỡ framebuffer HIỆN
+        TẠI bằng ``scene`` đã dựng sẵn (đóng gói pose/khung webcam từ lúc
+        dựng, không tự đọc gì mới) — một đường mã DUY NHẤT cho cả khung
+        bình thường của main loop lẫn khung vẽ-lại khi cửa sổ đang bị kéo
+        cạnh (``_on_refresh``). Không đọc input, không tick ván/PvP,
+        không đọc webcam, không gọi ``pump_events``.
+        """
+        if self._album is not None:
+            if not self._album.has_viewport():
+                # Màn không có ô viewport: vẫn chạy đúng đường vẽ demo
+                # (render đầy đủ) nhưng cắt xuống 1 pixel — xem chú thích
+                # gốc ở chỗ gọi cũ trong main loop.
+                self._album.draw_hidden_scene(scene)
+            self._album_draw_guarded(scene)
+        else:
+            scene()
+        self._window.swap_buffers()
+
+    def _on_refresh(self) -> None:
+        """
+        ``window.set_refresh_handler``: GLFW báo cửa sổ cần vẽ lại NGAY —
+        đang kéo cạnh (modal loop bên trong ``glfw.poll_events()``, main
+        loop không chạy tới lượt) hoặc vừa đổi cỡ. Vẽ lại bằng
+        ``self._last_scene`` (pose/khung webcam LẦN CUỐI main loop tính,
+        đúng như tài liệu P1 mô tả "the last eye position").
+
+        Chặn lồng nhau: một refresh nổ ra TRONG một refresh khác, hoặc
+        trong lúc main loop đang tự vẽ khung của nó, thì bỏ qua — không
+        có gì để vẽ thêm mà an toàn hơn vẽ chồng.
+        """
+        if self._drawing or self._last_scene is None:
+            return
+        self._drawing = True
+        try:
+            self._draw_frame_only(self._last_scene)
+        finally:
+            self._drawing = False
+
     def _photo_rgb_for_camo(self):
         """
         Ảnh gốc (RGB, CPU) để lấy màu nguỵ trang — KHÔNG đọc lại GL.
@@ -1004,8 +1052,11 @@ class HcpdApplication:
             n = len(times)
             median_dt = times[n // 2] if n else 0.0
             fps = (1.0 / median_dt) if median_dt > 0.0 else 0.0
+            p99_dt = times[min(n - 1, int(round(0.99 * (n - 1))))] if n else 0.0
+            hitches = sum(1 for t in times if t > 0.050)
             logger.info("FX_BENCH: %d khung trong 20s, FPS median %.1f, "
-                        "khung cham nhat %.1f ms", n, fps,
+                        "p99 %.1f ms, khung >50ms: %d, khung cham nhat %.1f ms",
+                        n, fps, p99_dt * 1000.0, hitches,
                         max(times) * 1000.0 if times else 0.0)
             self._window.request_close()
 
@@ -2015,6 +2066,90 @@ class HcpdApplication:
         save_framebuffer(path, width, height)
         logger.info("Sakuga UI shot: %s (%dx%d)", path, width, height)
 
+    # ---- TASK_game_feel_1118 Phase 0/7: anti-aliasing before/after crops ---
+    def _aa_shot_plan(self) -> list:
+        """5 bước — màn/khoảnh khắc y hệt cho cả ảnh "trước" (Phase 0) và
+        "sau" (Phase 7); việc cắt/zoom 3x làm ở bước riêng, ngoài app."""
+        F = self._album.flow
+        HOLD = 30
+
+        def go_levels():
+            self._album.state.go(F.LEVELS)
+            self._album.state.level = 2
+            self._album.mouse = (-1000.0, -1000.0)
+
+        def go_play_static():
+            self._album.mouse = (-1000.0, -1000.0)
+
+        def spawn_burst():
+            self._album.mouse = (640.0, 360.0)
+            self._aa_burst_pending = True
+
+        return [
+            ("aa_level_row", go_levels, HOLD),
+            ("aa_tab", go_levels, HOLD),
+            ("aa_burst", spawn_burst, 6),        # ~0.1s @ ~60fps cua so nho
+            ("aa_layer_edge", go_play_static, HOLD),
+            ("aa_bug", go_play_static, HOLD),
+        ]
+
+    def _tick_aa_baseline_shots(self) -> None:
+        """``HCPD_AA_BASELINE_1118=1`` (dùng cùng
+        ``HCPD_ALBUM_AUTOMATCH=1``): 5 ảnh thô (chưa cắt) vào thư mục
+        ``HCPD_AA_OUT`` (mặc định ``results/game_feel_1118/baseline/aa_raw``)
+        — màn PLAY cần ván thật (bọ + lớp ảnh) nên đợi ``_album.game`` có
+        trước khi chụp hai bước cuối."""
+        from OpenGL import GL
+
+        if self._window.is_iconified():
+            return
+        plan = self._aa_shot_plan()
+        index = getattr(self, "_aa_shot_index", 0)
+        if index >= len(plan):
+            return
+        stem, setup, hold_frames = plan[index]
+        if not getattr(self, "_aa_shot_started", False):
+            setup()
+            self._aa_shot_started = True
+            self._aa_shot_hold = 0
+        if stem in ("aa_layer_edge", "aa_bug", "aa_burst"):
+            F = self._album.flow
+            if (self._album.state.screen != F.PLAY or self._album.game is None
+                    or self._renderer.waiting_for_depth):
+                return          # cho ván thật mở xong (lop + bo)
+        if getattr(self, "_aa_burst_pending", False):
+            if self._album.spawn_fx("hit_kill", 640.0, 360.0):
+                self._aa_burst_pending = False
+            else:
+                return
+        hold = getattr(self, "_aa_shot_hold", 0) + 1
+        self._aa_shot_hold = hold
+        if hold < hold_frames:
+            return
+        GL.glFinish()
+        self._save_aa_shot(stem)
+        self._aa_shot_started = False
+        self._aa_shot_hold = 0
+        self._aa_burst_pending = False
+        self._aa_shot_index = index + 1
+        if self._aa_shot_index >= len(plan):
+            logger.info("AA baseline: xong %d anh", len(plan))
+            self._window.request_close()
+
+    def _save_aa_shot(self, stem: str) -> None:
+        from src.ui_album.shots import save_framebuffer
+
+        self._window.restore_and_focus()
+        self._window.pump_events()
+        width, height = self._window.framebuffer_size()
+        if width < 2 or height < 2:
+            logger.warning("AA shot bo qua: framebuffer %dx%d", width, height)
+            return
+        out = os.environ.get("HCPD_AA_OUT") or "results/game_feel_1118/baseline/aa_raw"
+        path = self._root / out / f"raw_{stem}.png"
+        save_framebuffer(path, width, height)
+        logger.info("AA baseline shot: %s (%dx%d)", path, width, height)
+
     def _begin_rest_measure(self, now: float) -> None:
         """Phím G: đo mắt nghỉ 2 giây thay vì đặt vật ngay."""
         if len(self._renderer.layer_records()) < 2:
@@ -2279,6 +2414,11 @@ class HcpdApplication:
         # nhỏ tới khi có lớp. Giữ thứ tự cũ: mở camera TRƯỚC cửa sổ (run13) làm cửa
         # sổ hiện muộn hơn và phím không ăn [GIẢ ĐỊNH về cơ chế].
         self._window.create()
+        # TASK_game_feel_1118 P1: GLFW chạy một modal loop bên trong
+        # poll_events() khi người dùng đang kéo cạnh cửa sổ — main loop
+        # không tới lượt, nên đăng ký NGAY để khung đầu tiên trong lúc kéo
+        # cũng vẽ lại (``_on_refresh`` tự bỏ qua nếu chưa có khung nào).
+        self._window.set_refresh_handler(self._on_refresh)
         self._window.pump_events()
         self._renderer = SceneRenderer(
             self._window,
@@ -2520,24 +2660,24 @@ class HcpdApplication:
                     tracking_preview=preview,
                     dt_s=dt,
                 )
+                # TASK_game_feel_1118 P1: nhớ lại closure này — lúc cửa sổ
+                # bị kéo cạnh, ``_on_refresh`` vẽ lại bằng ĐÚNG scene này
+                # (pose/khung webcam đã chụp ở trên), không tự đọc gì mới.
+                self._last_scene = scene
+                self._drawing = True
+                try:
+                    self._draw_frame_only(scene)
+                finally:
+                    self._drawing = False
                 if self._album is not None:
-                    if not self._album.has_viewport():
-                        # Màn không có ô viewport: vẫn chạy ĐÚNG đường vẽ của
-                        # bản demo (render đầy đủ) nhưng cắt xuống 1 pixel nên
-                        # không thấy gì và gần như không tốn gì. Gọi riêng
-                        # video_plane.update() ngoài render() đã làm app văng
-                        # giữa lúc dựng lớp (log 23:01, không có traceback).
-                        self._album.draw_hidden_scene(scene)
-                    self._album_draw_guarded(scene)
                     if self._album_options.shots or self._album_options.ui_shots:
                         self._album_shots_step()
                     elif os.environ.get("HCPD_V3_LIVE") == "1":
                         self._tick_v3_live_shots()
                     elif os.environ.get("HCPD_UI_SHOTS_1117") == "1":
                         self._tick_sakuga_shots()
-                else:
-                    scene()
-                self._window.swap_buffers()
+                    elif os.environ.get("HCPD_AA_BASELINE_1118") == "1":
+                        self._tick_aa_baseline_shots()
                 self._profiler.render_latency_ms = (
                     time.perf_counter() - render_start
                 ) * 1000.0
