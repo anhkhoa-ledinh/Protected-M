@@ -25,7 +25,13 @@ from PIL import Image
 from src.fx import screens as fx_screens
 from src.fx.player import FxPlayer
 from src.fx.spec import FxSpec
-from src.ui_album.textures import upload_rgba
+from src.ui_album.textures import bleed_transparent, upload_rgba
+from src.ui_album.v3 import DESIGN_SIZE
+
+#: TASK_game_feel_1118 P2: atlas khung cách nhau 2px — bậc mip cao hơn sẽ
+#: loang màu SANG khung bên cạnh, nên chặn ở bậc 1 (vẫn đủ AA cho viền,
+#: không đủ để lem).
+FX_MAX_MIP_LEVEL = 1
 
 logger = logging.getLogger(__name__)
 
@@ -121,6 +127,9 @@ class FxLibrary:
         try:
             with Image.open(path) as image:
                 array = np.asarray(image.convert("RGBA"), dtype=np.uint8)
+            # TASK_game_feel_1118 P2: loang màu ở LUỒNG NỀN này (CPU, có
+            # thể chậm), không phải ở ``pump()`` (luồng GL chính).
+            array = bleed_transparent(array)
         except (OSError, ValueError) as err:
             logger.warning("FxLibrary: khong doc duoc %s (%s)", path, err)
             array = None
@@ -138,7 +147,8 @@ class FxLibrary:
             self._pending.discard(decoded.key)
             if decoded.array is not None:
                 height, width = decoded.array.shape[:2]
-                self._textures[decoded.key] = (upload_rgba(decoded.array), width, height)
+                texture = upload_rgba(decoded.array, max_level=FX_MAX_MIP_LEVEL)
+                self._textures[decoded.key] = (texture, width, height)
                 uploads += 1
                 resident = self.resident_bytes()
                 if resident > self._max_resident_bytes:
@@ -233,13 +243,28 @@ class FxLibrary:
     # ---- drawing -----------------------------------------------------
     def draw(self, painter, player: FxPlayer) -> None:
         """Draw every live effect's current frame/words. Silently skips
-        any command whose texture isn't resident yet."""
+        any command whose texture isn't resident yet.
+
+        TASK_game_feel_1118 P2: clipped to the design box with a scissor
+        — a word/sprite quad can straddle the edge of the 1280x720
+        canvas (e.g. a word cue's ``dx``/``dy`` pushed past it), and
+        without a clip it draws into the black letterbox bars either
+        side of the canvas at non-16:9 window sizes.
+        """
         if self.disabled_reason:
             return
-        for command in player.draw_list():
-            entry = self.get(command.texture_key)
-            if entry is None:
-                continue
-            texture, _width, _height = entry
-            painter.quad_corners(command.corners, texture,
-                                 tint=(1.0, 1.0, 1.0, command.alpha), uv=command.uv)
+        commands = player.draw_list()
+        if not commands:
+            return
+        GL.glEnable(GL.GL_SCISSOR_TEST)
+        GL.glScissor(*painter.viewport_px((0.0, 0.0, DESIGN_SIZE[0], DESIGN_SIZE[1])))
+        try:
+            for command in commands:
+                entry = self.get(command.texture_key)
+                if entry is None:
+                    continue
+                texture, _width, _height = entry
+                painter.quad_corners(command.corners, texture,
+                                     tint=(1.0, 1.0, 1.0, command.alpha), uv=command.uv)
+        finally:
+            GL.glDisable(GL.GL_SCISSOR_TEST)

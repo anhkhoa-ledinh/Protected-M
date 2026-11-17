@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 from collections import OrderedDict
 
+import cv2
 import numpy as np
 from OpenGL import GL
 from PIL import Image
@@ -20,20 +21,76 @@ logger = logging.getLogger(__name__)
 IMAGE_CACHE_MAX = 6
 SMALL_CACHE_MAX = 256
 
+#: TASK_game_feel_1118 P2: số lần lặp box-blur của ``bleed_transparent`` —
+#: gần giống Gauss (rẻ hơn, ``cv2.blur`` là box-filter thuần), loang màu
+#: ra xa dần theo số lần.
+BLEED_ITERATIONS = 6
+BLEED_KERNEL = 3
 
-def upload_rgba(array: np.ndarray) -> int:
-    """Mảng RGBA uint8 → tên texture GL (lọc tuyến tính, kẹp biên)."""
+
+def bleed_transparent(array: np.ndarray, iterations: int = BLEED_ITERATIONS,
+                      ksize: int = BLEED_KERNEL) -> np.ndarray:
+    """
+    Loang màu vào các điểm TRONG SUỐT HOÀN TOÀN (alpha=0) trước khi lên
+    mipmap.
+
+    PNG alpha thẳng (không premultiply) thường giữ RGB=đen ở chỗ alpha=0
+    (không ai nhìn thấy màu đó — cho tới khi mipmap TRUNG BÌNH CỘNG nó
+    vào viền, ra quầng tối quanh hình). Cách: premultiply (``RGB·a``),
+    làm mờ CẢ ``RGB·a`` LẪN ``a`` bằng cùng một nhân hộp lặp
+    ``iterations`` lần, rồi ở những điểm ``a=0`` gán
+    ``RGB = blur(RGB·a) / max(blur(a), eps)`` — màu trung bình có trọng
+    số của các điểm KHÔNG trong suốt gần đó. Alpha giữ NGUYÊN — chỉ RGB
+    của điểm alpha=0 đổi.
+    """
+    if array.ndim != 3 or array.shape[2] != 4:
+        return array
+    alpha = array[..., 3]
+    transparent = alpha == 0
+    if not np.any(transparent):
+        return array           # đặc hoàn toàn (hoặc không điểm nào a=0): không có gì để loang
+    alpha_f = (alpha.astype(np.float32) / 255.0)[..., None]
+    rgb_pm = array[..., :3].astype(np.float32) * alpha_f
+    a = alpha_f[..., 0]
+    for _ in range(max(1, iterations)):
+        rgb_pm = cv2.blur(rgb_pm, (ksize, ksize))
+        a = cv2.blur(a, (ksize, ksize))
+    bled = rgb_pm / np.maximum(a[..., None], 1e-6)
+    bled = np.clip(bled, 0.0, 255.0).astype(np.uint8)
+    out = array.copy()
+    out[..., :3][transparent] = bled[transparent]
+    return out
+
+
+def upload_rgba(array: np.ndarray, *, mipmaps: bool = True,
+                max_level: int | None = None) -> int:
+    """
+    Mảng RGBA uint8 → tên texture GL (kẹp biên).
+
+    TASK_game_feel_1118 P2: mặc định BẬT mipmap
+    (``GL_LINEAR_MIPMAP_LINEAR`` + ``glGenerateMipmap``) — không texture
+    nào trong app trước đây dùng mipmap, và ảnh gốc luôn lớn hơn cỡ hiển
+    thị thật (UI 1366px thu 1,35×, sprite/fx 1,5× thu ~1,9× ở cửa sổ
+    1012px), nên viền mỏng/góc bo alias rõ. ``max_level`` giới hạn số bậc
+    mip (cho atlas fx: khung cách nhau 2px, bậc cao hơn sẽ loang màu
+    SANG khung bên cạnh).
+    """
     height, width = array.shape[:2]
     texture = GL.glGenTextures(1)
     GL.glBindTexture(GL.GL_TEXTURE_2D, texture)
-    GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MIN_FILTER, GL.GL_LINEAR)
+    min_filter = GL.GL_LINEAR_MIPMAP_LINEAR if mipmaps else GL.GL_LINEAR
+    GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MIN_FILTER, min_filter)
     GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MAG_FILTER, GL.GL_LINEAR)
     GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_WRAP_S, GL.GL_CLAMP_TO_EDGE)
     GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_WRAP_T, GL.GL_CLAMP_TO_EDGE)
+    if max_level is not None:
+        GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MAX_LEVEL, int(max_level))
     GL.glPixelStorei(GL.GL_UNPACK_ALIGNMENT, 1)
     GL.glTexImage2D(GL.GL_TEXTURE_2D, 0, GL.GL_RGBA, width, height, 0,
                     GL.GL_RGBA, GL.GL_UNSIGNED_BYTE,
                     np.ascontiguousarray(array))
+    if mipmaps:
+        GL.glGenerateMipmap(GL.GL_TEXTURE_2D)
     return int(texture)
 
 
@@ -45,16 +102,26 @@ MAX_IMAGE_WIDTH = 1366
 
 
 def load_rgba(path, max_width: int = MAX_IMAGE_WIDTH) -> np.ndarray | None:
-    """Đọc PNG thành mảng RGBA (thu về ``max_width``); ``None`` nếu hỏng."""
+    """
+    Đọc PNG thành mảng RGBA (thu về ``max_width``); ``None`` nếu hỏng.
+
+    TASK_game_feel_1118 P2: loang màu (``bleed_transparent``) TRƯỚC khi
+    thu nhỏ, không phải sau — ``Image.resize`` không premultiply alpha,
+    nên tự nó đã có đúng lỗi quầng đen y hệt mipmap nếu điểm RGB=đen còn
+    nguyên lúc resize.
+    """
     try:
         with Image.open(path) as image:
-            if max_width and image.width > max_width:
-                height = max(1, round(image.height * max_width / image.width))
-                image = image.resize((max_width, height), Image.LANCZOS)
-            return np.asarray(image.convert("RGBA"), dtype=np.uint8)
+            array = np.asarray(image.convert("RGBA"), dtype=np.uint8)
     except (OSError, ValueError, MemoryError) as err:
         logger.warning("Album: khong doc duoc %s (%s)", path, err)
         return None
+    array = bleed_transparent(array)
+    if max_width and array.shape[1] > max_width:
+        height = max(1, round(array.shape[0] * max_width / array.shape[1]))
+        resized = Image.fromarray(array).resize((max_width, height), Image.LANCZOS)
+        array = np.asarray(resized, dtype=np.uint8)
+    return array
 
 
 class TextureCache:

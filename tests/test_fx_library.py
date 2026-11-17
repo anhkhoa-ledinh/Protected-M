@@ -92,6 +92,9 @@ def test_draw_skips_commands_whose_texture_is_not_resident(gl_context, spec):
         def quad_corners(self, *a, **kw):
             calls.append((a, kw))
 
+        def viewport_px(self, rect):
+            return (0, 0, 1280, 720)
+
     painter = FakePainter()
     assert _wait(lambda: library.try_spawn(player, "ui_tap", 1.0, 1.0, words=False),
                 library)

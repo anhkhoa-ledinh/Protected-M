@@ -28,6 +28,7 @@ from src.math.homogeneous import to_column_major_flat, translation_matrix
 from src.renderer.shader import ShaderProgram
 from src.renderer.textured_mesh import TexturedMesh
 from src.renderer.video_player import VideoPlayer
+from src.ui_album.textures import bleed_transparent
 from src.scene.primitives import (
     RELIEF_CLAMP_GAP_FRACTION,
     create_displaced_vertical_plane_uv,
@@ -784,7 +785,11 @@ class ContentPlaneRenderer:
             GL.glDeleteTextures(1, [self._texture])
         self._texture = int(GL.glGenTextures(1))
         GL.glBindTexture(GL.GL_TEXTURE_2D, self._texture)
-        GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MIN_FILTER, GL.GL_LINEAR)
+        # TASK_game_feel_1118 P2: mipmap — mặt kính/ảnh luôn lớn hơn cỡ
+        # hiển thị thật, không mip thì cạnh khối ảnh alias ở cửa sổ nhỏ.
+        # RGB thuần (không kênh alpha) nên không cần loang màu.
+        GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MIN_FILTER,
+                           GL.GL_LINEAR_MIPMAP_LINEAR)
         GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MAG_FILTER, GL.GL_LINEAR)
         GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_WRAP_S, GL.GL_CLAMP_TO_EDGE)
         GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_WRAP_T, GL.GL_CLAMP_TO_EDGE)
@@ -1323,11 +1328,19 @@ class ContentPlaneRenderer:
         )
 
     def _create_rgba_texture(self, rgba: npt.NDArray[np.uint8]) -> int:
-        data = np.ascontiguousarray(np.flipud(rgba), dtype=np.uint8)
+        # TASK_game_feel_1118 P2: loang màu TRƯỚC ``flipud`` — loang không
+        # quan tâm hướng trục, và làm trên mảng gốc (liên tục trong bộ
+        # nhớ) rẻ hơn làm sau khi lật.
+        data = np.ascontiguousarray(
+            np.flipud(bleed_transparent(rgba)), dtype=np.uint8)
         h, w = data.shape[:2]
         texture = int(GL.glGenTextures(1))
         GL.glBindTexture(GL.GL_TEXTURE_2D, texture)
-        GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MIN_FILTER, GL.GL_LINEAR)
+        # Mipmap: lớp ảnh/bóng co lại rõ rệt theo khoảng cách camera ảo,
+        # viền cắt lớp (alpha nhị phân, đã loang màu ở trên) alias mạnh
+        # nhất trong cả app nếu không mip.
+        GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MIN_FILTER,
+                           GL.GL_LINEAR_MIPMAP_LINEAR)
         GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MAG_FILTER, GL.GL_LINEAR)
         GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_WRAP_S, GL.GL_CLAMP_TO_EDGE)
         GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_WRAP_T, GL.GL_CLAMP_TO_EDGE)
@@ -1336,6 +1349,7 @@ class ContentPlaneRenderer:
             GL.GL_TEXTURE_2D, 0, GL.GL_RGBA, w, h, 0,
             GL.GL_RGBA, GL.GL_UNSIGNED_BYTE, data,
         )
+        GL.glGenerateMipmap(GL.GL_TEXTURE_2D)
         return texture
 
     def _build_layer_shadows(self) -> None:
@@ -1517,6 +1531,10 @@ class ContentPlaneRenderer:
                 GL.GL_TEXTURE_2D, 0, 0, 0, w, h,
                 GL.GL_RGB, GL.GL_UNSIGNED_BYTE, rgb,
             )
+        # TASK_game_feel_1118 P2: bậc mip phải theo kịp nội dung mới —
+        # nhánh glTexSubImage2D (video đang phát) cũng cần, không chỉ
+        # nhánh cấp phát lại.
+        GL.glGenerateMipmap(GL.GL_TEXTURE_2D)
 
 
 # Backward-compatible alias
