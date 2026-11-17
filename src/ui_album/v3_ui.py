@@ -21,6 +21,7 @@ from src.fx.player import FxPlayer
 from src.fx.spec import load_spec
 from src.ui_album import v3_routes, v3_values
 from src.ui_album import v3_flow as F
+from src.ui_album.scope import ScopeState
 from src.ui_album.shot_feel import ShotFeel
 from src.ui_album.v3 import V3Manifest, V3Painter, draw_screen, hit_test, shot_state
 from src.ui_album.v3_hover import HoverFx, cursor_for
@@ -100,6 +101,10 @@ class V3UI:
         #: crit impact — survives the whole session, like ``_hover_fx``.
         self._shot_feel = ShotFeel()
         self._shot_feel.shake_enabled = _prefs.screen_shake_enabled(root)
+        #: TASK_game_feel_1118 P6: Precision-gun scope — zoom spring,
+        #: right-mouse hold, finer-aim crosshair. ``app.py``'s
+        #: ``_tick_scope`` drives it via the methods below.
+        self._scope = ScopeState()
         #: Khung webcam đã lên GPU: ô ``camera`` của màn cài đặt / thử nghiêng.
         self._camera_entry = None
         self._camera_token = None
@@ -357,6 +362,12 @@ class V3UI:
                 state.hit_markers = self._shot_feel.hit_markers
                 state.crit_impact_alpha = self._shot_feel.crit_impact_alpha
                 state.scene_shake = self._shot_feel.shake_offset
+                # TASK_game_feel_1118 P6: ``visually_active`` (not
+                # ``is_scoped``) — the vignette/reticle keep showing a
+                # moment longer than the trigger-held state, matching the
+                # zoom spring easing back to 1.0 after release.
+                state.scope_zoom = (self._scope.z
+                                    if self.scope_visually_active else 1.0)
         if self._fx_enabled:
             if name != self._fx_screen:
                 self._fx_library.enter_screen(name, self._fx_player)
@@ -444,6 +455,38 @@ class V3UI:
     def release_auto_bloom(self) -> None:
         """The full-auto trigger was just released."""
         self._shot_feel.release_bloom()
+
+    # ---- Precision-gun scope (TASK_game_feel_1118 P6) ---------------------
+    @property
+    def is_scoped(self) -> bool:
+        return self._scope.active
+
+    @property
+    def scope_visually_active(self) -> bool:
+        """``True`` a moment longer than ``is_scoped`` — the zoom is still
+        meaningfully above 1.0 while it eases back down, so the camera
+        keeps rendering the (shrinking) magnified view smoothly instead
+        of cutting it off the instant the trigger is released."""
+        return self._scope.visually_active
+
+    @property
+    def scope_zoom(self) -> float:
+        return self._scope.z
+
+    def enter_scope(self) -> None:
+        self._scope.enter(self.mouse)
+
+    def exit_scope(self) -> None:
+        self._scope.exit()
+
+    def step_scope(self, dt: float) -> None:
+        self._scope.step(dt)
+
+    def apply_scope_aim(self, raw_mouse: tuple) -> tuple:
+        """Finer aim while scoped — see ``ScopeState.update_crosshair``.
+        Caller (``app.py``) is responsible for only calling this while
+        ``is_scoped``, and for assigning the result to ``self.mouse``."""
+        return self._scope.update_crosshair(self.mouse, raw_mouse)
 
     # ---- per-tick/per-screen fx triggers (TASK_ui_sakuga_1117 Phase 6) ----
     def _step_fx_triggers(self, state, now: float) -> None:

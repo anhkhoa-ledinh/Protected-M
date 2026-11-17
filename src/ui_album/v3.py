@@ -29,6 +29,10 @@ from PIL import Image, ImageDraw
 from src.renderer.shader import ShaderProgram
 from src.ui_album.fonts import FontBook
 from src.ui_album.manifest import letterbox
+from src.ui_album.scope import (RETICLE_ARM_PX, RETICLE_COL, RETICLE_GAP_PX,
+                                RETICLE_THICK_PX, VIGNETTE_ALPHA,
+                                VIGNETTE_COL, VIGNETTE_RADIUS_PX,
+                                VIGNETTE_SOFT_PX, ZOOM_SETTLED_EPS)
 from src.ui_album.shot_feel import (CRIT_IMPACT_COL,
                                     HITMARK_ANGLES_DEG, HITMARK_COL,
                                     HITMARK_CRIT_COL, HITMARK_CRIT_SCALE,
@@ -600,6 +604,10 @@ class V3Painter:
         """Pixel cửa sổ → toạ độ thiết kế (bắt chuột, U1.2)."""
         return self._box.unmap(x, y)
 
+    def map(self, x: float, y: float) -> tuple[float, float]:
+        """Toạ độ thiết kế → pixel cửa sổ — nghịch đảo của ``unmap``."""
+        return self._box.map(x, y)
+
     def begin(self) -> None:
         GL.glDisable(GL.GL_DEPTH_TEST)
         GL.glDisable(GL.GL_CULL_FACE)
@@ -1094,7 +1102,7 @@ class V3State:
                  "extra", "mirror", "aim", "shots", "aim_ready", "confirm",
                  "text_rect", "fx_on", "fx_draw", "selected", "pressed",
                  "hover_fx", "aim_kick_scale", "tracers", "hit_markers",
-                 "crit_impact_alpha", "scene_shake")
+                 "crit_impact_alpha", "scene_shake", "scope_zoom")
 
     def __init__(self) -> None:
         #: ``key`` → chuỗi (thay run đầu) hoặc danh sách chuỗi (thay từng run).
@@ -1184,6 +1192,9 @@ class V3State:
         #: Design-px ``(dx, dy)`` the 3D scene viewport and the fx layer
         #: are shifted by — HUD panels/text never move with it.
         self.scene_shake: tuple = (0.0, 0.0)
+        #: TASK_game_feel_1118 P6: Precision-gun scope zoom, 1.0 = not
+        #: scoped (no vignette/reticle drawn) up to 2.5 at full zoom.
+        self.scope_zoom: float = 1.0
 
 
 def shot_state(manifest: V3Manifest, screen: str) -> V3State:
@@ -1273,10 +1284,13 @@ def draw_screen(painter: V3Painter, manifest: V3Manifest, screen: str,
     painter.layer(full, record.get("base"))
     _draw_photos(painter, manifest, record, state)
     painter.layer(full, record.get("top"))
-    # TASK_game_feel_1118 P4: the crit impact frame sits here — under
-    # every HUD element below AND under the ``hit_crit`` Sakuga burst
-    # (drawn with ``state.fx_draw()``, near the end of this function).
+    # TASK_game_feel_1118 P4/P6: the crit impact frame and the scope
+    # vignette both sit here — under every HUD element below AND under
+    # the ``hit_crit`` Sakuga burst (drawn with ``state.fx_draw()``, near
+    # the end of this function) — "HUD panels stay drawn above the
+    # vignette" (P6's own wording).
     _draw_crit_impact(painter, state)
+    _draw_scope_vignette(painter, state)
     _draw_bars(painter, record, state)
     _draw_pips(painter, record, state)
     _draw_pills(painter, record, state)
@@ -1286,6 +1300,7 @@ def draw_screen(painter: V3Painter, manifest: V3Manifest, screen: str,
     _draw_shots(painter, state)
     _draw_tracers(painter, state)
     _draw_aim(painter, state)
+    _draw_scope_reticle(painter, state)
     _draw_hit_markers(painter, state)
     _draw_rings(painter, manifest, screen, record, state)
     _draw_toast(painter, state, screen)
@@ -1552,6 +1567,8 @@ def _draw_aim(painter, state) -> None:
     """
     if state.aim is None or state.shot:
         return
+    if state.scope_zoom > 1.0 + ZOOM_SETTLED_EPS:
+        return          # TASK_game_feel_1118 P6: the scope's own reticle instead
     x, y = float(state.aim[0]), float(state.aim[1])
     ready = max(0.0, min(1.0, float(state.aim_ready)))
     # Chưa hồi xong: bốn nhánh dạt ra và nhạt bớt, rồi khép lại dần.
@@ -1645,6 +1662,86 @@ def _draw_crit_impact(painter, state) -> None:
         return
     painter.fill((0.0, 0.0, DESIGN_SIZE[0], DESIGN_SIZE[1]),
                 rgba(CRIT_IMPACT_COL, state.crit_impact_alpha))
+
+
+def _scope_vignette_texture(painter):
+    """A square radial-gradient RGBA texture — transparent inside
+    ``VIGNETTE_RADIUS_PX``, full ``VIGNETTE_COL``/``VIGNETTE_ALPHA``
+    outside it, with a soft edge in between. Built once per framebuffer
+    scale and cached (same ``pil`` cache ``rounded_frame`` uses) — the
+    crosshair it's centred on moves every frame, but the gradient itself
+    never changes shape, so only the DRAW rect needs to move."""
+    scale = painter.scale
+    half_px = max(8, int(round((VIGNETTE_RADIUS_PX + VIGNETTE_SOFT_PX) * scale)))
+    size_px = half_px * 2
+    radius_px = VIGNETTE_RADIUS_PX * scale
+    soft_px = max(1.0, VIGNETTE_SOFT_PX * scale)
+    key = ("scope_vignette", size_px, round(radius_px, 1), round(soft_px, 1))
+
+    def build():
+        yy, xx = np.mgrid[0:size_px, 0:size_px].astype(np.float64)
+        dist = np.hypot(xx - half_px + 0.5, yy - half_px + 0.5)
+        falloff = np.clip((dist - radius_px) / soft_px, 0.0, 1.0)
+        r, g, b, _a = rgba(VIGNETTE_COL)
+        image = np.empty((size_px, size_px, 4), dtype=np.uint8)
+        image[..., 0] = int(round(r * 255.0))
+        image[..., 1] = int(round(g * 255.0))
+        image[..., 2] = int(round(b * 255.0))
+        image[..., 3] = (falloff * VIGNETTE_ALPHA * 255.0).astype(np.uint8)
+        return image, None
+
+    return painter.pil.get(key, build)
+
+
+def _draw_scope_vignette(painter, state) -> None:
+    """TASK_game_feel_1118 P6: outside a 288 design-px circle centred on
+    the crosshair, an ``#0F1C2B`` wash at alpha 0.94 with a soft 6 px
+    edge — placed (by ``draw_screen``'s call order) above the scene, under
+    the HUD, same slot as the crit impact frame."""
+    if (state.shot or state.aim is None
+            or state.scope_zoom <= 1.0 + ZOOM_SETTLED_EPS):
+        return
+    cx, cy = float(state.aim[0]), float(state.aim[1])
+    half = VIGNETTE_RADIUS_PX + VIGNETTE_SOFT_PX
+    design_w, design_h = DESIGN_SIZE
+    col = rgba(VIGNETTE_COL, VIGNETTE_ALPHA)
+    top = max(0.0, cy - half)
+    bottom = min(design_h, cy + half)
+    if top > 0.0:
+        painter.fill((0.0, 0.0, design_w, top), col)
+    if bottom < design_h:
+        painter.fill((0.0, bottom, design_w, design_h - bottom), col)
+    left = max(0.0, cx - half)
+    right = min(design_w, cx + half)
+    band_h = bottom - top
+    if left > 0.0:
+        painter.fill((0.0, top, left, band_h), col)
+    if right < design_w:
+        painter.fill((right, top, design_w - right, band_h), col)
+    entry = _scope_vignette_texture(painter)
+    if entry is not None:
+        size = half * 2.0
+        painter.quad((cx - half, cy - half, size, size), entry[0])
+
+
+def _draw_scope_reticle(painter, state) -> None:
+    """TASK_game_feel_1118 P6: a thin 1.5 px cross with a centre gap, in
+    ``#24415F`` — the scope's OWN reticle, drawn instead of the normal
+    crosshair while scoped (``_draw_aim`` skips itself in that case)."""
+    if (state.shot or state.aim is None
+            or state.scope_zoom <= 1.0 + ZOOM_SETTLED_EPS):
+        return
+    x, y = float(state.aim[0]), float(state.aim[1])
+    half = RETICLE_THICK_PX * 0.5
+    colour = rgba(RETICLE_COL)
+    painter.fill((x - RETICLE_ARM_PX, y - half,
+                 RETICLE_ARM_PX - RETICLE_GAP_PX, RETICLE_THICK_PX), colour)
+    painter.fill((x + RETICLE_GAP_PX, y - half,
+                 RETICLE_ARM_PX - RETICLE_GAP_PX, RETICLE_THICK_PX), colour)
+    painter.fill((x - half, y - RETICLE_ARM_PX,
+                 RETICLE_THICK_PX, RETICLE_ARM_PX - RETICLE_GAP_PX), colour)
+    painter.fill((x - half, y + RETICLE_GAP_PX,
+                 RETICLE_THICK_PX, RETICLE_ARM_PX - RETICLE_GAP_PX), colour)
 
 
 def _draw_rings(painter, manifest, screen, record, state) -> None:

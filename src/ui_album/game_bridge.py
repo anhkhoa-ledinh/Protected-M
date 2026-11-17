@@ -284,6 +284,17 @@ def fire(match: AlbumMatch, crosshair, aim: AimContext) -> tuple | None:
     match.shot_at_s = now
     match.shot_point = tuple(crosshair)
     # Vết đạn: giữ vài phát gần nhất, cũ nhất rụng trước.
+    #
+    # TASK_game_feel_1118 P6: this is the ONE scene-anchored overlay
+    # (besides the Sakuga hit/miss fx, spawned the same way — see
+    # ``v3_ui.py``'s ``spawn_hit_fx``/``spawn_miss_fx``) — and it needs NO
+    # ``s = c + z(g - c)`` transform while scoped. It's always stored at
+    # ``crosshair`` itself (the design-px point the scope's own Kooima
+    # sub-window is centred on), and that point is a FIXED POINT of the
+    # warp: plugging ``g = c`` into the formula gives ``s = c`` for ANY
+    # zoom. A shot mark at the firing crosshair is correctly placed at
+    # every later frame — scoped or not, whatever the zoom is then —
+    # without tracking a separate 3D position at all.
     match.shots.append((float(crosshair[0]), float(crosshair[1]), now,
                         best >= 0))
     del match.shots[:-SHOT_MARKS]

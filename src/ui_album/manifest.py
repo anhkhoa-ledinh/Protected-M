@@ -39,6 +39,11 @@ class Letterbox:
         """Pixel cửa sổ → toạ độ thiết kế (để bắt chuột)."""
         return ((x - self.ox) / self.scale, (y - self.oy) / self.scale)
 
+    def map(self, x: float, y: float) -> tuple[float, float]:
+        """Toạ độ thiết kế → pixel cửa sổ — nghịch đảo của ``unmap``
+        (TASK_game_feel_1118 P6: dời con trỏ HĐH về tâm ngắm lúc hạ ống)."""
+        return (self.ox + x * self.scale, self.oy + y * self.scale)
+
 
 def letterbox(design, window) -> Letterbox:
     """Khung thiết kế lọt giữa cửa sổ, giữ tỉ lệ."""

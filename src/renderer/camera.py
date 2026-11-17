@@ -38,10 +38,24 @@ class VirtualCamera:
     zoom_offset_mm: float = 0.0
     zoom_step_mm: float = 5.0
 
+    #: TASK_game_feel_1118 P6: Precision-gun scope. ``scope_crosshair_m``
+    #: is the Kooima sub-window centre ``c`` (glass metres, same frame as
+    #: ``pa``/``pb``/``pc``); ``scope_eye_anchor_mm`` is the eye position
+    #: at the moment the scope was entered — both set each frame by
+    #: ``app.py``'s ``_tick_scope`` while scoped, left alone otherwise.
+    scope_active: bool = False
+    scope_zoom: float = 1.0
+    scope_crosshair_m: np.ndarray = field(
+        default_factory=lambda: np.zeros(3, dtype=np.float64))
+    scope_eye_anchor_mm: np.ndarray | None = None
+
     def __post_init__(self) -> None:
         self.eye_position_mm = self._sanitize_eye(self.eye_position_mm)
         self._cached_eye = self.eye_position_mm.copy()
         self._cached_zoom_mm = float(self.zoom_offset_mm)
+        self._cached_scope_active = self.scope_active
+        self._cached_scope_zoom = float(self.scope_zoom)
+        self._cached_scope_crosshair = self.scope_crosshair_m.copy()
         self._view_flat: npt.NDArray[np.float32] | None = None
         self._proj_flat: npt.NDArray[np.float32] | None = None
 
@@ -98,6 +112,34 @@ class VirtualCamera:
         return self.eye_position_mm * 0.001
 
     @property
+    def effective_eye_position_mm(self) -> np.ndarray:
+        """TASK_game_feel_1118 P6: the "steady eye" while scoped —
+        ``anchor + (eye - anchor)/z`` — otherwise just ``eye_position_mm``.
+        Rendering (below) AND the hit test (``app.py``'s ``_aim_context``)
+        both read this SAME property, so neither sees the raw tracked eye
+        magnified 2.5x by the scope while the other doesn't."""
+        if not self.scope_active or self.scope_eye_anchor_mm is None:
+            return self.eye_position_mm
+        z = max(1e-6, float(self.scope_zoom))
+        anchor = self.scope_eye_anchor_mm
+        return anchor + (self.eye_position_mm - anchor) / z
+
+    @property
+    def effective_eye_position_m(self) -> np.ndarray:
+        return self.effective_eye_position_mm * 0.001
+
+    def _effective_corners(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """TASK_game_feel_1118 P6: the Kooima sub-window — ``pa/pb/pc``
+        warped about the crosshair's glass point ``c`` by the scope's
+        zoom, or the plain corners when not scoped."""
+        pa, pb, pc = self.pa, self.pb, self.pc
+        if not self.scope_active:
+            return pa, pb, pc
+        c = self.scope_crosshair_m
+        z = max(1e-6, float(self.scope_zoom))
+        return c + (pa - c) / z, c + (pb - c) / z, c + (pc - c) / z
+
+    @property
     def pa(self) -> np.ndarray:
         half_w = self.screen_width_m * 0.5
         half_h = self.screen_height_m * 0.5
@@ -126,11 +168,12 @@ class VirtualCamera:
         return np.array([cx + half_w, cy + half_h, cz], dtype=np.float64)
 
     def projection_matrix(self) -> Mat4:
+        pa, pb, pc = self._effective_corners()
         projection, _ = compute_off_axis_projection(
-            self.pa,
-            self.pb,
-            self.pc,
-            self.eye_position_m,
+            pa,
+            pb,
+            pc,
+            self.effective_eye_position_m,
             self.near_m,
             self.far_m,
             depth_offset_m=self.zoom_offset_mm * 0.001,
@@ -138,11 +181,12 @@ class VirtualCamera:
         return projection
 
     def view_matrix(self) -> Mat4:
+        pa, pb, pc = self._effective_corners()
         _, view = compute_off_axis_projection(
-            self.pa,
-            self.pb,
-            self.pc,
-            self.eye_position_m,
+            pa,
+            pb,
+            pc,
+            self.effective_eye_position_m,
             self.near_m,
             self.far_m,
             depth_offset_m=self.zoom_offset_mm * 0.001,
@@ -156,6 +200,9 @@ class VirtualCamera:
             self._proj_flat = to_column_major_flat(self.projection_matrix())
             self._cached_eye = self.eye_position_mm.copy()
             self._cached_zoom_mm = float(self.zoom_offset_mm)
+            self._cached_scope_active = self.scope_active
+            self._cached_scope_zoom = float(self.scope_zoom)
+            self._cached_scope_crosshair = self.scope_crosshair_m.copy()
         assert self._view_flat is not None and self._proj_flat is not None
         return self._view_flat, self._proj_flat
 
@@ -215,4 +262,18 @@ class VirtualCamera:
         delta = np.linalg.norm(self.eye_position_mm - self._cached_eye)
         if abs(self.zoom_offset_mm - self._cached_zoom_mm) > 1e-6:
             return True
+        # TASK_game_feel_1118 P6: scope state is part of the cache key too
+        # — it changes what ``_effective_corners()``/``effective_eye_
+        # position_m`` return, same as ``eye_position_mm``/``zoom_offset_mm``
+        # above, so a scope entering/exiting or zooming must invalidate
+        # the cached matrices just as much as the eye moving does.
+        if self.scope_active != self._cached_scope_active:
+            return True
+        if self.scope_active:
+            if abs(self.scope_zoom - self._cached_scope_zoom) > 1e-6:
+                return True
+            crosshair_delta = np.linalg.norm(
+                self.scope_crosshair_m - self._cached_scope_crosshair)
+            if crosshair_delta > 1e-6:
+                return True
         return delta > self.cache_epsilon_mm

@@ -102,6 +102,9 @@ class HcpdApplication:
         # releasing the button is detected exactly once (see
         # ``_tick_auto_fire``).
         self._heavy_mag_was_held = False
+        # TASK_game_feel_1118 P6: Precision-gun scope — dt tracker for
+        # stepping the zoom spring (``_tick_scope``).
+        self._scope_last_t = None
         # PB-055: demo đọc content.demo.json, không ghi file config nào, chỉ nhận
         # G, T, F6, kéo-thả, F4, Esc (lọc ở GlfwWindow).
         self._demo = bool(demo)
@@ -412,7 +415,8 @@ class HcpdApplication:
             # đúng mỗi khung thì KHÔNG BAO GIỜ thấy hover, bất kể bước nào
             # (``album.mouse`` luôn là vị trí chuột thật, không phải vị trí
             # hotspot bước đó muốn trỏ tới).
-            album.mouse = album.design_mouse(*self._window.cursor_pos())
+            raw_mouse = album.design_mouse(*self._window.cursor_pos())
+            album.mouse = self._tick_scope(now, raw_mouse)
         if self._album_options.is_v3 and not sakuga_shots:
             # TASK_ui_sakuga_1117 Phase 5: press feedback needs HOLD state,
             # not just the edge-triggered clicks ``pop_clicks()`` gives.
@@ -859,7 +863,12 @@ class HcpdApplication:
             if self._bugs is not None else None
         if mask is None:
             return None
-        eye = self._virtual_camera.eye_position_mm
+        # TASK_game_feel_1118 P6: the "steady eye" while scoped — equals
+        # ``eye_position_mm`` whenever not scoped, so this is a no-op
+        # change for every OTHER weapon/screen. Rendering reads the same
+        # property (``VirtualCamera.projection_matrix``/``view_matrix``),
+        # so a shot never hits something different from what's on screen.
+        eye = self._virtual_camera.effective_eye_position_mm
         glass, centre = self._glass_mm()
         radius = float(self._content.game_prop_radius_mm)
         bugs = {
@@ -963,6 +972,67 @@ class HcpdApplication:
         elif self._heavy_mag_was_held and not firing:
             self._album.release_auto_bloom()
         self._heavy_mag_was_held = firing
+
+    def _tick_scope(self, now: float, raw_mouse: tuple) -> tuple:
+        """
+        TASK_game_feel_1118 P6: Precision-gun scope — right mouse, held.
+
+        Called once per frame, BEFORE anything else reads
+        ``self._album.mouse`` — returns the crosshair this frame should
+        actually use: the raw mouse position unscoped, or the finer-aim
+        crosshair while scoped. Also keeps ``self._virtual_camera``'s
+        scope fields in sync, so rendering (``projection_matrix``/
+        ``view_matrix``) and the hit test (``_aim_context``, which reads
+        ``effective_eye_position_mm``) always agree.
+        """
+        if not self._album_options.is_v3:
+            return raw_mouse
+        F = self._album.flow
+        match = self._album.game
+        on_screen = (match is not None
+                    and self._album.state.screen in (F.PLAY, F.PVP_HUNT))
+        is_precision = match is not None and match.weapon_name == "Precision gun"
+        held = self._window.is_right_mouse_down()
+        reloading = match is not None and match.reloading(now)
+        want = on_screen and is_precision and held and not reloading
+        if want and not self._album.is_scoped:
+            self._album.enter_scope()
+            self._virtual_camera.scope_eye_anchor_mm = \
+                self._virtual_camera.eye_position_mm.copy()
+        elif not want and self._album.is_scoped:
+            self._end_scope()
+        dt = (0.0 if self._scope_last_t is None
+             else max(0.0, now - self._scope_last_t))
+        self._scope_last_t = now
+        self._album.step_scope(dt)
+        crosshair = raw_mouse
+        if self._album.is_scoped:
+            crosshair = self._album.apply_scope_aim(raw_mouse)
+        self._sync_scope_camera(crosshair)
+        return crosshair
+
+    def _end_scope(self) -> None:
+        """Right mouse released (or reload started, or weapon/screen
+        changed) — warp the OS cursor to the crosshair's CURRENT window
+        pixel so the next frame's raw mouse read doesn't jump it."""
+        wx, wy = self._album.painter.map(*self._album.mouse)
+        self._window.set_cursor_pos(wx, wy)
+        self._album.exit_scope()
+        self._virtual_camera.scope_eye_anchor_mm = None
+
+    def _sync_scope_camera(self, crosshair: tuple) -> None:
+        from src.ui_album.scope import design_to_glass_m
+
+        camera = self._virtual_camera
+        if self._album.scope_visually_active:
+            glass, centre = self._glass_mm()
+            sx, sy = design_to_glass_m(crosshair, glass, centre)
+            camera.scope_active = True
+            camera.scope_zoom = self._album.scope_zoom
+            camera.scope_crosshair_m = np.array(
+                [sx, sy, float(camera.screen_center_m[2])], dtype=np.float64)
+        else:
+            camera.scope_active = False
 
     def _album_action(self, action: str, now: float) -> None:
         """Thực hiện một hành động mà giao diện album yêu cầu."""

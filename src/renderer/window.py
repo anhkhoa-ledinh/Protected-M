@@ -586,6 +586,21 @@ class GlfwWindow:
         return glfw.get_mouse_button(self._window,
                                      glfw.MOUSE_BUTTON_LEFT) == glfw.PRESS
 
+    def is_right_mouse_down(self) -> bool:
+        """TASK_game_feel_1118 P6: chuột phải đang giữ — bật ống ngắm của
+        Precision gun (chỉ khẩu đó)."""
+        if self._window is None:
+            return False
+        return glfw.get_mouse_button(self._window,
+                                     glfw.MOUSE_BUTTON_RIGHT) == glfw.PRESS
+
+    def set_cursor_pos(self, x: float, y: float) -> None:
+        """TASK_game_feel_1118 P6: hạ ống ngắm xong thì dời con trỏ HĐH về
+        đúng tâm ngắm (toạ độ PIXEL CỬA SỔ — gọi qua phép ánh xạ của
+        painter, không phải toạ độ thiết kế) để tâm ngắm không nhảy."""
+        if self._window is not None:
+            glfw.set_cursor_pos(self._window, float(x), float(y))
+
     #: Tên hình (``v3_hover.cursor_for``) -> hằng GLFW tương ứng.
     _CURSOR_GLFW = {"hand": "HAND_CURSOR", "ibeam": "IBEAM_CURSOR",
                     "arrow": "ARROW_CURSOR"}

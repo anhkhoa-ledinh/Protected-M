@@ -355,7 +355,11 @@ class SceneRenderer:
             self._log_depth_state("sau glClear")
 
         view_flat, proj_flat = self._camera.view_projection_flat()
-        eye = self._camera.eye_position_m
+        # TASK_game_feel_1118 P6: the "steady eye" while scoped (a no-op
+        # otherwise) — ``uViewPos`` feeds specular lighting, which would
+        # otherwise use the raw tracked eye while the vertex transform
+        # above (view_flat/proj_flat) already uses the steadied one.
+        eye = self._camera.effective_eye_position_m
 
         self._shader.use()
         self._shader.set_mat4("uView", view_flat)
