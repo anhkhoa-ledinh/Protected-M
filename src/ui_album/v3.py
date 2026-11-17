@@ -50,8 +50,10 @@ TEXT_PAD = 8
 SHOT_VIEWPORT_RGB = (60, 70, 80)
 SHOT_CAMERA_RGB = (90, 90, 100)
 
-#: Vòng hover: 2 px #3B72B4 ở 45 %. Vòng focus bàn phím: 2,5 px, lùi ra 3 px.
-HOVER_PX, HOVER_ALPHA = 2.0, 0.45
+#: Vòng hover của hộp xác nhận chia sẻ (``_draw_confirm_dialog`` — hộp
+#: thoại không đi qua ``v3_hover.py``, chỉ hai nút Yes/No của nó).
+HOVER_PX = 2.0
+#: Vòng focus bàn phím: 2,5 px, lùi ra 3 px (``v3_hover.py`` dùng cả hai).
 FOCUS_PX, FOCUS_INSET = 2.5, 3.0
 #: TASK_bug_art_0530: bán kính bo góc của field_user/field_pass, đo trực tiếp
 #: trên ``v3_01a_sign_in/base.png`` (quét cột đầu mép bo ở mỗi hàng, bán kính
@@ -178,7 +180,7 @@ def hotspot_shape(name: str, rect) -> HotspotShape:
         "(them vao _EXACT_SHAPES/_PREFIX_SHAPES trong src/ui_album/v3.py)")
 
 
-def _ring_draw_radius(shape: HotspotShape, rect) -> float | None:
+def ring_draw_radius(shape: HotspotShape, rect) -> float | None:
     """
     Bán kính để vẽ vòng NGAY BÂY GIỜ (Phase 2) — ``rounded``/``pill``/
     ``circle`` vẫn vẽ khung bo tròn như hôm nay, chỉ đúng bán kính hơn.
@@ -1074,7 +1076,8 @@ class V3State:
                  "pips", "pills", "photo", "camera_tex", "viewport_draw",
                  "hover", "focus", "caret", "alpha", "shot", "message", "wrap",
                  "extra", "mirror", "aim", "shots", "aim_ready", "confirm",
-                 "text_rect", "fx_on", "fx_draw")
+                 "text_rect", "fx_on", "fx_draw", "selected", "pressed",
+                 "hover_fx")
 
     def __init__(self) -> None:
         #: ``key`` → chuỗi (thay run đầu) hoặc danh sách chuỗi (thay từng run).
@@ -1139,6 +1142,19 @@ class V3State:
         #: on ``FxLibrary``) so this module stays GL-texture-agnostic;
         #: ``app.py`` wires it to ``FxLibrary.draw(player)``.
         self.fx_draw = None
+        #: TASK_ui_sakuga_1117 Phase 5: hotspot names that are the CURRENT
+        #: selection (active tab/level/weapon/display/theme) — their hover
+        #: ring draws at half alpha even while hovered, so hovering an
+        #: already-selected row doesn't look identical to hovering a
+        #: plain unselected one.
+        self.selected: set = set()
+        #: Left mouse button held down on ``hover`` right now (not just
+        #: hovered) — the pressed tint/inset ring in ``v3_hover.py``.
+        self.pressed: bool = False
+        #: The persistent ``v3_hover.HoverFx`` instance (springs survive
+        #: across frames; ``V3State`` itself does not) — ``None`` means
+        #: "no hover feedback this frame" (``shot_state``'s screenshots).
+        self.hover_fx = None
 
 
 def shot_state(manifest: V3Manifest, screen: str) -> V3State:
@@ -1236,7 +1252,7 @@ def draw_screen(painter: V3Painter, manifest: V3Manifest, screen: str,
     _draw_choose_photo_extra(painter, screen, state)
     _draw_shots(painter, state)
     _draw_aim(painter, state)
-    _draw_rings(painter, screen, record, state)
+    _draw_rings(painter, manifest, screen, record, state)
     _draw_toast(painter, state, screen)
     # TASK_ui_sakuga_1117: above HUD/toast (so a hit's burst reads clearly
     # over gameplay) but below the share-album confirm dialog (so an open
@@ -1512,33 +1528,19 @@ def _draw_aim(painter, state) -> None:
         painter.fill((x - half, y + inner, half * 2.0, outer - inner), colour)
 
 
-def _draw_rings(painter, screen, record, state) -> None:
-    """Vòng hover và vòng focus — lớp cuối, sau mọi thứ (README mục 9)."""
-    if state.shot:
+def _draw_rings(painter, manifest, screen, record, state) -> None:
+    """Vòng hover và vòng focus — lớp cuối, sau mọi thứ (README mục 9).
+
+    TASK_ui_sakuga_1117 Phase 5: chỉ còn một lệnh gọi mỏng vào
+    ``v3_hover.HoverFx.draw`` — spring, màu/alpha theo hình thật
+    (``rounded``/``pill``/``circle``/``underline``/``thumb``/``none``),
+    con trỏ OS, và vòng focus bàn phím đều ở đó. Nhập trong hàm (không ở
+    đầu file) để tránh vòng nhập: ``v3_hover`` đọc ngược lại các hằng/hàm
+    của module này.
+    """
+    if state.shot or state.hover_fx is None:
         return
-    for hotspot in record.get("hotspots", ()):
-        name = hotspot["n"]
-        rect = hotspot_rect(screen, hotspot)
-        shape = hotspot_shape(name, rect)
-        radius = _ring_draw_radius(shape, rect)
-        if radius is None:
-            # TASK_ui_sakuga_1117 Bug B: underline/thumb/none không còn vẽ
-            # khung vuông sai nữa (lỗi "thanh mỏng kéo hết cả thẻ" dưới
-            # "Play as guest") — hình vẽ RIÊNG của chúng là việc của Phase 5
-            # (src/ui_album/v3_hover.py).
-            continue
-        if name == state.focus:
-            ring_rect = (rect[0] - FOCUS_INSET, rect[1] - FOCUS_INSET,
-                        rect[2] + 2 * FOCUS_INSET, rect[3] + 2 * FOCUS_INSET)
-            # 01:18 + 03:xx: vòng focus/hover bốn thanh vuông góc quanh một ô
-            # BO GÓC nhìn lệch hẳn (field_user/field_pass, level_row_*, ...).
-            # Một helper duy nhất (``rounded_frame``) cho mọi hotspot; bán
-            # kính 0 (phần tử không bo) tự quay lại khung vuông như hôm nay.
-            painter.rounded_frame(ring_rect, rgba(CARET_COL), FOCUS_PX,
-                                 radius + FOCUS_INSET if radius else 0.0)
-        elif name == state.hover:
-            painter.rounded_frame(rect, rgba(CARET_COL, HOVER_ALPHA),
-                                 HOVER_PX, radius)
+    state.hover_fx.draw(painter, manifest, screen, record, state)
 
 
 def hit_test(manifest: V3Manifest, screen: str, design_x: float,

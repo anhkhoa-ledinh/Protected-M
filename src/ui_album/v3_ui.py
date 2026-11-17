@@ -22,6 +22,7 @@ from src.fx.spec import load_spec
 from src.ui_album import v3_routes, v3_values
 from src.ui_album import v3_flow as F
 from src.ui_album.v3 import V3Manifest, V3Painter, draw_screen, hit_test, shot_state
+from src.ui_album.v3_hover import HoverFx, cursor_for
 
 logger = logging.getLogger(__name__)
 
@@ -29,14 +30,23 @@ logger = logging.getLogger(__name__)
 class V3UI:
     """Giao diện v3 gắn vào một cửa sổ GLFW đã có context."""
 
-    def __init__(self, root: Path, shader_dir: Path, options) -> None:
+    def __init__(self, root: Path, shader_dir: Path, options, window=None) -> None:
         self.manifest = V3Manifest(root)
         self.painter = V3Painter(self.manifest, shader_dir)
         self.state = F.V3Flow()
         self.options = options
         self.game = None
         self.mouse = (0.0, 0.0)
+        #: TASK_ui_sakuga_1117 Phase 5: left button held RIGHT NOW (press
+        #: feedback needs hold state, not the edge-triggered clicks
+        #: ``app.py`` otherwise drains via ``pop_clicks()``).
+        self.mouse_down = False
         self.pending = ""
+        #: OS cursor shape changes (``window.set_cursor_shape``) — optional,
+        #: so standalone/test construction without a real window still works.
+        self._window = window
+        self._hover_fx = HoverFx()
+        self._hover_last_t: float | None = None
         #: Khung webcam đã lên GPU: ô ``camera`` của màn cài đặt / thử nghiêng.
         self._camera_entry = None
         self._camera_token = None
@@ -147,11 +157,14 @@ class V3UI:
         if self.options.ui_shots:
             return
         F.update(self.state, time.perf_counter())
+        now = time.perf_counter()
+        dt = 0.0 if self._hover_last_t is None else max(0.0, now - self._hover_last_t)
+        self._hover_last_t = now
+        self._hover_fx.step(self.state.screen, self.hover(), dt)
         if self._fx_enabled:
-            now = time.perf_counter()
-            dt = 0.0 if self._fx_last_t is None else max(0.0, now - self._fx_last_t)
+            fx_dt = 0.0 if self._fx_last_t is None else max(0.0, now - self._fx_last_t)
             self._fx_last_t = now
-            self._fx_player.step(dt)
+            self._fx_player.step(fx_dt)
 
     def set_camera_frame(self, frame) -> None:
         """
@@ -187,9 +200,13 @@ class V3UI:
             state = v3_values.state_for(self.manifest, self.painter, self.state,
                                         self.game, self.mouse)
             state.hover = self.hover()
+            state.pressed = self.mouse_down and state.hover is not None
+            state.hover_fx = self._hover_fx
             state.camera_tex = self._camera_entry
             if scene_draw is not None:
                 state.viewport_draw = lambda rect: self._scene(rect, scene_draw)
+            if self._window is not None:
+                self._window.set_cursor_shape(cursor_for(name, state.hover, state))
         if self._fx_enabled:
             if name != self._fx_screen:
                 self._fx_library.enter_screen(name, self._fx_player)

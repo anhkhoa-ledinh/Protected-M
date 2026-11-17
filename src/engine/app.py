@@ -393,6 +393,10 @@ class HcpdApplication:
         """
         album = self._album
         album.mouse = album.design_mouse(*self._window.cursor_pos())
+        if self._album_options.is_v3:
+            # TASK_ui_sakuga_1117 Phase 5: press feedback needs HOLD state,
+            # not just the edge-triggered clicks ``pop_clicks()`` gives.
+            album.mouse_down = self._window.is_mouse_down()
         for char in self._window.pop_typed():
             album.key(char)
         if input_state.backspace:
@@ -2037,7 +2041,7 @@ class HcpdApplication:
                 from src.ui_album.v3_ui import V3UI
 
                 self._album = V3UI(self._root, self._shader_dir,
-                                   self._album_options)
+                                   self._album_options, window=self._window)
             else:
                 from src.ui_album.ui import AlbumUI
 

@@ -928,6 +928,34 @@ def _board(state, flow) -> None:
     state.texts["you_score"] = str(best)
 
 
+#: TASK_ui_sakuga_1117 Phase 5: ``tab_Solo`` targets ``F.LEVELS``
+#: (``F.TABS``), but the nav bar also renders — still highlighted — on
+#: ``PHOTOS``/``LOADOUT``/``TILT``, the rest of the solo flow upstream of
+#: a match. The other three tabs' screens are a straight 1:1 with
+#: ``F.TABS``, so only "Solo" needs its own wider set.
+_SOLO_TAB_SCREENS = frozenset({F.LEVELS, F.PHOTOS, F.LOADOUT, F.TILT})
+
+
+def _selected_hotspots(screen: str, flow) -> set:
+    """Hotspot names that are the CURRENT selection on ``screen`` — the
+    active tab/level/weapon/display/theme — for ``V3State.selected``
+    (Phase 5's halved hover-ring alpha on an already-selected row)."""
+    selected: set = set()
+    for name in F.TABS:
+        in_section = (screen in _SOLO_TAB_SCREENS if name == "tab_Solo"
+                     else screen == F.TABS[name])
+        if in_section:
+            selected.add(name)
+    if screen == F.LEVELS:
+        selected.add(f"level_row_{flow.level}")
+    if screen == F.LOADOUT:
+        selected.add(f"weapon_{flow.weapon_name()}")
+    if screen == F.SETTINGS:
+        selected.add("display_window" if flow.display == "window" else "display_full")
+        selected.add("theme_night" if flow.theme == "night" else "theme_day")
+    return selected
+
+
 # ---- điều phối ---------------------------------------------------------
 def state_for(manifest, painter, flow, game=None, aim=None) -> V3State:
     """Bộ giá trị sống cho màn đang mở. ``aim`` là tâm ngắm (toạ độ thiết kế)."""
@@ -936,6 +964,7 @@ def state_for(manifest, painter, flow, game=None, aim=None) -> V3State:
     screen = flow.screen
     state.message = (flow.message if now < flow.message_until_s else "")
     state.confirm = flow.shared_album_pending
+    state.selected = _selected_hotspots(screen, flow)
     if screen in F.LOCKED:
         _sign_in(state, flow)
     elif screen == F.MENU:

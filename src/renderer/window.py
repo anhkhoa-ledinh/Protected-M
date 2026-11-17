@@ -194,6 +194,11 @@ class GlfwWindow:
         self._geometry_listener = None
         self._logged_dpi = False
         self._window = None
+        #: TASK_ui_sakuga_1117 Phase 5: con trỏ OS theo hình — tạo một lần
+        #: mỗi hình, nhớ lại tránh gọi ``glfw.set_cursor`` lại mỗi khung khi
+        #: hình không đổi.
+        self._cursors: dict = {}
+        self._cursor_shape: str | None = None
         # Kích thước vùng vẽ thật. Khởi tạo bằng số cấu hình vì cửa sổ chưa tồn
         # tại; create() thay ngay bằng số GLFW báo về.
         self._fb_size = (settings.window_width, settings.window_height)
@@ -571,6 +576,23 @@ class GlfwWindow:
             return False
         return glfw.get_mouse_button(self._window,
                                      glfw.MOUSE_BUTTON_LEFT) == glfw.PRESS
+
+    #: Tên hình (``v3_hover.cursor_for``) -> hằng GLFW tương ứng.
+    _CURSOR_GLFW = {"hand": "HAND_CURSOR", "ibeam": "IBEAM_CURSOR",
+                    "arrow": "ARROW_CURSOR"}
+
+    def set_cursor_shape(self, kind: str) -> None:
+        """Đổi hình con trỏ OS — "arrow"/"hand"/"ibeam"
+        (TASK_ui_sakuga_1117 Phase 5). Không làm gì nếu hình không đổi."""
+        if self._window is None or kind == self._cursor_shape:
+            return
+        cursor = self._cursors.get(kind)
+        if cursor is None:
+            constant = getattr(glfw, self._CURSOR_GLFW.get(kind, "ARROW_CURSOR"))
+            cursor = glfw.create_standard_cursor(constant)
+            self._cursors[kind] = cursor
+        glfw.set_cursor(self._window, cursor)
+        self._cursor_shape = kind
 
     # ---- D2: hình chữ nhật vật lý của cửa sổ ---------------------------
     def set_geometry_listener(self, listener) -> None:
