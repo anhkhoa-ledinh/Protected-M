@@ -15,6 +15,10 @@ from pathlib import Path
 
 from OpenGL import GL
 
+from src.config import prefs as _prefs
+from src.fx.library import FxLibrary
+from src.fx.player import FxPlayer
+from src.fx.spec import load_spec
 from src.ui_album import v3_routes, v3_values
 from src.ui_album import v3_flow as F
 from src.ui_album.v3 import V3Manifest, V3Painter, draw_screen, hit_test, shot_state
@@ -44,8 +48,28 @@ class V3UI:
         if forced and forced in self.manifest.screens:
             self.state.go(forced)
 
+        # TASK_ui_sakuga_1117: tắt qua HCPD_NO_FX hoặc "fx": false trong
+        # user_prefs.json (G6) — tắt thì KHÔNG đọc fx.json luôn, không chỉ
+        # không vẽ, nên không texture nào của bộ này lên GPU.
+        self._fx_enabled = _prefs.fx_enabled(root)
+        self._fx_player = None
+        self._fx_library = None
+        self._fx_screen: str | None = None
+        self._fx_last_t: float | None = None
+        if self._fx_enabled:
+            try:
+                spec = load_spec(root)
+            except (OSError, ValueError) as err:
+                logger.warning("V3UI: khong nap duoc fx.json (%s) — tat hieu ung", err)
+                self._fx_enabled = False
+            else:
+                self._fx_player = FxPlayer(spec)
+                self._fx_library = FxLibrary(spec)
+
     def initialize(self) -> None:
         self.painter.initialize()
+        if self._fx_enabled and not self._fx_library.check_capability():
+            self._fx_enabled = False
 
     #: Xem ``ui.AlbumUI.flow``: ``app.py`` dùng chung một bộ hàm cho hai bộ
     #: giao diện, phân biệt nhau đúng ở module này.
@@ -123,6 +147,11 @@ class V3UI:
         if self.options.ui_shots:
             return
         F.update(self.state, time.perf_counter())
+        if self._fx_enabled:
+            now = time.perf_counter()
+            dt = 0.0 if self._fx_last_t is None else max(0.0, now - self._fx_last_t)
+            self._fx_last_t = now
+            self._fx_player.step(dt)
 
     def set_camera_frame(self, frame) -> None:
         """
@@ -161,11 +190,36 @@ class V3UI:
             state.camera_tex = self._camera_entry
             if scene_draw is not None:
                 state.viewport_draw = lambda rect: self._scene(rect, scene_draw)
+        if self._fx_enabled:
+            if name != self._fx_screen:
+                self._fx_library.enter_screen(name, self._fx_player)
+                self._fx_screen = name
+            self._fx_library.pump()
+            state.fx_on = True
+            state.fx_draw = lambda: self._fx_library.draw(self.painter, self._fx_player)
         self.painter.bind_screen(name, v3_values.extra_files(self.manifest,
                                                              name, state))
         self.painter.begin()
         draw_screen(self.painter, self.manifest, name, state)
         self.painter.end()
+
+    # ---- Sakuga VFX (TASK_ui_sakuga_1117) ---------------------------------
+    def spawn_fx(self, name: str, x: float, y: float, **kwargs) -> bool:
+        """Spawn a named effect at design-space ``(x, y)``; no-op (returns
+        ``False``) if fx is off or its texture isn't resident yet."""
+        if not self._fx_enabled:
+            return False
+        return self._fx_library.try_spawn(self._fx_player, name, x, y, **kwargs)
+
+    def spawn_fx_word(self, word: str, style: str, x: float, y: float, **kwargs) -> bool:
+        """Spawn a bare word (no sprite) at design-space ``(x, y)``."""
+        if not self._fx_enabled:
+            return False
+        return self._fx_library.try_spawn_word(self._fx_player, word, style, x, y, **kwargs)
+
+    @property
+    def fx_enabled(self) -> bool:
+        return self._fx_enabled
 
     def _scene(self, rect, scene_draw) -> None:
         """
@@ -206,6 +260,8 @@ class V3UI:
         if self._camera_entry is not None:
             GL.glDeleteTextures(1, [self._camera_entry[0]])
             self._camera_entry = None
+        if self._fx_library is not None:
+            self._fx_library.release()
         self.painter.release()
 
 

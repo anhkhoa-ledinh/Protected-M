@@ -611,6 +611,30 @@ class V3Painter:
         data = np.array([x0, y1, u0, v1, x1, y1, u1, v1,
                          x1, y0, u1, v0, x0, y1, u0, v1,
                          x1, y0, u1, v0, x0, y0, u0, v0], dtype=np.float32)
+        self._draw_quad(data, texture, tint)
+
+    def quad_corners(self, corners, texture, tint=(1.0, 1.0, 1.0, 1.0),
+                     uv=(0.0, 0.0, 1.0, 1.0)) -> None:
+        """
+        Một quad từ 4 góc ``(trên-trái, trên-phải, dưới-phải, dưới-trái)``
+        toạ độ THIẾT KẾ bất kỳ — dùng cho chữ hiệu ứng đã QUAY, thứ
+        ``quad()`` không vẽ được vì nó chỉ nhận ``rect`` thẳng trục.
+        """
+        if texture is None:
+            return
+        box, fb_w, fb_h = self._box, *self._fb
+        def _ndc(point):
+            px, py = box.ox + point[0] * box.scale, box.oy + point[1] * box.scale
+            return (2.0 * px / fb_w - 1.0, 1.0 - 2.0 * py / fb_h)
+        tl, tr, br, bl = (_ndc(p) for p in corners)
+        u0, v0, u1, v1 = uv
+        data = np.array([bl[0], bl[1], u0, v1, br[0], br[1], u1, v1,
+                         tr[0], tr[1], u1, v0, bl[0], bl[1], u0, v1,
+                         tr[0], tr[1], u1, v0, tl[0], tl[1], u0, v0],
+                        dtype=np.float32)
+        self._draw_quad(data, texture, tint)
+
+    def _draw_quad(self, data, texture, tint) -> None:
         GL.glBindBuffer(GL.GL_ARRAY_BUFFER, self._vbo)
         GL.glBufferSubData(GL.GL_ARRAY_BUFFER, 0, data.nbytes, data)
         self._shader.use()
@@ -1050,7 +1074,7 @@ class V3State:
                  "pips", "pills", "photo", "camera_tex", "viewport_draw",
                  "hover", "focus", "caret", "alpha", "shot", "message", "wrap",
                  "extra", "mirror", "aim", "shots", "aim_ready", "confirm",
-                 "text_rect")
+                 "text_rect", "fx_on", "fx_draw")
 
     def __init__(self) -> None:
         #: ``key`` → chuỗi (thay run đầu) hoặc danh sách chuỗi (thay từng run).
@@ -1104,6 +1128,17 @@ class V3State:
         #: bản của cùng một kiểu chữ). ``check_hint`` cần đúng việc này: dời
         #: theo hàng đang hỏi, giữ nguyên kiểu chữ/x.
         self.text_rect: dict = {}
+        #: TASK_ui_sakuga_1117: Sakuga VFX on for this frame? Only gates
+        #: the old green ``HIT_FLASH`` (shot marks always draw either way)
+        #: — the real on/off switch for spawning/drawing effects lives in
+        #: ``fx_draw`` below and in the caller that decides whether to
+        #: spawn anything at all.
+        self.fx_on: bool = False
+        #: Zero-arg callback that draws the live Sakuga effects for this
+        #: frame, or ``None``. Kept as a callback (not a direct dependency
+        #: on ``FxLibrary``) so this module stays GL-texture-agnostic;
+        #: ``app.py`` wires it to ``FxLibrary.draw(player)``.
+        self.fx_draw = None
 
 
 def shot_state(manifest: V3Manifest, screen: str) -> V3State:
@@ -1203,6 +1238,13 @@ def draw_screen(painter: V3Painter, manifest: V3Manifest, screen: str,
     _draw_aim(painter, state)
     _draw_rings(painter, screen, record, state)
     _draw_toast(painter, state, screen)
+    # TASK_ui_sakuga_1117: above HUD/toast (so a hit's burst reads clearly
+    # over gameplay) but below the share-album confirm dialog (so an open
+    # dialog's own ui_tap effect, drawn separately by the dialog's own
+    # click handling, is never occluded by an unrelated effect still
+    # playing underneath it).
+    if state.fx_draw is not None:
+        state.fx_draw()
     _draw_confirm_dialog(painter, state)
 
 
@@ -1369,7 +1411,9 @@ def _draw_shots(painter, state) -> None:
         _hole(painter, x, y, HOLE_DUST, rgba(HOLE_DUST_COL, 0.22 * left))
         _hole(painter, x, y, HOLE_RING, rgba(HOLE_RING_COL, 0.72 * left))
         _hole(painter, x, y, HOLE_CORE, rgba(HOLE_CORE_COL, 0.92 * left))
-        if hit and age < HIT_FLASH_S:
+        if hit and age < HIT_FLASH_S and not state.fx_on:
+            # Sakuga's own hit_kill/hit_crit sprite replaces this flash
+            # when fx is on (TASK_ui_sakuga_1117) — off, it's unchanged.
             flash = 1.0 - age / HIT_FLASH_S
             _hole(painter, x, y, HIT_FLASH_SIZE * (1.0 - flash * 0.5),
                   rgba(HIT_FLASH_COL, 0.55 * flash))
