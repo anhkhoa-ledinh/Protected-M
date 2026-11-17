@@ -24,7 +24,7 @@ from src.ui_album import v3_flow as F
 MENU_SET = frozenset({"ui_confirm", "ui_tap", "toast_in"})
 
 #: PLAY/PVP_HUNT/PVP_HIDE: sprite sheets only, no word effect.
-_MATCH_SET = frozenset({"hit_kill", "hit_crit", "hit_block", "star_pop"})
+MATCH_SET = frozenset({"hit_kill", "hit_crit", "hit_block", "star_pop"})
 
 _MATCH_SCREENS = (F.PLAY, F.PVP_HUNT, F.PVP_HIDE)
 _LOADING_SCREENS = (F.LOADING, F.LOADING_READY)
@@ -33,7 +33,7 @@ _WIN_RESULT_SCREENS = (F.WIN, F.PVP_RESULT)
 
 _SCREEN_SETS = {}
 for _screen in _MATCH_SCREENS:
-    _SCREEN_SETS[_screen] = _MATCH_SET
+    _SCREEN_SETS[_screen] = MATCH_SET
 for _screen in _LOADING_SCREENS:
     _SCREEN_SETS[_screen] = MENU_SET | {"load_edge", "load_done", "star_pop"}
 for _screen in _TILT_LOADOUT_SCREENS:

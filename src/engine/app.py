@@ -1932,6 +1932,12 @@ class HcpdApplication:
             def setup():
                 self._album.state.go(screen)
                 self._album.mouse = (-1000.0, -1000.0)
+                # TASK_game_feel_1118 P3: fx_kill/fx_crit/fx_miss all fire
+                # on the SAME screen back to back — a screen change is
+                # what normally clears the previous shot's effect, so
+                # without this the next shot's screenshot still shows it
+                # (fx_miss.png showing fx_crit's red DON).
+                self._album.clear_fx()
                 self._fx_shot_pending = (name, point, kwargs)
             return setup
 
@@ -1959,6 +1965,13 @@ class HcpdApplication:
 
         def win_shot():
             def setup():
+                # TASK_game_feel_1118 P3: prove the match-toast-leak fix —
+                # a "Reloading" toast set while actually ON PLAY must NOT
+                # survive the PLAY -> WIN transition (1117's own fx_win.png
+                # showed it lingering; a MENU -> WIN jump never exercises
+                # that path at all).
+                self._album.state.go(F.PLAY)
+                F.say(self._album.state, "Reloading")
                 self._album.state.last_result = {
                     "found": 3, "total": 3, "score": 120,
                     "time_left": 10, "used": {}}
@@ -1967,7 +1980,11 @@ class HcpdApplication:
             return setup
 
         return [
-            ("hover_tab_solo", hover_at(F.MENU, "tab_Solo"), HOVER_HOLD),
+            # TASK_game_feel_1118 P3: MENU has no "tab_Solo" hotspot (its
+            # four big cards are "btn_Solo" etc — the top tab bar only
+            # exists on LEVELS/PHOTOS/LOADOUT/TILT/SETTINGS/...), so the
+            # old shot never moved the mouse and just showed a plain menu.
+            ("hover_tab_solo", hover_at(F.LEVELS, "tab_Solo"), HOVER_HOLD),
             ("hover_display_full", hover_at(F.SETTINGS, "display_full"), HOVER_HOLD),
             ("hover_link_guest", hover_at(F.SIGN_IN, "link_guest"), HOVER_HOLD),
             ("hover_level_row_2", hover_at(F.LEVELS, "level_row_2"), HOVER_HOLD),
@@ -1987,7 +2004,10 @@ class HcpdApplication:
             ("fx_miss", fx_shot(F.PLAY, "hit_block", (640.0, 360.0)), 0),
             ("fx_loading_50", loading_state(50.0), AUTO_FX_HOLD),
             ("fx_loading_done", loading_state(100.0), AUTO_FX_HOLD),
-            ("fx_button_primary", primary_click(F.SETTINGS), AUTO_FX_HOLD),
+            # TASK_game_feel_1118 P3: redo on LEVELS — "btn_Next: choose a
+            # photo" is an obvious advancing CTA; SETTINGS' primary button
+            # is the much less representative "btn_recalibrate".
+            ("fx_button_primary", primary_click(F.LEVELS), AUTO_FX_HOLD),
             ("fx_toast", toast_shot(), AUTO_FX_HOLD),
             ("fx_win", win_shot(), AUTO_FX_HOLD),
         ]
@@ -2295,10 +2315,13 @@ class HcpdApplication:
         self._album.game = None
         if self._album.state.screen not in (flow.PLAY, flow.PVP_HUNT):
             return
+        self._album.state.go(flow.LOADOUT)
         if self._album_options.is_v3:
+            # TASK_game_feel_1118 P3: ``go()`` clears any match toast when
+            # LEAVING PLAY/PVP_HUNT/PVP_HIDE — must run first, or it would
+            # wipe out THIS deliberate explanation right after setting it.
             flow.say(self._album.state,
                      "The photo layers changed — set up the match again.")
-        self._album.state.go(flow.LOADOUT)
         logger.info("Ván giao diện dừng theo ván vật ẩn (%s)", reason)
 
     def _toggle_tracking(self) -> None:

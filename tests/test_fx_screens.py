@@ -6,7 +6,7 @@ from src.ui_album import v3_flow as F
 
 def test_match_screens_get_sheets_only_set():
     for screen in (F.PLAY, F.PVP_HUNT, F.PVP_HIDE):
-        assert S.effects_for_screen(screen) == S._MATCH_SET
+        assert S.effects_for_screen(screen) == S.MATCH_SET
         assert S.is_match_screen(screen)
 
 

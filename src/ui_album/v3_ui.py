@@ -60,7 +60,14 @@ _STEP_DOT_Y = 687.0
 #: centre — kept as its own constant rather than reusing one for the other).
 _TILT_STAR_X, _TILT_STAR_Y0, _TILT_STAR_DY = 783.0, 497.0, 32.0
 
-_WIN_SCORE_XY = (1084.0, 370.0)
+#: TASK_game_feel_1118 P3: the OLD anchor, (1084, 370), was the exact
+#: centre of the ``score`` text rect ((984, 308, 200, 125) on
+#: v3_09a_result_win) — the burst's "pon" word always landed right on
+#: the score digits. Moved straight up, clear of both the score rect AND
+#: the row_value text just above it — checked with
+#: ``src/fx/layout.py``'s rect-intersection helpers (see
+#: ``tests/test_fx_layout.py``), not eyeballed.
+_WIN_SCORE_XY = (1084.0, 220.0)
 _PVP_CROWN_XY = (640.0, 50.0)
 _RANK_UP_DELAY_S = 0.5
 
@@ -137,6 +144,11 @@ class V3UI:
         self.painter.initialize()
         if self._fx_enabled and not self._fx_library.check_capability():
             self._fx_enabled = False
+        if self._fx_enabled:
+            # TASK_game_feel_1118 P3: decode+upload EVERY fx sheet/word
+            # starting now, not lazily per-screen — see
+            # ``FxLibrary.start_preload``'s docstring for why.
+            self._fx_library.start_preload()
 
     #: Xem ``ui.AlbumUI.flow``: ``app.py`` dùng chung một bộ hàm cho hai bộ
     #: giao diện, phân biệt nhau đúng ở module này.
@@ -355,6 +367,18 @@ class V3UI:
         if not self._fx_enabled:
             return False
         return self._fx_library.try_spawn_word(self._fx_player, word, style, x, y, **kwargs)
+
+    def clear_fx(self) -> None:
+        """Drop every live effect right now, regardless of screen scope.
+
+        TASK_game_feel_1118 P3: the sakuga screenshot stepper fires
+        ``hit_kill``/``hit_crit``/``hit_block`` back to back on the SAME
+        screen (``F.PLAY``) — ``_fx_library.enter_screen``'s scope-based
+        clearing only runs on a SCREEN CHANGE, so the previous shot's
+        effect (e.g. ``hit_crit``'s red DON) was still alive and visible
+        in the NEXT shot's screenshot (``fx_miss.png``)."""
+        if self._fx_enabled:
+            self._fx_player.clear(lambda _name: True)
 
     @property
     def fx_enabled(self) -> bool:

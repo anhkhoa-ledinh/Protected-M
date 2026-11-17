@@ -49,16 +49,28 @@ def bleed_transparent(array: np.ndarray, iterations: int = BLEED_ITERATIONS,
     transparent = alpha == 0
     if not np.any(transparent):
         return array           # đặc hoàn toàn (hoặc không điểm nào a=0): không có gì để loang
-    alpha_f = (alpha.astype(np.float32) / 255.0)[..., None]
-    rgb_pm = array[..., :3].astype(np.float32) * alpha_f
-    a = alpha_f[..., 0]
+    # TASK_game_feel_1118 P3: ``dst=`` dùng LẠI đúng bộ đệm mỗi lần lặp
+    # (``cv2.blur`` mặc định cấp một mảng MỚI mỗi lần gọi) — atlas lớn
+    # nhất (hit_kill, 1987x3548) tốn ~80 MB một bản float32 RGB; không
+    # dùng lại thì N lần lặp = N bản sống cùng lúc, dễ ``MemoryError``
+    # khi vài atlas lớn giải mã song song (đo được khi chạy test).
+    a = alpha.astype(np.float32)
+    a *= 1.0 / 255.0
+    rgb_pm = array[..., :3].astype(np.float32)
+    rgb_pm *= a[..., None]
     for _ in range(max(1, iterations)):
-        rgb_pm = cv2.blur(rgb_pm, (ksize, ksize))
-        a = cv2.blur(a, (ksize, ksize))
-    bled = rgb_pm / np.maximum(a[..., None], 1e-6)
-    bled = np.clip(bled, 0.0, 255.0).astype(np.uint8)
+        rgb_pm = cv2.blur(rgb_pm, (ksize, ksize), dst=rgb_pm)
+        a = cv2.blur(a, (ksize, ksize), dst=a)
+    np.divide(rgb_pm, np.maximum(a[..., None], 1e-6), out=rgb_pm)
+    np.clip(rgb_pm, 0.0, 255.0, out=rgb_pm)
     out = array.copy()
-    out[..., :3][transparent] = bled[transparent]
+    # Index BEFORE converting dtype — ``rgb_pm[transparent]`` is only as
+    # big as the transparent REGION; ``rgb_pm.astype(uint8)[transparent]``
+    # would convert and hold the WHOLE image first (a 1920x1080 UI
+    # background mostly-opaque-but-not-entirely blew well past 15 MiB
+    # just for that one throwaway copy, observed under full-suite memory
+    # pressure).
+    out[..., :3][transparent] = rgb_pm[transparent].astype(np.uint8)
     return out
 
 

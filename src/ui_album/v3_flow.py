@@ -226,6 +226,12 @@ class V3Flow:
     def go(self, screen: str) -> None:
         if screen != self.screen:
             logger.info("UI v3: %s -> %s", self.screen, screen)
+            if self.screen in (PLAY, PVP_HUNT, PVP_HIDE):
+                # TASK_game_feel_1118 P3: toast "trận" (vd "Reloading")
+                # không được rò sang màn SAU trận — review ảnh 1117 bắt
+                # được nó còn hiện nguyên trên WIN (``fx_win.png``).
+                self.message = ""
+                self.message_until_s = 0.0
             if screen == TILT:
                 self.tilt_entered_s = time.perf_counter()
                 self.tilt_left_done = self.tilt_right_done = False
