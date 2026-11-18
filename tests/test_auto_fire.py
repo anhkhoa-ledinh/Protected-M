@@ -67,10 +67,13 @@ def _hold_for(app: HcpdApplication, seconds: float, *, dt: float = 1.0 / 60.0,
     """Simulate the trigger held for ``seconds`` of fake time, ticking at
     a realistic ~60fps cadence. Returns the fake clock's end value.
 
-    ``tick_reload`` is real gameplay's job (``AlbumMatch.tick()``, called
-    every frame from ``_tick_album_match`` — but that method reads REAL
-    ``time.perf_counter()``, incompatible with a fake clock), so this
-    calls it directly with the fake ``now`` instead, same effect."""
+    Also ticks reload itself (real gameplay's job normally,
+    ``AlbumMatch.tick()`` called every frame from ``_tick_album_match`` —
+    but that method reads REAL ``time.perf_counter()``, incompatible
+    with a fake clock) — harmless duplication now that ``_tick_auto_fire``
+    calls ``tick_reload`` itself too (see its docstring: without that,
+    held auto-fire — unlike a rare discrete click — hits the reload
+    re-trigger race on nearly every single reload)."""
     now = start
     end = start + seconds
     app._album.mouse_down = True
@@ -97,6 +100,28 @@ def test_holding_through_a_reload_resumes():
     # Still held — once the reload (1.3s) finishes, firing must resume.
     _hold_for(app, 2.0, start=now)
     assert app._shot_count > MAG
+
+
+def test_reload_actually_completes_with_no_external_tick_reload_call():
+    """Regression: ``_tick_auto_fire`` ran BEFORE ``match.tick()`` every
+    held frame (unlike a rare discrete click) reliably landed on the
+    frame the reload deadline passed — ``reloading(now)`` already False,
+    but ``rounds_left`` not yet refilled — and ``take_round`` re-armed
+    ANOTHER reload right there, every single time, so reload never
+    actually finished for as long as the trigger stayed held. Fixed by
+    ``_tick_auto_fire`` calling ``match.tick_reload(now)`` itself first.
+    This test does NOT call ``tick_reload`` externally — only
+    ``_tick_auto_fire`` itself may clear the reload here."""
+    app = make_app()
+    now = 0.0
+    dt = 1.0 / 60.0
+    app._album.mouse_down = True
+    end = 8.0                          # well past one magazine + one reload
+    while now < end:
+        app._tick_auto_fire(now)       # no app._album.game.tick_reload(now) here
+        now += dt
+    assert app._shot_count > MAG
+    assert app._album.game.reload_until_s == 0.0
 
 
 def test_releasing_stops_firing_and_calls_release_once():

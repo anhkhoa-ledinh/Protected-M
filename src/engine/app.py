@@ -7,6 +7,7 @@ import binascii
 import hashlib
 import json
 import logging
+import math
 import os
 import time
 from dataclasses import asdict
@@ -409,19 +410,31 @@ class HcpdApplication:
         """
         album = self._album
         sakuga_shots = os.environ.get("HCPD_UI_SHOTS_1117") == "1"
-        if not sakuga_shots:
+        scope_bench = os.environ.get("HCPD_SCOPE_BENCH") == "1"
+        if not sakuga_shots and not scope_bench:
             # TASK_ui_sakuga_1117: lượt chụp 20 ảnh tự đặt ``album.mouse``
             # cho từng bước (hover_*/press_*) — con trỏ OS thật ghi đè lên
             # đúng mỗi khung thì KHÔNG BAO GIỜ thấy hover, bất kể bước nào
             # (``album.mouse`` luôn là vị trí chuột thật, không phải vị trí
-            # hotspot bước đó muốn trỏ tới).
+            # hotspot bước đó muốn trỏ tới). TASK_game_feel_1118 P7:
+            # ``HCPD_SCOPE_BENCH=1`` drives its OWN circular crosshair —
+            # see ``_tick_scope_bench``.
             raw_mouse = album.design_mouse(*self._window.cursor_pos())
             album.mouse = self._tick_scope(now, raw_mouse)
-        if self._album_options.is_v3 and not sakuga_shots:
+        fx_bench_heavy = (os.environ.get("HCPD_FX_BENCH") == "1"
+                         and os.environ.get("HCPD_BENCH_WEAPON") == "Heavy-mag gun")
+        if self._album_options.is_v3 and not sakuga_shots and not fx_bench_heavy:
             # TASK_ui_sakuga_1117 Phase 5: press feedback needs HOLD state,
             # not just the edge-triggered clicks ``pop_clicks()`` gives.
             # (``sakuga_shots`` mode sets its OWN ``album.mouse_down`` per
             # step — same reasoning as ``album.mouse`` above.)
+            #
+            # TASK_game_feel_1118 P7: ``fx_bench_heavy`` also skips this —
+            # ``_tick_fx_bench`` (called LATER this same frame) holds
+            # ``album.mouse_down`` down itself; running this line
+            # unconditionally every frame would reset it to the real
+            # (unpressed) mouse state before ``_tick_auto_fire`` (called
+            # EARLIER than ``_tick_fx_bench``) ever saw it held.
             album.mouse_down = self._window.is_mouse_down()
         for char in self._window.pop_typed():
             album.key(char)
@@ -452,6 +465,7 @@ class HcpdApplication:
         album.tick()
         self._tick_album_automatch(now)
         self._tick_fx_bench(now)
+        self._tick_scope_bench(now)
         self._tick_album_match(now)
         self._tick_pvp(now)
         self._tick_pvp_auto(now)
@@ -957,11 +971,25 @@ class HcpdApplication:
         so an unready frame never even logs "Bam co dan". Releasing the
         gun — button up, weapon switch, or leaving the match screen — any
         of those ends the bloom bump started below.
+
+        Calls ``match.tick_reload(now)`` itself, BEFORE the readiness
+        check — ``_tick_album_match`` (which normally owns that call, via
+        ``match.tick()``) only runs LATER this same frame. Without this,
+        on the exact frame the reload deadline passes, this method's
+        check sees "not reloading" (the deadline IS past) while
+        ``rounds_left`` is STILL 0 (not yet refilled) — ``take_round``
+        then re-triggers ANOTHER reload right there, and since this runs
+        every single held frame (not a rare discrete click), that race
+        was hit on nearly every reload, reload never actually finishing
+        while the button stayed held. Calling it here first closes that
+        window; the later call from ``match.tick()`` becomes a no-op.
         """
         if not self._album_options.is_v3:
             return
         F = self._album.flow
         match = self._album.game
+        if match is not None:
+            match.tick_reload(now)
         firing = (match is not None
                  and self._album.state.screen in (F.PLAY, F.PVP_HUNT)
                  and match.weapon_name == "Heavy-mag gun"
@@ -992,7 +1020,10 @@ class HcpdApplication:
         on_screen = (match is not None
                     and self._album.state.screen in (F.PLAY, F.PVP_HUNT))
         is_precision = match is not None and match.weapon_name == "Precision gun"
-        held = self._window.is_right_mouse_down()
+        # TASK_game_feel_1118 P7: HCPD_SCOPE_BENCH=1 holds the (fake)
+        # trigger the whole run, exactly as a real right-mouse hold would.
+        held = (os.environ.get("HCPD_SCOPE_BENCH") == "1"
+               or self._window.is_right_mouse_down())
         reloading = match is not None and match.reloading(now)
         want = on_screen and is_precision and held and not reloading
         if want and not self._album.is_scoped:
@@ -1033,6 +1064,45 @@ class HcpdApplication:
                 [sx, sy, float(camera.screen_center_m[2])], dtype=np.float64)
         else:
             camera.scope_active = False
+
+    def _tick_scope_bench(self, now: float) -> None:
+        """
+        TASK_game_feel_1118 P7: ``HCPD_SCOPE_BENCH=1`` (dùng cùng
+        ``HCPD_ALBUM_AUTOMATCH=1``, lấy sẵn khẩu Precision gun mặc định) —
+        10 giây scoped, tâm ngắm chạy vòng tròn chậm, một phát mỗi 0.6 s.
+        ``_tick_scope`` tự coi ``HCPD_SCOPE_BENCH=1`` là "đang giữ chuột
+        phải" (xem ở đó), nên hàm này chỉ còn việc đưa tâm ngắm vòng tròn
+        và bắn theo nhịp.
+        """
+        if os.environ.get("HCPD_SCOPE_BENCH") != "1" or not self._album_options.is_v3:
+            return
+        F = self._album.flow
+        if self._album.state.screen != F.PLAY:
+            return
+        if not hasattr(self, "_scope_bench_start"):
+            self._scope_bench_start = now
+            self._scope_bench_last_shot = now
+            self._scope_bench_last_frame_t = now
+            self._scope_bench_frame_times: list = []
+            return
+        elapsed = now - self._scope_bench_start
+        angle = elapsed * (2.0 * math.pi / 10.0)      # one slow turn over 10s
+        circle_mouse = (640.0 + 150.0 * math.cos(angle),
+                        360.0 + 150.0 * math.sin(angle))
+        self._album.mouse = self._tick_scope(now, circle_mouse)
+        self._scope_bench_frame_times.append(now - self._scope_bench_last_frame_t)
+        self._scope_bench_last_frame_t = now
+        if now - self._scope_bench_last_shot >= 0.6:
+            self._scope_bench_last_shot += 0.6
+            self._album_shoot(now)
+        if elapsed >= 10.0:
+            times = sorted(self._scope_bench_frame_times)
+            n = len(times)
+            median_dt = times[n // 2] if n else 0.0
+            fps = (1.0 / median_dt) if median_dt > 0.0 else 0.0
+            logger.info("SCOPE_BENCH: %d khung trong 10s, FPS median %.1f, "
+                        "zoom cuoi %.2f", n, fps, self._album.scope_zoom)
+            self._window.request_close()
 
     def _album_action(self, action: str, now: float) -> None:
         """Thực hiện một hành động mà giao diện album yêu cầu."""
@@ -1132,6 +1202,13 @@ class HcpdApplication:
         — qua ĐÚNG API Sakuga thật (``spawn_hit_fx``/``spawn_miss_fx``),
         không giả bằng cách bắn thật (ngắm trúng/hụt không kiểm soát được) —
         rồi ghi khung hình để tính FPS median (TASK_ui_sakuga_1117 G2).
+
+        TASK_game_feel_1118 P7: ``HCPD_BENCH_WEAPON`` (one of
+        ``WEAPONS_SPEC``'s keys) also exercises that weapon's
+        ``shot_feel`` (kick/tracer/shake/hit marker) via ``register_shot``
+        on each cycled shot — and for the Heavy-mag gun specifically,
+        holds the (fake) trigger down the whole 20 s so the REAL
+        ``_tick_auto_fire`` path fires, instead of the synthetic cycle.
         """
         if os.environ.get("HCPD_FX_BENCH") != "1" or not self._album_options.is_v3:
             return
@@ -1144,13 +1221,29 @@ class HcpdApplication:
             self._fx_bench_last_frame_t = now
             self._fx_bench_frame_times: list = []
             self._fx_bench_cycle = 0
+            requested = os.environ.get("HCPD_BENCH_WEAPON", "").strip()
+            from src.ui_album.game_bridge import WEAPONS_SPEC
+
+            self._fx_bench_weapon = requested if requested in WEAPONS_SPEC else None
+            self._fx_bench_weapon_applied = False
             return
+        weapon = getattr(self, "_fx_bench_weapon", None)
+        if weapon and not self._fx_bench_weapon_applied and self._album.game is not None:
+            self._apply_bench_weapon(weapon)
+            self._fx_bench_weapon_applied = True
         self._fx_bench_frame_times.append(now - self._fx_bench_last_frame_t)
         self._fx_bench_last_frame_t = now
-        if now - self._fx_bench_last_shot >= 0.25:        # 4 phat/s
+        if weapon == "Heavy-mag gun":
+            # P7: "holds the button so auto-fire is exercised" — the real
+            # click-and-hold path (``_tick_auto_fire``), not the
+            # synthetic cycle below.
+            self._album.mouse_down = True
+        elif now - self._fx_bench_last_shot >= 0.25:       # 4 phat/s
             self._fx_bench_last_shot += 0.25
             kind = self._fx_bench_cycle % 3
             self._fx_bench_cycle += 1
+            if weapon:
+                self._album.register_shot(kind != 2, kind == 1)
             if kind == 0:
                 self._album.spawn_hit_fx(False)
             elif kind == 1:
@@ -1164,11 +1257,32 @@ class HcpdApplication:
             fps = (1.0 / median_dt) if median_dt > 0.0 else 0.0
             p99_dt = times[min(n - 1, int(round(0.99 * (n - 1))))] if n else 0.0
             hitches = sum(1 for t in times if t > 0.050)
-            logger.info("FX_BENCH: %d khung trong 20s, FPS median %.1f, "
+            logger.info("FX_BENCH%s: %d khung trong 20s, FPS median %.1f, "
                         "p99 %.1f ms, khung >50ms: %d, khung cham nhat %.1f ms",
-                        n, fps, p99_dt * 1000.0, hitches,
+                        f" ({weapon})" if weapon else "", n, fps,
+                        p99_dt * 1000.0, hitches,
                         max(times) * 1000.0 if times else 0.0)
             self._window.request_close()
+
+    def _apply_bench_weapon(self, weapon_name: str) -> None:
+        """TASK_game_feel_1118 P7: force the live match onto
+        ``weapon_name`` (automatch always picks the Precision gun) with a
+        fresh magazine, for ``HCPD_BENCH_WEAPON``."""
+        from src.ui_album.game_bridge import WEAPONS_SPEC
+
+        match = self._album.game
+        if match is None:
+            return
+        spec = WEAPONS_SPEC[weapon_name]
+        match.weapon_name = weapon_name
+        match.mag_size = spec.mag
+        match.rounds_left = spec.mag
+        match.fire_interval_s = spec.fire_s
+        match.reload_s = spec.reload_s
+        match.reload_until_s = 0.0
+        match.next_shot_s = 0.0
+        logger.info("FX_BENCH: ep vu khi %s (bang %d, nhip %.2fs, nap %.1fs)",
+                    weapon_name, spec.mag, spec.fire_s, spec.reload_s)
 
     def _tick_album_match(self, now: float) -> None:
         """Nhịp của màn tách lớp và của ván đang chơi."""
@@ -2209,9 +2323,11 @@ class HcpdApplication:
             self._album.mouse = (-1000.0, -1000.0)
 
         def go_play_static():
+            self._album.state.go(F.PLAY)
             self._album.mouse = (-1000.0, -1000.0)
 
         def spawn_burst():
+            self._album.state.go(F.PLAY)
             self._album.mouse = (640.0, 360.0)
             self._aa_burst_pending = True
 
