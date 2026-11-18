@@ -6,6 +6,7 @@ import logging
 from dataclasses import dataclass
 
 import glfw
+import numpy as np
 from OpenGL import GL
 
 from src.config.prefs import ASPECT, MIN_WINDOW, default_rect
@@ -238,6 +239,13 @@ class GlfwWindow:
         self._last_frame_tex = None
         self._last_frame_alloc_size: tuple[int, int] | None = None
         self._last_frame_valid_size: tuple[int, int] | None = None
+        #: Fix 9 (post-commit correction): the MSAA-safe textured-quad
+        #: draw used by ``draw_last_frame_letterboxed`` instead of a
+        #: (illegal, into a multisampled FBO 0) blit — lazily built on
+        #: first use by ``_ensure_blit_shader``.
+        self._blit_program = None
+        self._blit_vao = None
+        self._blit_vbo = None
         #: TASK_ui_sakuga_1117 Phase 5: con trỏ OS theo hình — tạo một lần
         #: mỗi hình, nhớ lại tránh gọi ``glfw.set_cursor`` lại mỗi khung khi
         #: hình không đổi.
@@ -828,6 +836,109 @@ class GlfwWindow:
         glfw.swap_buffers(self._window)
 
     # ---- Fix 9: last-frame cache for cheap resize-drag redraws -----------
+    #: TASK_game_feel_fix_1118 Fix 9 (post-commit correction): the default
+    #: framebuffer is MULTISAMPLED whenever ``msaa_samples > 0`` (the
+    #: project default is 4) — ``glBlitFramebuffer`` into a multisampled
+    #: DRAW framebuffer is illegal regardless of rect sizes (GL spec:
+    #: "If SAMPLE_BUFFERS for the draw framebuffer is greater than zero,
+    #: an INVALID_OPERATION error is generated"), and reproduced for real
+    #: the first time this ran against a live window (GLError 1282 from
+    #: glBlitFramebuffer, caught while gathering Fix 9's own evidence).
+    #: ``capture_last_frame``'s blit is the OTHER direction (multisampled
+    #: READ -> single-sample draw, at identical size) and stays legal;
+    #: only the letterboxed draw-back-into-FBO-0 half needs to stop using
+    #: a blit and rasterize a plain textured quad instead — always legal,
+    #: MSAA or not.
+    _BLIT_VERTEX_SRC = """#version 330 core
+    layout (location = 0) in vec2 aPos;
+    layout (location = 1) in vec2 aUV;
+    out vec2 vUV;
+    void main() {
+        gl_Position = vec4(aPos, 0.0, 1.0);
+        vUV = aUV;
+    }
+    """
+    _BLIT_FRAGMENT_SRC = """#version 330 core
+    in vec2 vUV;
+    out vec4 fragColor;
+    uniform sampler2D uTex;
+    void main() {
+        fragColor = texture(uTex, vUV);
+    }
+    """
+
+    def _ensure_blit_shader(self) -> None:
+        if self._blit_program is not None:
+            return
+
+        def compile_one(source: str, kind) -> int:
+            shader = GL.glCreateShader(kind)
+            GL.glShaderSource(shader, source)
+            GL.glCompileShader(shader)
+            if GL.glGetShaderiv(shader, GL.GL_COMPILE_STATUS) != GL.GL_TRUE:
+                info = GL.glGetShaderInfoLog(shader).decode("utf-8")
+                raise RuntimeError(f"Window blit shader compile failed: {info}")
+            return shader
+
+        vertex = compile_one(self._BLIT_VERTEX_SRC, GL.GL_VERTEX_SHADER)
+        fragment = compile_one(self._BLIT_FRAGMENT_SRC, GL.GL_FRAGMENT_SHADER)
+        program = GL.glCreateProgram()
+        GL.glAttachShader(program, vertex)
+        GL.glAttachShader(program, fragment)
+        GL.glLinkProgram(program)
+        GL.glDeleteShader(vertex)
+        GL.glDeleteShader(fragment)
+        if GL.glGetProgramiv(program, GL.GL_LINK_STATUS) != GL.GL_TRUE:
+            info = GL.glGetProgramInfoLog(program).decode("utf-8")
+            raise RuntimeError(f"Window blit shader link failed: {info}")
+        self._blit_program = program
+        self._blit_vao = GL.glGenVertexArrays(1)
+        self._blit_vbo = GL.glGenBuffers(1)
+        GL.glBindVertexArray(self._blit_vao)
+        GL.glBindBuffer(GL.GL_ARRAY_BUFFER, self._blit_vbo)
+        # 6 verts (2 tris) x 4 floats (pos.xy, uv.xy) — filled in per draw.
+        GL.glBufferData(GL.GL_ARRAY_BUFFER, 6 * 4 * 4, None, GL.GL_DYNAMIC_DRAW)
+        GL.glEnableVertexAttribArray(0)
+        GL.glVertexAttribPointer(0, 2, GL.GL_FLOAT, GL.GL_FALSE, 16, None)
+        GL.glEnableVertexAttribArray(1)
+        GL.glVertexAttribPointer(1, 2, GL.GL_FLOAT, GL.GL_FALSE, 16,
+                                 GL.ctypes.c_void_p(8))
+        GL.glBindVertexArray(0)
+
+    def _draw_textured_rect(self, x: int, y: int, w: int, h: int,
+                            fb_width: int, fb_height: int) -> None:
+        """Rasterizes ``_last_frame_tex`` into the CURRENTLY BOUND
+        framebuffer at pixel rect ``(x, y, w, h)`` (bottom-left origin,
+        matching ``letterbox_rect``) — the MSAA-safe replacement for a
+        blit into FBO 0."""
+        self._ensure_blit_shader()
+        x0, x1 = 2.0 * x / fb_width - 1.0, 2.0 * (x + w) / fb_width - 1.0
+        y0, y1 = 2.0 * y / fb_height - 1.0, 2.0 * (y + h) / fb_height - 1.0
+        data = np.array([x0, y0, 0.0, 0.0, x1, y0, 1.0, 0.0, x1, y1, 1.0, 1.0,
+                         x0, y0, 0.0, 0.0, x1, y1, 1.0, 1.0, x0, y1, 0.0, 1.0],
+                        dtype=np.float32)
+        GL.glUseProgram(self._blit_program)
+        GL.glActiveTexture(GL.GL_TEXTURE0)
+        GL.glBindTexture(GL.GL_TEXTURE_2D, self._last_frame_tex)
+        GL.glUniform1i(GL.glGetUniformLocation(self._blit_program, "uTex"), 0)
+        GL.glBindVertexArray(self._blit_vao)
+        GL.glBindBuffer(GL.GL_ARRAY_BUFFER, self._blit_vbo)
+        GL.glBufferSubData(GL.GL_ARRAY_BUFFER, 0, data.nbytes, data)
+        GL.glDrawArrays(GL.GL_TRIANGLES, 0, 6)
+        GL.glBindVertexArray(0)
+        GL.glUseProgram(0)
+
+    def _release_blit_shader(self) -> None:
+        if self._blit_program is not None:
+            GL.glDeleteProgram(self._blit_program)
+            self._blit_program = None
+        if self._blit_vao is not None:
+            GL.glDeleteVertexArrays(1, [self._blit_vao])
+            self._blit_vao = None
+        if self._blit_vbo is not None:
+            GL.glDeleteBuffers(1, [self._blit_vbo])
+            self._blit_vbo = None
+
     def _ensure_last_frame_storage(self, width: int, height: int) -> None:
         if self._last_frame_alloc_size == (width, height) and self._last_frame_fbo is not None:
             return
@@ -874,11 +985,17 @@ class GlfwWindow:
         self._last_frame_valid_size = (width, height)
 
     def draw_last_frame_letterboxed(self, bg_colour: tuple = (0.05, 0.06, 0.08)) -> bool:
-        """The entire resize-drag redraw: clear to ``bg_colour``, blit the
+        """The entire resize-drag redraw: clear to ``bg_colour``, draw the
         cached last frame letterboxed (16:9) into the CURRENT framebuffer
         size, swap. No scene/UI redraw — this is what keeps a drag smooth.
         Returns ``False`` (no-op) if nothing has been captured yet, e.g. a
-        resize before the very first frame."""
+        resize before the very first frame.
+
+        A textured-quad draw, not a blit: FBO 0 is multisampled whenever
+        ``msaa_samples > 0`` (the project default), and
+        ``glBlitFramebuffer`` into a multisampled draw framebuffer is
+        illegal regardless of rect sizes — see ``_draw_textured_rect``'s
+        docstring."""
         if self._last_frame_fbo is None or self._last_frame_valid_size is None:
             return False
         width, height = self._fb_size
@@ -889,18 +1006,13 @@ class GlfwWindow:
         GL.glClearColor(bg_colour[0], bg_colour[1], bg_colour[2], 1.0)
         GL.glClear(GL.GL_COLOR_BUFFER_BIT)
         dst_x, dst_y, dst_w, dst_h = letterbox_rect((width, height))
-        src_w, src_h = self._last_frame_valid_size
-        GL.glBindFramebuffer(GL.GL_READ_FRAMEBUFFER, self._last_frame_fbo)
-        GL.glBindFramebuffer(GL.GL_DRAW_FRAMEBUFFER, 0)
-        GL.glBlitFramebuffer(0, 0, src_w, src_h,
-                             dst_x, dst_y, dst_x + dst_w, dst_y + dst_h,
-                             GL.GL_COLOR_BUFFER_BIT, GL.GL_LINEAR)
-        GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, 0)
+        self._draw_textured_rect(dst_x, dst_y, dst_w, dst_h, width, height)
         self.swap_buffers()
         return True
 
     def destroy(self) -> None:
         """Destroy window and terminate GLFW."""
+        self._release_blit_shader()
         self._release_last_frame_storage()
         if self._window is not None:
             glfw.destroy_window(self._window)

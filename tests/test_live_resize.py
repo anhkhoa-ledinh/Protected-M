@@ -21,6 +21,8 @@ whatever the CURRENT framebuffer size is — see
 
 from __future__ import annotations
 
+import pytest
+
 from src.engine.app import HcpdApplication
 from src.renderer.window import GlfwWindow, letterbox_rect
 from src.config.schema import RendererSettings
@@ -297,6 +299,9 @@ def _bare_gl_window(fb_size, gl_window):
     window._last_frame_tex = None
     window._last_frame_alloc_size = None
     window._last_frame_valid_size = None
+    window._blit_program = None
+    window._blit_vao = None
+    window._blit_vbo = None
     return window
 
 
@@ -333,4 +338,76 @@ def test_capture_reallocates_storage_only_when_size_changes(gl_context):
     window.capture_last_frame()  # different size — must reallocate
     assert window._last_frame_alloc_size == (96, 48)
     assert window._last_frame_valid_size == (96, 48)
+    window._release_last_frame_storage()
+
+
+# ---- MSAA regression: draw_last_frame_letterboxed must not blit into FBO 0 -
+
+@pytest.fixture
+def msaa_gl_window():
+    """A REAL GLFW window (not the hidden-probe ``gl_context`` fixture,
+    which requests no multisampling) with ``SAMPLES=4`` — the project's
+    own default (``RendererSettings.msaa_samples``). Reproduces the
+    actual bug: ``glBlitFramebuffer`` into FBO 0 is illegal whenever FBO
+    0 is multisampled, independent of rect sizes — caught for real while
+    gathering Fix 9's own evidence (GLError 1282, INVALID_OPERATION)."""
+    import os
+
+    import glfw as _glfw
+
+    if os.environ.get("PM_FORCE_NO_GL") == "1":
+        pytest.skip("PM_FORCE_NO_GL=1 (forced)")
+    if not _glfw.init():
+        pytest.skip("glfw.init() failed")
+    _glfw.window_hint(_glfw.VISIBLE, _glfw.FALSE)
+    _glfw.window_hint(_glfw.CONTEXT_VERSION_MAJOR, 3)
+    _glfw.window_hint(_glfw.CONTEXT_VERSION_MINOR, 3)
+    _glfw.window_hint(_glfw.OPENGL_PROFILE, _glfw.OPENGL_CORE_PROFILE)
+    _glfw.window_hint(_glfw.SAMPLES, 4)
+    window = _glfw.create_window(64, 64, "pytest-msaa-probe", None, None)
+    if window is None:
+        _glfw.terminate()
+        pytest.skip("Could not create a multisampled OpenGL 3.3 context")
+    _glfw.make_context_current(window)
+    try:
+        from OpenGL import GL as _GL
+
+        if not _GL.glGetString(_GL.GL_VERSION):
+            raise RuntimeError("no GL_VERSION")
+        samples = _GL.glGetIntegerv(_GL.GL_SAMPLES)
+    except Exception:
+        _glfw.destroy_window(window)
+        _glfw.terminate()
+        pytest.skip("No real OpenGL driver on this runner")
+    if not samples:
+        _glfw.destroy_window(window)
+        _glfw.terminate()
+        pytest.skip("Driver did not grant a multisampled default framebuffer "
+                   "— can't reproduce the MSAA-blit bug on this runner")
+    try:
+        yield window
+    finally:
+        _glfw.destroy_window(window)
+        _glfw.terminate()
+
+
+def test_draw_last_frame_letterboxed_does_not_blit_into_multisampled_fbo0(msaa_gl_window):
+    from OpenGL import GL
+
+    window = _bare_gl_window((64, 64), msaa_gl_window)
+    GL.glClearColor(0.2, 0.3, 0.4, 1.0)
+    GL.glClear(GL.GL_COLOR_BUFFER_BIT)
+    window.capture_last_frame()
+
+    GL.glGetError()  # clear any pre-existing error state
+    assert window.draw_last_frame_letterboxed() is True
+    assert GL.glGetError() == GL.GL_NO_ERROR
+
+    # And again at a DIFFERENT size — the actual drag scenario, where the
+    # original bug's error report showed mismatched src/dst rects.
+    window._fb_size = (96, 54)
+    assert window.draw_last_frame_letterboxed() is True
+    assert GL.glGetError() == GL.GL_NO_ERROR
+
+    window._release_blit_shader()
     window._release_last_frame_storage()
