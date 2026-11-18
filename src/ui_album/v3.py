@@ -1283,13 +1283,24 @@ def draw_screen(painter: V3Painter, manifest: V3Manifest, screen: str,
     full = (0.0, 0.0, DESIGN_SIZE[0], DESIGN_SIZE[1])
     painter.layer(full, record.get("base"))
     _draw_photos(painter, manifest, record, state)
-    painter.layer(full, record.get("top"))
-    # TASK_game_feel_1118 P4/P6: the crit impact frame and the scope
-    # vignette both sit here — under every HUD element below AND under
-    # the ``hit_crit`` Sakuga burst (drawn with ``state.fx_draw()``, near
-    # the end of this function) — "HUD panels stay drawn above the
-    # vignette" (P6's own wording).
+    # TASK_game_feel_fix_1118 Fix 4: the crit impact frame draws here —
+    # BEFORE ``top.png``, not after. ``top.png`` is where the HUD CARD
+    # BACKGROUNDS are actually baked (the dynamic numbers/bars/pips drawn
+    # further below were always on top and stayed readable); drawing the
+    # wash AFTER ``top.png`` (the 1118 version) painted it straight over
+    # those opaque card backgrounds, visibly darkening them — exactly
+    # what ``hud_layer_check.png``/G3 catches. Now the card art (drawn
+    # next) covers the wash wherever a card sits, leaving it visible only
+    # in the open scene area.
+    #
+    # ``_draw_scope_vignette`` below is left as-is (still after
+    # ``top.png``, so it has the SAME card-darkening issue today) — out
+    # of Fix 4's own scope, which names only the crit impact frame; the
+    # scope's own HUD handling is Fix 10's "every card fades to 0 while
+    # scoped", a bigger, deliberate redesign rather than a one-line
+    # reorder like this one.
     _draw_crit_impact(painter, state)
+    painter.layer(full, record.get("top"))
     _draw_scope_vignette(painter, state)
     _draw_bars(painter, record, state)
     _draw_pips(painter, record, state)
