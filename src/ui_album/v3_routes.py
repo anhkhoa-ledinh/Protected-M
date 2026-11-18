@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 
+from src.account import crypto as _account_crypto
 from src.content import shared_album
 from src.ui_album import v3_flow as F
 
@@ -36,6 +37,15 @@ ACT_PVP_JOIN_ROOM = "pvp_join_room"
 ACT_PVP_CANCEL = "pvp_cancel"
 ACT_PVP_REMATCH = "pvp_rematch"
 ACT_PVP_RECONNECT = "pvp_reconnect"
+#: TASK_accounts_1119: băm/kiểm mật khẩu CHẠY TRÊN LUỒNG RIÊNG (app.py) —
+#: giao diện chỉ hỏi, giống hệt các hành động mạng PvP ở trên.
+ACT_SIGN_IN = "account_sign_in"
+ACT_SIGN_UP = "account_sign_up"
+ACT_FORGOT_OPEN = "account_forgot_open"
+ACT_FORGOT_SUBMIT = "account_forgot_submit"
+ACT_FORGOT_CLOSE = "account_forgot_close"
+ACT_RECOVERY_SAVED = "account_recovery_saved"
+ACT_COPY_RECOVERY_CODE = "account_copy_recovery_code"
 
 #: Nút chính của từng màn — Enter bấm đúng nút này (U2 "Enter = the primary
 #: button"). Màn không có tên trong bảng thì Enter không làm gì.
@@ -89,17 +99,34 @@ def on_back(state, now: float) -> str:
 
 
 def _sign_in(state, name: str) -> str:
+    """
+    TASK_accounts_1119: thật — không còn mô phỏng.
+
+    Băm/kiểm mật khẩu CHẠY NGOÀI LUỒNG VẼ (``app.py``, tương tự mọi hành
+    động mạng PvP) — hàm này chỉ kiểm được những gì KHÔNG cần đọc kho tài
+    khoản (hình dạng tên, độ dài mật khẩu, mật khẩu khớp), và trả về một
+    ``ACT_*`` để app.py tự quyết phần còn lại off-thread, đúng khuôn mọi
+    hành động khác trong file này.
+    """
     if name == "btn_Sign in":
-        # Mật khẩu **phải có**; tài khoản vẫn là mô phỏng (chưa lưu ra file,
-        # chưa băm) nên không kiểm nội dung, chỉ kiểm có nhập hay không.
-        ok = bool(state.player.strip()) and bool(state.password)
         state.focus = None
-        state.go(F.MENU if ok else F.SIGN_IN_ERR)
+        if not state.player.strip() or not state.password:
+            state.sign_in_error = "Enter a username and password."
+            state.go(F.SIGN_IN_ERR)
+            return ""
+        return ACT_SIGN_IN
     elif name == "btn_Create album" and state.screen == F.SIGN_UP:
-        ok = (bool(state.player.strip()) and len(state.password) >= 8
-              and state.password == state.password2)
         state.focus = None
-        state.go(F.MENU if ok else F.SIGN_UP)
+        # Chạm hết ba ô: bấm thẳng nút mà chưa gõ ô nào (vd. chỉ gõ mật
+        # khẩu rồi Tab qua nút) vẫn phải thấy đúng gợi ý, không im lặng.
+        state.touched |= {"field_user", "field_pass", "field_pass2"}
+        display, reason = _account_crypto.validate_username(state.player)
+        if display is None:
+            return ""                          # gợi ý đã hiện qua state_for
+        pass_ok, _reason = _account_crypto.validate_password(state.password)
+        if not pass_ok or state.password != state.password2:
+            return ""
+        return ACT_SIGN_UP
     elif name in ("btn_Create album", "btn_Create a new album"):
         state.focus = None
         state.go(F.SIGN_UP)                    # trên màn đăng nhập = sang đăng ký
@@ -110,19 +137,24 @@ def _sign_in(state, name: str) -> str:
             state.go(F.SIGN_IN)
         else:
             state.player = state.player or "guest"
+            state.account_key = _account_crypto.GUEST_KEY
             state.go(F.MENU)
     elif name == "link_guest":
         state.focus = None
         state.player = state.player or "guest"
+        state.account_key = _account_crypto.GUEST_KEY
         state.go(F.MENU)
     elif name == "link_forgot":
-        F.say(state, "Password reset isn't available in the demo.")
+        # TASK_accounts_1119 Phase 6 làm hộp thoại thật; ở đây giữ nguyên
+        # thông báo cũ cho tới lúc đó.
+        F.say(state, "Password reset isn't available yet.")
     elif name == "switch_remember":
-        state.remember = not state.remember   # U2: không có tác dụng gì khác
+        state.remember = not state.remember
     elif name == "icon_show_password":
         state.show_password = not state.show_password
     elif name.startswith("field_"):
         state.focus = name
+    return ""
     return ""
 
 

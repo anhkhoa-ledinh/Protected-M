@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import time
 
+from src.account import crypto as account_crypto
 from src.content import shared_album
 from src.ui_album import v3_flow as F
 from src.ui_album.v3 import V3State
@@ -150,7 +151,30 @@ def extra_files(manifest, screen: str, state: V3State) -> tuple:
 
 
 # ---- màn đăng nhập / đăng ký -------------------------------------------
-def _sign_in(state, flow) -> None:
+def _signup_problem(flow, accounts: dict | None) -> str | None:
+    """Vấn đề ĐẦU TIÊN (trên xuống: tên → mật khẩu → nhập lại) của một ô
+    người dùng đã THẬT SỰ gõ vào (``flow.touched``) — ``None`` nếu không
+    ô nào đã động tới có vấn đề. ``accounts`` là dữ liệu kho tài khoản
+    (để kiểm tên đã bị lấy chưa); ``None`` bỏ qua việc kiểm đó (vd. khi
+    gọi mà chưa có kho — không nên xảy ra ở đường chạy thật, nhưng tránh
+    văng thay vì giả định)."""
+    if "field_user" in flow.touched:
+        display, reason = account_crypto.validate_username(flow.player)
+        if display is None:
+            return reason
+        if accounts is not None and account_crypto.username_key(display) in accounts.get(
+                "accounts", {}):
+            return "Username already taken"
+    if "field_pass" in flow.touched:
+        ok, reason = account_crypto.validate_password(flow.password)
+        if not ok:
+            return reason
+    if "field_pass2" in flow.touched and flow.password2 != flow.password:
+        return "Passwords don't match"
+    return None
+
+
+def _sign_in(state, flow, accounts: dict | None = None) -> None:
     dots = flow.password if flow.show_password else "•" * len(flow.password)
     dots2 = flow.password2 if flow.show_password else "•" * len(flow.password2)
     state.texts["user"] = flow.player
@@ -159,13 +183,25 @@ def _sign_in(state, flow) -> None:
     state.caret = {"field_user": "user", "field_pass": "pass",
                    "field_pass2": "pass2"}.get(flow.focus or "")
     state.focus = flow.focus
+    if flow.screen == F.SIGN_IN_ERR:
+        state.texts["error"] = flow.sign_in_error
     if flow.screen == F.SIGN_UP:
-        if flow.player.strip():
+        # TASK_accounts_1119: "valid_user" chỉ bật khi tên VỪA hợp lệ VỪA
+        # còn trống — không còn là "có gõ gì đó" như bản mô phỏng cũ.
+        display, _reason = account_crypto.validate_username(flow.player)
+        taken = (display is not None and accounts is not None
+                and account_crypto.username_key(display) in accounts.get("accounts", {}))
+        if display is not None and not taken:
             state.sprites["valid_user"] = True
-        ok = len(flow.password) >= 8 and flow.password == flow.password2
-        if ok:
+        pass_ok, _reason2 = account_crypto.validate_password(flow.password)
+        if pass_ok and flow.password == flow.password2:
             state.sprites["valid_pass2"] = True
+        problem = _signup_problem(flow, accounts)
+        if problem is None:
             state.sprites["hint_ok"] = True
+        else:
+            state.sprites["hint_bad"] = True
+            state.texts["hint"] = problem
 
 
 # ---- màn chính ---------------------------------------------------------
@@ -957,8 +993,10 @@ def _selected_hotspots(screen: str, flow) -> set:
 
 
 # ---- điều phối ---------------------------------------------------------
-def state_for(manifest, painter, flow, game=None, aim=None) -> V3State:
-    """Bộ giá trị sống cho màn đang mở. ``aim`` là tâm ngắm (toạ độ thiết kế)."""
+def state_for(manifest, painter, flow, game=None, aim=None, accounts=None) -> V3State:
+    """Bộ giá trị sống cho màn đang mở. ``aim`` là tâm ngắm (toạ độ thiết kế).
+    ``accounts`` (TASK_accounts_1119): dữ liệu kho tài khoản hiện có, chỉ
+    màn đăng nhập/đăng ký đọc tới (kiểm tên đã bị lấy chưa)."""
     now = time.perf_counter()
     state = V3State()
     screen = flow.screen
@@ -966,7 +1004,7 @@ def state_for(manifest, painter, flow, game=None, aim=None) -> V3State:
     state.confirm = flow.shared_album_pending
     state.selected = _selected_hotspots(screen, flow)
     if screen in F.LOCKED:
-        _sign_in(state, flow)
+        _sign_in(state, flow, accounts)
     elif screen == F.MENU:
         _menu(state, flow)
     elif screen == F.SETTINGS:

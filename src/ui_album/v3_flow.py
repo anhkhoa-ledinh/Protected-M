@@ -6,8 +6,11 @@ Khác ``flow.py`` ở hai chỗ, và chỉ hai chỗ: tên màn là tên bảng 
 tên cấp/vật phẩm/vũ khí là **tiếng Anh** (bộ asset v3 in chữ Anh, nên khoá nội
 bộ phải cùng ngôn ngữ với sprite ``item_tile:<item>``).
 
-Phần PvP và tài khoản vẫn là **mô phỏng** (bot, trạng thái trong bộ nhớ) —
-báo cáo phải nói rõ.
+TASK_accounts_1119: tài khoản đã THẬT (``src/account``) — sống trên một
+máy, không có server. ``player`` vẫn là nội dung ô "Username"/tên hiển
+thị; ``account_key`` là khoá đã case-fold trong kho tài khoản (xem
+``src.account.crypto.GUEST_KEY`` cho khoá chơi khách), hoặc ``""`` khi
+chưa đăng nhập.
 """
 
 from __future__ import annotations
@@ -201,6 +204,33 @@ class V3Flow:
     #: nhớ qua ``assets/config/user_prefs.json`` ("hud_compact").
     hud_compact: bool = False
 
+    # ---- TASK_accounts_1119: tài khoản cục bộ (không có server) -----------
+    #: Khoá tài khoản (``crypto.username_key``) đang đăng nhập; ``""`` =
+    #: chưa đăng nhập, ``"guest"`` = chơi khách. Khác ``player`` (tên hiển
+    #: thị, cũng là nội dung ô "Username" trên màn đăng nhập/đăng ký).
+    account_key: str = ""
+    #: Ô nào trên màn đăng ký người dùng đã GÕ VÀO rồi — gợi ý lỗi chỉ hiện
+    #: cho ô đã động tới (không doạ người mới vào màn với lỗi ngay lập tức).
+    touched: set = field(default_factory=set)
+    #: Dòng lỗi của màn ``v3_01c_sign_in_error`` (khoá text ``error``) và
+    #: màn ``v3_01b_sign_up`` (khoá text ``hint``, khi có vấn đề).
+    sign_in_error: str = ""
+    hint_text: str = ""
+    #: Có đang hiện icon "!" đỏ (``hint_bad``) thay vì dấu tích xanh
+    #: (``hint_ok``) trên màn đăng ký hay không.
+    hint_bad: bool = False
+    #: TASK_accounts_1119 Phase 6: hộp thoại mã khôi phục (hiện MỘT LẦN
+    #: ngay sau khi đăng ký) và hộp thoại quên mật khẩu.
+    recovery_code_shown: str = ""
+    forgot_open: bool = False
+    forgot_focus: str | None = None
+    forgot_user: str = ""
+    forgot_code: str = ""
+    forgot_new_pass: str = ""
+    forgot_new_pass2: str = ""
+    forgot_error: str = ""
+    forgot_touched: set = field(default_factory=set)
+
     # ---- bảng cấp --------------------------------------------------------
     def level_name(self) -> str:
         return LEVEL_TABLE[self.level][0]
@@ -238,6 +268,11 @@ class V3Flow:
             if screen == TILT:
                 self.tilt_entered_s = time.perf_counter()
                 self.tilt_left_done = self.tilt_right_done = False
+            if screen == SIGN_UP and self.screen != SIGN_UP:
+                # TASK_accounts_1119: hint/lỗi chỉ hiện cho ô đã gõ vào —
+                # vào màn đăng ký MỚI (không phải bật qua tắt lại chính
+                # màn này) thì chưa ô nào được coi là đã động tới.
+                self.touched = set()
         self.screen = screen
 
     # ---- dấu kiểm của màn thử nghiêng -----------------------------------
@@ -259,6 +294,12 @@ class V3Flow:
 FIELD_ATTR = {"field_user": "player", "field_pass": "password",
               "field_pass2": "password2"}
 
+#: TASK_accounts_1119: trần ký tự riêng từng ô — mật khẩu hợp lệ dài tới 64
+#: (``crypto.validate_password``), nên trần 24 cũ (dùng chung mọi ô) sẽ cắt
+#: mật khẩu dài mà người dùng không hề biết ("Raise the field cap so a
+#: password is never truncated silently").
+FIELD_MAXLEN = {"field_user": 32, "field_pass": 64, "field_pass2": 64}
+
 #: Thứ tự ô nhập khi bấm Tab.
 FIELD_ORDER = ("field_user", "field_pass", "field_pass2")
 
@@ -271,7 +312,11 @@ def type_char(flow: V3Flow, char: str) -> None:
         return
     attr = FIELD_ATTR.get(flow.focus or "")
     if attr:
-        setattr(flow, attr, (getattr(flow, attr) + char)[:24])
+        maxlen = FIELD_MAXLEN.get(flow.focus, 24)
+        setattr(flow, attr, (getattr(flow, attr) + char)[:maxlen])
+        # TASK_accounts_1119: gợi ý lỗi trên màn đăng ký chỉ hiện cho ô
+        # người dùng đã THẬT SỰ gõ vào — đánh dấu ngay lần gõ đầu tiên.
+        flow.touched.add(flow.focus)
 
 
 def backspace(flow: V3Flow) -> None:
@@ -281,6 +326,7 @@ def backspace(flow: V3Flow) -> None:
     attr = FIELD_ATTR.get(flow.focus or "")
     if attr:
         setattr(flow, attr, getattr(flow, attr)[:-1])
+        flow.touched.add(flow.focus)
 
 
 def focus_next(flow: V3Flow, fields) -> None:

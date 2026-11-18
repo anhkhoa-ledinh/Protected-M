@@ -55,6 +55,8 @@ WANTED = {
     "R choi lai": glfw.KEY_R,
     "1 o vat pham": glfw.KEY_1,
     "U chia se anh": glfw.KEY_U,
+    "H HUD gon": glfw.KEY_H,
+    "Ctrl+V dan vao o nhap": glfw.KEY_V,
 }
 
 
@@ -92,4 +94,4 @@ def test_old_album_pack_keeps_its_tools():
 
 def test_v3_set_is_small_enough_to_read():
     """Danh sách cho phép phải ngắn; dài ra là dấu hiệu lại trượt về trừ dần."""
-    assert len(V3_KEYS) <= 16
+    assert len(V3_KEYS) <= 17

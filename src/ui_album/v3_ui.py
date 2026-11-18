@@ -10,11 +10,14 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 import time
 from pathlib import Path
 
 from OpenGL import GL
 
+from src.account import crypto as account_crypto
+from src.account import store as account_store
 from src.config import prefs as _prefs
 from src.fx.anim import Spring
 from src.fx.library import FxLibrary
@@ -129,8 +132,27 @@ class V3UI:
         #: Khung webcam đã lên GPU: ô ``camera`` của màn cài đặt / thử nghiêng.
         self._camera_entry = None
         self._camera_token = None
+        # TASK_accounts_1119: kho tài khoản cục bộ — nạp MỘT LẦN ở đây,
+        # giống `_fx_enabled`/`_shot_feel`: thuộc phiên giao diện, không
+        # phải trạng thái màn (``V3Flow``). ``app.py`` không tự đọc/ghi
+        # file tài khoản — chỉ gọi các phương thức công khai dưới đây.
+        self._account_root = root
+        account_load = account_store.load(root)
+        self._account_data = account_load.data
+        #: True đúng MỘT lần sau khi nạp, nếu cả ``accounts.json`` lẫn
+        #: ``.bak`` đều hỏng — ``app.py`` đọc cờ này ở khung đầu để báo
+        #: toast, rồi tự xoá cờ (xem ``pop_account_corrupt_toast``).
+        self._account_corrupt = account_load.reset
+        self._account_throttle = account_store.FailThrottle()
+        #: ``(kind, holder)`` trong lúc một việc băm đang chạy trên luồng
+        #: riêng — ``holder`` là dict mà luồng đó tự điền ``done``/
+        #: ``result``/``error`` vào, đọc lại ở ``_poll_account_job``
+        #: (gọi mỗi khung từ ``tick()``). Nút chính bỏ qua cú bấm lặp lại
+        #: trong lúc ``account_busy`` là True.
+        self._account_job: tuple | None = None
         if options.guest:
             self.state.player = "guest"
+            self.state.account_key = account_crypto.GUEST_KEY
             self.state.go(F.MENU)
         # Móc đo: mở thẳng một màn để đếm FPS trên đúng màn đó (vd. màn chơi).
         forced = os.environ.get("HCPD_V3_SCREEN", "").strip()
@@ -316,6 +338,10 @@ class V3UI:
 
     # ---- nhịp ------------------------------------------------------------
     def tick(self) -> None:
+        # TASK_accounts_1119: đọc kết quả một việc băm/kiểm chạy nền, nếu
+        # có — rẻ (không có việc nào đang chạy thì chỉ là một so sánh
+        # ``is None``), nên chạy TRƯỚC cả cổng ``ui_shots`` dưới đây.
+        self._poll_account_job()
         # Khi chụp, KHÔNG chạy đồng hồ mô phỏng: nó đẩy "đang tìm trận" sang
         # "đã tìm thấy" ngay, nên hai ảnh ra y hệt nhau (bẫy của lượt album).
         if self.options.ui_shots:
@@ -377,6 +403,144 @@ class V3UI:
         self.state.hud_compact = not self.state.hud_compact
         return self.state.hud_compact
 
+    # ---- TASK_accounts_1119: accounts — local store, no server -----------
+    @property
+    def account_busy(self) -> bool:
+        """True while a sign-in/sign-up hash job is running on its own
+        thread — the primary button must ignore repeat clicks during this
+        window (scrypt takes tens to hundreds of ms; a second click while
+        one is in flight would start a SECOND concurrent hash for no
+        reason, and could race the first one's result application)."""
+        return self._account_job is not None
+
+    def pop_account_corrupt_toast(self) -> bool:
+        """True exactly once, the first time it's read after a launch
+        where ``accounts.json`` AND its ``.bak`` were both unreadable —
+        ``app.py`` shows a toast for this, then it never fires again this
+        process (the store already started empty and renamed the bad
+        file aside; nothing more to say after the first toast)."""
+        was = self._account_corrupt
+        self._account_corrupt = False
+        return was
+
+    def _start_account_job(self, kind: str, fn, *args) -> None:
+        if self.account_busy:
+            return
+        holder: dict = {}
+        self._account_job = (kind, holder)
+
+        def worker() -> None:
+            try:
+                holder["result"] = fn(*args)
+            except Exception as exc:                          # noqa: BLE001
+                holder["error"] = exc
+            finally:
+                holder["done"] = True
+
+        threading.Thread(target=worker, name=f"account-{kind}", daemon=True).start()
+
+    def _poll_account_job(self) -> None:
+        if self._account_job is None:
+            return
+        kind, holder = self._account_job
+        if not holder.get("done"):
+            return
+        self._account_job = None
+        if "error" in holder:
+            logger.exception("TASK_accounts_1119: viec '%s' loi", kind,
+                             exc_info=holder["error"])
+            F.say(self.state, "Something went wrong. Try again.")
+            return
+        {
+            "sign_in": self._apply_sign_in_result,
+            "sign_up": self._apply_sign_up_result,
+        }[kind](holder["result"])
+
+    def sign_in_submit(self) -> None:
+        """``ACT_SIGN_IN`` (``app.py``): the cooldown check is cheap and
+        synchronous (in-memory, no hashing) and happens HERE, before even
+        starting a thread — a name mid-cooldown must never spend a scrypt
+        call just to be told to wait."""
+        username, password = self.state.player, self.state.password
+        key_guess = account_crypto.username_key(account_crypto.normalize_username(username))
+        now = time.perf_counter()
+        remaining = self._account_throttle.cooldown_remaining(key_guess, now)
+        if remaining > 0.0:
+            self.state.sign_in_error = f"Too many tries. Wait {int(round(remaining))} s."
+            self.state.go(F.SIGN_IN_ERR)
+            return
+        self._start_account_job("sign_in", self._verify_credentials_job,
+                                username, password)
+
+    def _verify_credentials_job(self, username: str, password: str):
+        result = account_store.verify_credentials(self._account_data, username, password)
+        if result[0] == account_store.RESULT_OK:
+            # Only a successful sign-in ever mutates ``data`` (last-signed-
+            # in time, and a rehash if the stored scrypt params were
+            # stale) — no point writing the file back out after a no-op
+            # failed attempt.
+            account_store.save(self._account_root, self._account_data)
+        return result
+
+    def _apply_sign_in_result(self, result) -> None:
+        outcome, key = result
+        now = time.perf_counter()
+        if outcome == account_store.RESULT_OK:
+            self._account_throttle.reset(key)
+            self.state.account_key = key
+            self.state.player = self._account_data["accounts"][key]["display"]
+            self.state.password = self.state.password2 = ""
+            self.state.focus = None
+            self.state.go(F.MENU)
+            return
+        # RESULT_UNKNOWN has no key (no such account) — throttle on the
+        # NAME the user actually typed, same as RESULT_WRONG's real key
+        # (an unknown name still burns cooldown attempts, matching the
+        # task's own "5 failures in a row for one name", not "one
+        # account").
+        throttle_key = key or account_crypto.username_key(
+            account_crypto.normalize_username(self.state.player))
+        self._account_throttle.record_failure(throttle_key, now)
+        remaining = self._account_throttle.cooldown_remaining(throttle_key, now)
+        if remaining > 0.0:
+            self.state.sign_in_error = f"Too many tries. Wait {int(round(remaining))} s."
+        elif outcome == account_store.RESULT_UNKNOWN:
+            self.state.sign_in_error = f"No album named {self.state.player}. Create one below."
+        else:
+            self.state.sign_in_error = "Wrong password. Try again."
+        self.state.go(F.SIGN_IN_ERR)
+
+    def sign_up_submit(self) -> None:
+        """``ACT_SIGN_UP`` — ``v3_routes`` already checked the FORMAT
+        (name shape, password length/match) synchronously; this does the
+        one check that needs the store (name actually free) plus the
+        hashing, both off-thread."""
+        self._start_account_job("sign_up", self._create_account_job,
+                                self.state.player, self.state.password)
+
+    def _create_account_job(self, display: str, password: str):
+        if not account_store.is_available(self._account_data, display):
+            return ("taken", None, None)
+        key, code = account_store.create_account(self._account_data, display, password)
+        account_store.save(self._account_root, self._account_data)
+        return ("ok", key, code)
+
+    def _apply_sign_up_result(self, result) -> None:
+        outcome, key, code = result
+        if outcome == "taken":
+            self.state.touched.add("field_user")
+            self.state.hint_bad = True
+            self.state.hint_text = "Username already taken"
+            return
+        self.state.account_key = key
+        self.state.player = self._account_data["accounts"][key]["display"]
+        self.state.password = self.state.password2 = ""
+        self.state.focus = None
+        # TASK_accounts_1119 Phase 6 shows the one-time recovery code
+        # dialog here; for now (Phase 2) go straight to the menu.
+        self.state.go(F.MENU)
+        _ = code
+
     def set_camera_frame(self, frame) -> None:
         """
         Nhận khung webcam mới nhất; chỉ đưa lên GPU khi màn đang mở cần nó.
@@ -409,7 +573,7 @@ class V3UI:
             state = shot_state(self.manifest, name)
         else:
             state = v3_values.state_for(self.manifest, self.painter, self.state,
-                                        self.game, self.mouse)
+                                        self.game, self.mouse, accounts=self._account_data)
             state.hover = self.hover()
             state.pressed = self.mouse_down and state.hover is not None
             state.hover_fx = self._hover_fx

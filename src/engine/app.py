@@ -694,6 +694,16 @@ class HcpdApplication:
             self._album_action(album.activate("btn_Share to album"), now)
         if input_state.hud_compact_toggle:
             self._apply_hud_compact(album.toggle_hud_compact())
+        if album.pop_account_corrupt_toast():
+            album.flow.say(state, "Your saved accounts file was unreadable — started a fresh one.")
+        if input_state.paste_requested:
+            # TASK_accounts_1119: dán vào ô đang chọn, kể cả ô mật khẩu —
+            # đi qua ĐÚNG đường ``album.key()`` mỗi ký tự gõ tay cũng đi,
+            # nên trần ký tự từng ô (``F.FIELD_MAXLEN``) và việc đánh dấu
+            # "đã gõ vào" (gợi ý lỗi) áp dụng y hệt dán tay.
+            for char in self._window.get_clipboard():
+                if char not in ("\n", "\r", "\t"):
+                    album.key(char)
         # Thanh âm lượng: bấm HOẶC kéo. Kéo phải đọc trạng thái phím chuột,
         # không đọc được qua danh sách cú bấm.
         if (state.screen == album.flow.SETTINGS
@@ -1327,6 +1337,7 @@ class HcpdApplication:
             state.go(F.LOADOUT)
         elif action == "logout":
             state.player = state.password = state.password2 = ""
+            state.account_key = ""
             state.focus = None
             state.go(F.SIGN_IN if hasattr(F, "SIGN_IN") else F.LOGIN)
         elif action == "copy_code":
@@ -1344,6 +1355,10 @@ class HcpdApplication:
                 self._apply_display_mode(mode)
         elif action.startswith("pvp_"):
             self._pvp_action(action, now)
+        elif action == "account_sign_in":
+            self._album.sign_in_submit()
+        elif action == "account_sign_up":
+            self._album.sign_up_submit()
 
     def _tick_album_automatch(self, now: float) -> None:
         """

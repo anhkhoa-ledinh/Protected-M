@@ -154,6 +154,8 @@ class InputState:
     share_to_album: bool = False
     #: TASK_game_feel_fix_1118 Fix 10.4: H = bật/tắt HUD gọn, mọi súng.
     hud_compact_toggle: bool = False
+    #: TASK_accounts_1119: Ctrl+V dán vào ô đang chọn (kể cả ô mật khẩu).
+    paste_requested: bool = False
 
 
 #: Phím có tác dụng ở chế độ demo (PB-055; quyết định 11/10: demo không có phím
@@ -195,6 +197,7 @@ V3_KEYS = frozenset({
     glfw.KEY_1, glfw.KEY_2, glfw.KEY_3,  # ô vật phẩm
     glfw.KEY_U,                        # TASK_shared_album_1111: Share to album
     glfw.KEY_H,                        # TASK_game_feel_fix_1118 Fix 10.4: HUD gọn
+    glfw.KEY_V,                        # TASK_accounts_1119: Ctrl+V dan vao o nhap
 })
 
 
@@ -287,6 +290,7 @@ class GlfwWindow:
         self._item_slot_requested = 0
         self._share_to_album_requested = False
         self._hud_compact_requested = False
+        self._paste_requested = False
         self._dropped_paths: list[str] = []
         #: TASK_album_ui_1106: chuột và chữ, chỉ giao diện album đọc tới.
         self._clicks: list[tuple[float, float]] = []
@@ -502,6 +506,7 @@ class GlfwWindow:
             item_slot=self._item_slot_requested,
             share_to_album=self._share_to_album_requested,
             hud_compact_toggle=self._hud_compact_requested,
+            paste_requested=self._paste_requested,
             # Giao diện v3: Esc là "lùi một bước", và app tự quyết khi nào cú
             # lùi ấy nghĩa là thoát (``v3_routes.on_back``).
             quit_app=(False if self._ui_v3 else
@@ -539,6 +544,7 @@ class GlfwWindow:
         self._item_slot_requested = 0
         self._share_to_album_requested = False
         self._hud_compact_requested = False
+        self._paste_requested = False
         return result
 
     # ---- D1: chế độ hiển thị -------------------------------------------
@@ -659,6 +665,20 @@ class GlfwWindow:
     def set_clipboard(self, text: str) -> None:
         if self._window is not None:
             glfw.set_clipboard_string(self._window, str(text))
+
+    def get_clipboard(self) -> str:
+        """TASK_accounts_1119: Ctrl+V paste source — GLFW returns bytes
+        (not text), and a non-text clipboard (an image, say) must not
+        crash a paste, just yield nothing."""
+        if self._window is None:
+            return ""
+        try:
+            raw = glfw.get_clipboard_string(self._window)
+        except Exception:                                    # noqa: BLE001
+            return ""
+        if raw is None:
+            return ""
+        return raw.decode("utf-8", errors="replace") if isinstance(raw, bytes) else str(raw)
 
     def is_mouse_down(self) -> bool:
         """Chuột trái đang giữ — màn cài đặt cần để KÉO thanh âm lượng."""
@@ -1020,7 +1040,7 @@ class GlfwWindow:
         glfw.terminate()
 
     def _on_key(self, window, key, scancode, action, mods) -> None:
-        _ = (window, scancode, mods)
+        _ = (window, scancode)
         if action != glfw.PRESS:
             return
         if self._ui_v3 and key not in V3_KEYS:
@@ -1093,6 +1113,8 @@ class GlfwWindow:
             self._share_to_album_requested = True
         elif key == glfw.KEY_H:
             self._hud_compact_requested = True
+        elif key == glfw.KEY_V and (mods & glfw.MOD_CONTROL):
+            self._paste_requested = True
 
     def _on_drop(self, window, paths) -> None:
         _ = window
