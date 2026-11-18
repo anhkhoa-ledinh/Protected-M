@@ -154,6 +154,27 @@ class V3UI:
             self.state.player = "guest"
             self.state.account_key = account_crypto.GUEST_KEY
             self.state.go(F.MENU)
+        else:
+            # TASK_accounts_1119 Phase 4: a valid "remember me" session
+            # signs in STRAIGHT to the menu, no sign-in screen — and
+            # refreshes the expiry (a session that's actively used should
+            # not quietly expire mid-way through a long play session).
+            resumed_key = account_store.resolve_session(root, self._account_data)
+            if resumed_key is not None:
+                account_store.start_session(root, self._account_data, resumed_key)
+                account_store.save(root, self._account_data)
+                self.state.account_key = resumed_key
+                self.state.player = self._account_data["accounts"][resumed_key]["display"]
+                self.state.go(F.MENU)
+            else:
+                # No session: pre-fill the username field with the last
+                # account that signed in on this machine (nothing to
+                # pre-fill if none ever has).
+                last_key = self._account_data.get("last_account")
+                last_account = (self._account_data["accounts"].get(last_key)
+                                if last_key else None)
+                if last_account is not None:
+                    self.state.player = last_account["display"]
         # Móc đo: mở thẳng một màn để đếm FPS trên đúng màn đó (vd. màn chơi).
         forced = os.environ.get("HCPD_V3_SCREEN", "").strip()
         if forced and forced in self.manifest.screens:
@@ -491,6 +512,15 @@ class V3UI:
             self.state.player = self._account_data["accounts"][key]["display"]
             self.state.password = self.state.password2 = ""
             self.state.focus = None
+            # TASK_accounts_1119 Phase 4: the switch's CURRENT state wins
+            # on every sign-in — on means create/refresh a session, off
+            # means make sure no stale one from an EARLIER sign-in (with
+            # the switch on, since changed) survives this one.
+            if self.state.remember:
+                account_store.start_session(self._account_root, self._account_data, key)
+            else:
+                account_store.clear_session(self._account_root, self._account_data, key)
+            account_store.save(self._account_root, self._account_data)
             self.state.go(F.MENU)
             return
         # RESULT_UNKNOWN has no key (no such account) — throttle on the
@@ -540,6 +570,19 @@ class V3UI:
         # dialog here; for now (Phase 2) go straight to the menu.
         self.state.go(F.MENU)
         _ = code
+
+    def sign_out(self) -> None:
+        """TASK_accounts_1119 Phase 4: a deliberate sign-out must not
+        leave a "remember me" session alive — same ``clear_session`` the
+        switch's OFF path uses on a sign-in. Guest "sessions" never had
+        one to begin with, but clearing ``session.json`` unconditionally
+        is still correct (and cheap) either way."""
+        key = self.state.account_key
+        if key and key != account_crypto.GUEST_KEY:
+            account_store.clear_session(self._account_root, self._account_data, key)
+            account_store.save(self._account_root, self._account_data)
+        else:
+            account_store.clear_session(self._account_root)
 
     def set_camera_frame(self, frame) -> None:
         """

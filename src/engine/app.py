@@ -1336,6 +1336,10 @@ class HcpdApplication:
             state.level = min(5, state.level + 1)
             state.go(F.LOADOUT)
         elif action == "logout":
+            # TASK_accounts_1119 Phase 4: a "remember me" session (if any)
+            # must not outlive a deliberate sign-out.
+            if self._album_options.is_v3:
+                self._album.sign_out()
             state.player = state.password = state.password2 = ""
             state.account_key = ""
             state.focus = None
