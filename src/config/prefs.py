@@ -29,8 +29,8 @@ NO_FX_ENV = "HCPD_NO_FX"
 
 #: Env override for screen shake (TASK_game_feel_1118 P4) — same idea as
 #: ``NO_FX_ENV``, always wins over the "screen_shake" prefs key. Disables
-#: screen shake AND the crit impact frame; crosshair kick, tracer and hit
-#: marker are unaffected.
+#: screen shake AND the crit impact frame; crosshair kick and hit marker
+#: are unaffected.
 NO_SHAKE_ENV = "HCPD_NO_SHAKE"
 
 FULLSCREEN, WINDOW = "fullscreen", "window"

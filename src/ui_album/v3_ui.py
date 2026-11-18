@@ -97,8 +97,8 @@ class V3UI:
         self._window = window
         self._hover_fx = HoverFx()
         self._hover_last_t: float | None = None
-        #: TASK_game_feel_1118 P4: crosshair kick/tracer/shake/hit marker/
-        #: crit impact — survives the whole session, like ``_hover_fx``.
+        #: TASK_game_feel_1118 P4: crosshair kick/shake/hit marker/crit
+        #: impact — survives the whole session, like ``_hover_fx``.
         self._shot_feel = ShotFeel()
         self._shot_feel.shake_enabled = _prefs.screen_shake_enabled(root)
         #: TASK_game_feel_1118 P6: Precision-gun scope — zoom spring,
@@ -353,12 +353,11 @@ class V3UI:
                 self._window.set_cursor_shape(cursor_for(name, state.hover, state))
             self._step_fx_triggers(state, time.perf_counter())
             if name in (F.PLAY, F.PVP_HUNT):
-                # TASK_game_feel_1118 P4: kick/tracer/hit marker/impact
-                # frame stay fixed to the HUD; only the scene viewport
-                # rect (below) and the fx layer (``offset=`` below) move
-                # with shake — see ``shot_feel.py``'s module docstring.
+                # TASK_game_feel_1118 P4: kick/hit marker/impact frame
+                # stay fixed to the HUD; only the scene viewport rect
+                # (below) and the fx layer (``offset=`` below) move with
+                # shake — see ``shot_feel.py``'s module docstring.
                 state.aim_kick_scale = self._shot_feel.kick_scale
-                state.tracers = self._shot_feel.tracers
                 state.hit_markers = self._shot_feel.hit_markers
                 state.crit_impact_alpha = self._shot_feel.crit_impact_alpha
                 state.scene_shake = self._shot_feel.shake_offset
@@ -456,7 +455,7 @@ class V3UI:
 
     # ---- shooting feel (TASK_game_feel_1118 P4) ---------------------------
     def register_shot(self, hit: bool, crit: bool) -> None:
-        """Crosshair kick/tracer/shake/hit marker/crit impact for a shot
+        """Crosshair kick/shake/hit marker/crit impact for a shot
         that just resolved (``app.py``'s ``_album_shoot``, AFTER
         ``game_bridge.fire()`` — this never influences that result, only
         reacts to it). Independent of Sakuga fx — runs even with

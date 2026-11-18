@@ -1,10 +1,15 @@
 """
 TASK_game_feel_1118 Phase 4: shooting feel for the match screens (``PLAY``,
-``PVP_HUNT``) — crosshair kick, tracer, screen shake, hit marker, crit
-impact frame. Pure Python (no GL); ``src/ui_album/v3.py`` draws what this
-module computes, and ``app.py`` calls ``ShotFeel.on_shot`` once per shot,
-right AFTER ``game_bridge.fire()`` has already decided the result — never
+``PVP_HUNT``) — crosshair kick, screen shake, hit marker, crit impact
+frame. Pure Python (no GL); ``src/ui_album/v3.py`` draws what this module
+computes, and ``app.py`` calls ``ShotFeel.on_shot`` once per shot, right
+AFTER ``game_bridge.fire()`` has already decided the result — never
 before, and nothing here feeds back into that result.
+
+TASK_game_feel_fix_1118 Fix 6: the tracer (a muzzle-to-crosshair streak)
+was removed per the user's own playtest note — deleted outright, not
+disabled: its drawing, its ``WeaponFeel.tracer`` column, every constant
+and the ``_Tracer`` class are gone, along with their tests.
 """
 
 from __future__ import annotations
@@ -19,17 +24,6 @@ from src.fx.anim import Spring
 #: value it gets KICKED TO (the table's "Crosshair kick (scale)") differs.
 KICK_SPRING_K, KICK_SPRING_D = 600.0, 30.0
 KICK_REST_SCALE = 1.0
-
-#: Tracer: muzzle = the HUD weapon icon centre (design px), fixed life and
-#: target-end width for every weapon — only the muzzle-end width (and,
-#: for the Spread gun, the line count/spread) is per-weapon.
-MUZZLE_XY = (968.0, 620.0)
-TRACER_LIFE_S = 0.07
-TRACER_TARGET_WIDTH_PX = 1.0
-TRACER_CORE_COL, TRACER_EDGE_COL = "#FFFFFF", "#24415F"
-#: The white core sits inside the coloured edge — this fraction of the
-#: edge's width at both ends.
-TRACER_CORE_FRACTION = 0.55
 
 #: Screen shake: exponential decay, time constant 0.08 s, same for every
 #: weapon — only the per-shot amount (and Heavy-mag's cap) differs.
@@ -59,21 +53,10 @@ BLOOM_CAP_SCALE = 1.3
 
 
 @dataclass(frozen=True)
-class TracerSpec:
-    lines: int = 1
-    muzzle_width_px: float = 3.0
-    #: Spread gun only: the TARGET end of each extra line sits this many
-    #: px either side of the crosshair, perpendicular to the shot line —
-    #: the muzzle end of every line still meets at one point.
-    spread_px: float = 0.0
-
-
-@dataclass(frozen=True)
 class WeaponFeel:
     shake_px: float
     shake_cap_px: float
     kick_scale: float
-    tracer: TracerSpec
 
 
 #: TASK_game_feel_1118 P4's own table. Heavy-mag is the only one whose
@@ -82,34 +65,19 @@ class WeaponFeel:
 #: fire slowly enough that one shot's shake has mostly decayed before the
 #: next, so their cap is simply their own per-shot amount.
 WEAPON_FEEL = {
-    "Precision gun": WeaponFeel(
-        shake_px=3.0, shake_cap_px=3.0, kick_scale=1.35,
-        tracer=TracerSpec(lines=1, muzzle_width_px=2.5)),
-    "Spread gun": WeaponFeel(
-        shake_px=4.0, shake_cap_px=4.0, kick_scale=1.40,
-        tracer=TracerSpec(lines=3, muzzle_width_px=3.0, spread_px=14.0)),
-    "Heavy-mag gun": WeaponFeel(
-        shake_px=1.5, shake_cap_px=3.0, kick_scale=1.15,
-        tracer=TracerSpec(lines=1, muzzle_width_px=1.5)),
+    "Precision gun": WeaponFeel(shake_px=3.0, shake_cap_px=3.0, kick_scale=1.35),
+    "Spread gun": WeaponFeel(shake_px=4.0, shake_cap_px=4.0, kick_scale=1.40),
+    "Heavy-mag gun": WeaponFeel(shake_px=1.5, shake_cap_px=3.0, kick_scale=1.15),
 }
 
 #: Fallback for an unrecognised weapon name — keeps ``on_shot`` from
 #: raising on a stale name; the three real weapons above never hit it.
-_DEFAULT_FEEL = WeaponFeel(shake_px=3.0, shake_cap_px=3.0, kick_scale=1.3,
-                           tracer=TracerSpec())
+_DEFAULT_FEEL = WeaponFeel(shake_px=3.0, shake_cap_px=3.0, kick_scale=1.3)
 
 
 def weapon_feel(name: str) -> WeaponFeel:
-    """The shake/kick/tracer spec for ``name`` (one of ``v3_flow.WEAPONS``)."""
+    """The shake/kick spec for ``name`` (one of ``v3_flow.WEAPONS``)."""
     return WEAPON_FEEL.get(name, _DEFAULT_FEEL)
-
-
-@dataclass
-class _Tracer:
-    muzzle: tuple
-    target: tuple
-    width_px: float
-    age: float = 0.0
 
 
 @dataclass
@@ -136,13 +104,12 @@ class ShotFeel:
         self._kick.to = KICK_REST_SCALE
         self._shake_x = 0.0
         self._shake_y = 0.0
-        self._tracers: list[_Tracer] = []
         self._hit_markers: list[_HitMarker] = []
         self._crit_impact_age: float | None = None
         #: ``"screen_shake": false`` in prefs, or ``HCPD_NO_SHAKE=1`` —
         #: the caller sets this once. Disables shake AND the crit impact
-        #: frame; kick, tracer and hit marker are unaffected (P4's own
-        #: off-switch rule).
+        #: frame; kick and hit marker are unaffected (P4's own off-switch
+        #: rule).
         self.shake_enabled = True
         #: P5: current bloom SCALE (not a delta) — the kick spring's
         #: resting point while the Heavy-mag trigger is held.
@@ -163,7 +130,6 @@ class ShotFeel:
                 scale = feel.shake_cap_px / mag
                 self._shake_x *= scale
                 self._shake_y *= scale
-        self._spawn_tracers(feel.tracer, crosshair)
         if hit:
             x, y = float(crosshair[0]), float(crosshair[1])
             self._hit_markers.append(_HitMarker(x, y, bool(crit)))
@@ -183,22 +149,6 @@ class ShotFeel:
         self._bloom_scale = KICK_REST_SCALE
         self._kick.to = KICK_REST_SCALE
 
-    def _spawn_tracers(self, tracer: TracerSpec, crosshair: tuple) -> None:
-        mx, my = MUZZLE_XY
-        tx, ty = float(crosshair[0]), float(crosshair[1])
-        if tracer.lines <= 1 or tracer.spread_px <= 0.0:
-            self._tracers.append(_Tracer((mx, my), (tx, ty), tracer.muzzle_width_px))
-            return
-        dx, dy = tx - mx, ty - my
-        length = math.hypot(dx, dy) or 1.0
-        nx, ny = -dy / length, dx / length
-        half = (tracer.lines - 1) / 2.0
-        for i in range(tracer.lines):
-            offset = (i - half) * (tracer.spread_px / half)
-            self._tracers.append(_Tracer(
-                (mx, my), (tx + nx * offset, ty + ny * offset),
-                tracer.muzzle_width_px))
-
     # ---- per-frame -----------------------------------------------------
     def step(self, dt: float) -> None:
         if not dt > 0.0:
@@ -207,9 +157,6 @@ class ShotFeel:
         decay = math.exp(-dt / SHAKE_TAU_S)
         self._shake_x *= decay
         self._shake_y *= decay
-        for tracer in self._tracers:
-            tracer.age += dt
-        self._tracers = [t for t in self._tracers if t.age < TRACER_LIFE_S]
         for marker in self._hit_markers:
             marker.age += dt
         self._hit_markers = [m for m in self._hit_markers if m.age < HITMARK_LIFE_S]
@@ -226,11 +173,6 @@ class ShotFeel:
     @property
     def shake_offset(self) -> tuple:
         return (self._shake_x, self._shake_y)
-
-    @property
-    def tracers(self) -> list:
-        """``[(muzzle, target, age, muzzle_width_px), ...]`` for drawing."""
-        return [(t.muzzle, t.target, t.age, t.width_px) for t in self._tracers]
 
     @property
     def hit_markers(self) -> list:

@@ -21,20 +21,15 @@ def test_weapon_feel_table_lookup():
     precision = weapon_feel("Precision gun")
     assert precision.shake_px == 3.0
     assert precision.kick_scale == 1.35
-    assert precision.tracer.lines == 1
-    assert precision.tracer.muzzle_width_px == 2.5
 
     spread = weapon_feel("Spread gun")
     assert spread.shake_px == 4.0
     assert spread.kick_scale == 1.40
-    assert spread.tracer.lines == 3
-    assert spread.tracer.spread_px == 14.0
 
     heavy = weapon_feel("Heavy-mag gun")
     assert heavy.shake_px == 1.5
     assert heavy.shake_cap_px == 3.0
     assert heavy.kick_scale == 1.15
-    assert heavy.tracer.muzzle_width_px == 1.5
 
     assert set(WEAPON_FEEL) == {"Precision gun", "Spread gun", "Heavy-mag gun"}
 
@@ -138,46 +133,9 @@ def test_no_shake_off_switch_disables_shake_and_crit_impact():
     feel.on_shot("Precision gun", (100.0, 200.0), hit=True, crit=True)
     assert feel.shake_offset == (0.0, 0.0)
     assert feel.crit_impact_alpha == 0.0
-    # Kick, tracer and hit marker stay on even with shake off.
+    # Kick and hit marker stay on even with shake off.
     assert feel.kick_scale == pytest.approx(1.35)
-    assert len(feel.tracers) == 1
     assert len(feel.hit_markers) == 1
-
-
-def test_tracer_spans_muzzle_to_crosshair_for_a_single_line_weapon():
-    from src.ui_album.shot_feel import MUZZLE_XY
-
-    feel = ShotFeel(seed=0)
-    feel.on_shot("Precision gun", (300.0, 400.0), hit=False, crit=False)
-    assert len(feel.tracers) == 1
-    muzzle, target, age, width = feel.tracers[0]
-    assert muzzle == MUZZLE_XY
-    assert target == (300.0, 400.0)
-    assert age == 0.0
-    assert width == 2.5
-
-
-def test_spread_gun_spawns_3_tracer_lines_offset_at_the_target_end():
-    feel = ShotFeel(seed=0)
-    feel.on_shot("Spread gun", (300.0, 400.0), hit=False, crit=False)
-    assert len(feel.tracers) == 3
-    targets = [t[1] for t in feel.tracers]
-    # The crosshair itself is one of the three target points; the other
-    # two sit 14 px away from it, perpendicular to the shot direction.
-    assert (300.0, 400.0) in targets
-    import math as _math
-    distances = sorted(
-        _math.hypot(tx - 300.0, ty - 400.0) for tx, ty in targets)
-    assert distances[0] == pytest.approx(0.0, abs=1e-9)
-    assert distances[1] == pytest.approx(14.0, abs=1e-6)
-    assert distances[2] == pytest.approx(14.0, abs=1e-6)
-
-
-def test_tracers_expire_after_their_life():
-    feel = ShotFeel(seed=0)
-    feel.on_shot("Precision gun", (300.0, 400.0), hit=False, crit=False)
-    feel.step(0.07)
-    assert feel.tracers == []
 
 
 def test_on_shot_has_no_return_value_to_feed_back_into_fire():

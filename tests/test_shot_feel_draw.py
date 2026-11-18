@@ -1,21 +1,22 @@
 """
 TASK_game_feel_1118 Phase 4: the draw-side of shot feel —
-``_draw_tracers``/``_draw_hit_markers``/``_draw_crit_impact`` in
-``src/ui_album/v3.py``, plus the screen-shake offset applied to the 3D
-scene viewport rect in ``_draw_photos``. Fake painters only, no GL —
-same style as ``tests/test_aim_cross.py``.
+``_draw_hit_markers``/``_draw_crit_impact`` in ``src/ui_album/v3.py``,
+plus the screen-shake offset applied to the 3D scene viewport rect in
+``_draw_photos``. Fake painters only, no GL — same style as
+``tests/test_aim_cross.py``.
+
+TASK_game_feel_fix_1118 Fix 6: the tracer and its tests (``_draw_tracers``
+and everything below "tracers") are gone — removed outright per the
+user's playtest note, not disabled.
 """
 
 from __future__ import annotations
 
 import pytest
 
-from src.ui_album.shot_feel import (CRIT_IMPACT_ALPHA, HITMARK_CRIT_COL,
-                                    HITMARK_OUTLINE_COL, MUZZLE_XY,
-                                    TRACER_EDGE_COL)
+from src.ui_album.shot_feel import CRIT_IMPACT_ALPHA, HITMARK_CRIT_COL, HITMARK_OUTLINE_COL
 from src.ui_album.v3 import (DESIGN_SIZE, V3State, _draw_crit_impact,
-                             _draw_hit_markers, _draw_photos, _draw_tracers,
-                             rgba)
+                             _draw_hit_markers, _draw_photos, rgba)
 
 
 class FakeWhiteCache:
@@ -38,61 +39,6 @@ class FakePainter:
     def quad_corners(self, corners, texture, tint=(1.0, 1.0, 1.0, 1.0),
                      uv=(0.0, 0.0, 1.0, 1.0)) -> None:
         self.quads.append((tuple(corners), texture, tint))
-
-
-# ---- tracers ---------------------------------------------------------
-def test_no_tracers_drawn_when_list_is_empty():
-    state = V3State()
-    painter = FakePainter()
-    _draw_tracers(painter, state)
-    assert painter.quads == []
-
-
-def test_one_line_tracer_draws_edge_then_core():
-    state = V3State()
-    state.tracers = [(MUZZLE_XY, (300.0, 400.0), 0.0, 2.5)]
-    painter = FakePainter()
-    _draw_tracers(painter, state)
-    assert len(painter.quads) == 2
-    assert painter.quads[0][2] == rgba(TRACER_EDGE_COL, 1.0)
-
-
-def test_expired_tracer_is_not_drawn():
-    state = V3State()
-    state.tracers = [(MUZZLE_XY, (300.0, 400.0), 0.07, 2.5)]  # age >= life
-    painter = FakePainter()
-    _draw_tracers(painter, state)
-    assert painter.quads == []
-
-
-def test_tracer_fades_with_age():
-    state = V3State()
-    state.tracers = [(MUZZLE_XY, (300.0, 400.0), 0.0, 2.5)]
-    fresh = FakePainter()
-    _draw_tracers(fresh, state)
-    state.tracers = [(MUZZLE_XY, (300.0, 400.0), 0.06, 2.5)]
-    old = FakePainter()
-    _draw_tracers(old, state)
-    assert old.quads[0][2][3] < fresh.quads[0][2][3]
-
-
-def test_shot_mode_draws_no_tracers():
-    state = V3State()
-    state.shot = True
-    state.tracers = [(MUZZLE_XY, (300.0, 400.0), 0.0, 2.5)]
-    painter = FakePainter()
-    _draw_tracers(painter, state)
-    assert painter.quads == []
-
-
-def test_three_line_tracer_draws_six_quads():
-    state = V3State()
-    state.tracers = [(MUZZLE_XY, (300.0, 400.0), 0.0, 3.0),
-                     (MUZZLE_XY, (290.0, 395.0), 0.0, 3.0),
-                     (MUZZLE_XY, (310.0, 405.0), 0.0, 3.0)]
-    painter = FakePainter()
-    _draw_tracers(painter, state)
-    assert len(painter.quads) == 6
 
 
 # ---- hit markers -------------------------------------------------------

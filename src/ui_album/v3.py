@@ -39,10 +39,7 @@ from src.ui_album.shot_feel import (CRIT_IMPACT_COL,
                                     HITMARK_CRIT_COL, HITMARK_CRIT_SCALE,
                                     HITMARK_INNER_PX, HITMARK_LIFE_S,
                                     HITMARK_OUTER_PX, HITMARK_OUTLINE_COL,
-                                    HITMARK_OUTLINE_PX, HITMARK_WIDTH_PX,
-                                    TRACER_CORE_COL, TRACER_CORE_FRACTION,
-                                    TRACER_EDGE_COL, TRACER_LIFE_S,
-                                    TRACER_TARGET_WIDTH_PX)
+                                    HITMARK_OUTLINE_PX, HITMARK_WIDTH_PX)
 from src.ui_album.textures import TextureCache, load_rgba, upload_rgba
 
 logger = logging.getLogger(__name__)
@@ -1102,7 +1099,7 @@ class V3State:
                  "hover", "focus", "caret", "alpha", "shot", "message", "wrap",
                  "extra", "mirror", "aim", "shots", "aim_ready", "confirm",
                  "text_rect", "fx_on", "fx_draw", "selected", "pressed",
-                 "hover_fx", "aim_kick_scale", "tracers", "hit_markers",
+                 "hover_fx", "aim_kick_scale", "hit_markers",
                  "crit_impact_alpha", "scene_shake", "scope_zoom")
 
     def __init__(self) -> None:
@@ -1185,8 +1182,6 @@ class V3State:
         #: shaking/marked right now"; ``v3_ui.py`` fills them in on
         #: PLAY/PVP_HUNT from its persistent ``ShotFeel``.
         self.aim_kick_scale: float = 1.0
-        #: ``[(muzzle, target, age_s, muzzle_width_px), ...]``.
-        self.tracers: list = []
         #: ``[(x, y, age_s, crit), ...]``.
         self.hit_markers: list = []
         self.crit_impact_alpha: float = 0.0
@@ -1310,7 +1305,6 @@ def draw_screen(painter: V3Painter, manifest: V3Manifest, screen: str,
     _draw_texts(painter, record, state)
     _draw_choose_photo_extra(painter, screen, state)
     _draw_shots(painter, state)
-    _draw_tracers(painter, state)
     _draw_aim(painter, state)
     _draw_scope_reticle(painter, state)
     _draw_hit_markers(painter, state)
@@ -1633,32 +1627,6 @@ def _flat_quad(painter, corners, colour) -> None:
     entry = painter.cache.white()
     if entry:
         painter.quad_corners(corners, entry[0], colour)
-
-
-def _draw_tracers(painter, state) -> None:
-    """TASK_game_feel_1118 P4: a tapered streak from the muzzle to the
-    crosshair, white core over a dark edge, fading over its 0.07 s life.
-    Fixed to the HUD (muzzle is the weapon icon) — unaffected by shake."""
-    if state.shot:
-        return
-    for muzzle, target, age, width_px in state.tracers:
-        if age >= TRACER_LIFE_S:
-            continue
-        fade = 1.0 - age / TRACER_LIFE_S
-        mx, my = muzzle
-        tx, ty = target
-        dx, dy = tx - mx, ty - my
-        length = math.hypot(dx, dy) or 1.0
-        nx, ny = -dy / length, dx / length
-        for col, fraction in ((TRACER_EDGE_COL, 1.0), (TRACER_CORE_COL,
-                                                        TRACER_CORE_FRACTION)):
-            hw_m = width_px * 0.5 * fraction
-            hw_t = TRACER_TARGET_WIDTH_PX * 0.5 * fraction
-            corners = ((mx + nx * hw_m, my + ny * hw_m),
-                      (tx + nx * hw_t, ty + ny * hw_t),
-                      (tx - nx * hw_t, ty - ny * hw_t),
-                      (mx - nx * hw_m, my - ny * hw_m))
-            _flat_quad(painter, corners, rgba(col, fade))
 
 
 def _draw_hit_markers(painter, state) -> None:
