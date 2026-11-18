@@ -7,7 +7,9 @@ swap."""
 
 from __future__ import annotations
 
+import queue
 import socket
+import threading
 import time
 
 import pytest
@@ -21,43 +23,69 @@ COMPETITIVE, HUNT_HIDE = PVP_MODES
 
 
 class FakeClient:
-    """A minimal synchronous PvP client over a real TCP socket."""
+    """A PvP client over a real TCP socket, built the same way as the real
+    ``src/net/client.py``: a background thread owns the socket and answers
+    ``ping`` the instant one arrives, regardless of what the test's main
+    thread happens to be blocked on.
+
+    TASK_game_feel_fix_1118 Fix 8: the original version only read the
+    socket (and so only replied to heartbeat pings) when the *test* called
+    ``recv()``. A test that fully drains one client's expected messages
+    before touching another client's (every multi-client test here does
+    this) left the other client's pings unanswered for however long that
+    took — long enough, intermittently, to blow past the fixture's tight
+    ``timeout_s``/``reconnect_s`` and get that perfectly healthy connection
+    heartbeat-killed by the server. A background reader removes that
+    test-only failure mode entirely, matching how a real client behaves."""
 
     def __init__(self, port: int, name: str = "P", version: str | None = None) -> None:
         self.name = name
         self.sock = socket.create_connection(("127.0.0.1", port), timeout=5.0)
-        self.reader = proto.LineReader()
-        self._pending: list[dict] = []
+        self.sock.settimeout(0.2)
+        self._reader = proto.LineReader()
+        self._queue: queue.Queue = queue.Queue()
+        self._send_lock = threading.Lock()
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
         self.send({"t": proto.HELLO, "name": name, "version": version or VERSION})
 
+    def _run(self) -> None:
+        try:
+            while not self._stop.is_set():
+                try:
+                    chunk = self.sock.recv(65536)
+                except socket.timeout:
+                    continue
+                except OSError:
+                    break
+                if not chunk:
+                    break
+                for msg in self._reader.feed(chunk):
+                    if msg.get("t") == proto.PING:
+                        self.send({"t": proto.PONG})
+                    else:
+                        self._queue.put(msg)
+        except OSError:
+            pass
+        # A closed/broken connection is a permanent state — put the
+        # sentinel back after every read so later calls see it too,
+        # instead of hanging until their own timeout.
+        self._queue.put(ConnectionError("connection closed"))
+
     def send(self, msg: dict) -> None:
-        self.sock.sendall(proto.encode(msg))
+        with self._send_lock:
+            self.sock.sendall(proto.encode(msg))
 
     def recv(self, timeout: float = 5.0) -> dict:
-        """Returns the next non-heartbeat message. A real client must
-        answer the server's ``ping`` with ``pong`` to stay alive past
-        ``Server._timeout_s`` — a passive test client that only reads when
-        asked would otherwise get closed by the server's own heartbeat, so
-        this auto-replies transparently, same as ``client.py`` will."""
-        deadline = time.monotonic() + timeout
-        while True:
-            if self._pending:
-                msg = self._pending.pop(0)
-                if msg.get("t") == proto.PING:
-                    self.send({"t": proto.PONG})
-                    continue
-                return msg
-            remaining = deadline - time.monotonic()
-            self.sock.settimeout(max(0.001, remaining))
-            try:
-                chunk = self.sock.recv(65536)
-            except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError) as exc:
-                # Windows raises these instead of returning b"" when the
-                # server closes the socket after a protocol violation.
-                raise ConnectionError("connection closed") from exc
-            if not chunk:
-                raise ConnectionError("connection closed")
-            self._pending = self.reader.feed(chunk)
+        try:
+            item = self._queue.get(timeout=timeout)
+        except queue.Empty:
+            raise TimeoutError("no message received in time") from None
+        if isinstance(item, BaseException):
+            self._queue.put(item)
+            raise item
+        return item
 
     def recv_type(self, t: str, timeout: float = 5.0) -> dict:
         deadline = time.monotonic() + timeout
@@ -70,10 +98,12 @@ class FakeClient:
                 return msg
 
     def close(self) -> None:
+        self._stop.set()
         try:
             self.sock.close()
         except OSError:
             pass
+        self._thread.join(timeout=2.0)
 
 
 def _bugs(n: int = 3) -> list[dict]:
@@ -83,8 +113,19 @@ def _bugs(n: int = 3) -> list[dict]:
 
 @pytest.fixture
 def server():
+    """TASK_game_feel_fix_1118 Fix 8: ``reconnect_s`` was 0.6 — tight
+    enough that ``test_rejoin_within_window_resumes_the_match``'s own
+    "disconnect, notice it, build a new socket, handshake, rejoin" path
+    could intermittently blow past it under scheduling jitter, forfeiting
+    the match before the rejoin arrived. 2.0 s keeps every other reconnect
+    test (which all use ``timeout=3.0`` or less on their own ``recv_type``
+    calls) comfortably inside its own wait, while giving the rejoin path
+    real headroom. ``FakeClient``'s background reader (see above) is what
+    actually fixed the OTHER half of Fix 8's flakiness — an idle-but-alive
+    client missing ``timeout_s``/``heartbeat_interval_s`` purely because
+    the test's main thread was busy draining a different client."""
     srv = Server("127.0.0.1", 0, beacon=False, heartbeat_interval_s=0.1,
-                 timeout_s=0.4, reconnect_s=0.6)
+                 timeout_s=0.4, reconnect_s=2.0)
     srv.start()
     yield srv
     srv.stop()
@@ -425,7 +466,7 @@ def test_opponent_is_notified_when_a_player_disconnects(server):
 def test_no_reconnect_within_window_forfeits_the_match_to_the_remaining_player(server):
     host, guest, ma, mb = _join_competitive(server)
     host.close()
-    end = guest.recv_type(proto.END, timeout=3.0)
+    end = guest.recv_type(proto.END, timeout=4.0)  # reconnect_s=2.0 + margin
     assert end["winner"] == "you" and end["reason"] == "opponent_disconnected"
     guest.close()
 
