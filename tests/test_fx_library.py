@@ -159,6 +159,70 @@ def test_try_spawn_counts_skipped_spawns_until_resident(gl_context, spec):
     library.release()
 
 
+# ---- TASK_game_feel_fix_1118 Fix 1: no partial effects --------------------
+def test_try_spawn_refuses_a_half_uploaded_sheet(gl_context, spec):
+    """A sheet mid-upload (allocated, some/no bands filled, NOT yet in
+    ``_textures`` — ``_finish()`` is the only thing that adds it there)
+    must not spawn, even though a naive "texture object exists" check
+    would see it."""
+    library = FxLibrary(spec)
+    library.check_capability()
+    player = FxPlayer(spec, seed=0)
+    key = "sheets/ui_confirm_1.png"
+    array = np.zeros((600, 10, 4), dtype=np.uint8)
+    item = library._allocate(key, array)
+    library._in_progress.append(item)
+    library._upload_band(item)                    # one band only — still in progress
+    assert item.next_row < item.height
+    assert key not in library._textures
+
+    assert library.try_spawn(player, "ui_confirm", 1.0, 1.0, words=False) is False
+    assert len(player._effects) == 0
+    assert library.skipped_spawns == 1
+
+    # finish the upload by hand, then it must spawn.
+    while item.next_row < item.height:
+        library._upload_band(item)
+    library._finish(item)
+    assert key in library._textures
+    assert library.try_spawn(player, "ui_confirm", 1.0, 1.0, words=False) is True
+    assert len(player._effects) == 1
+    library.release()
+
+
+def test_try_spawn_refuses_when_sheet_ready_but_word_is_not(gl_context, spec):
+    """TASK_game_feel_fix_1118 Fix 1: the exact bug the 1118 report's own
+    ``aa_burst.png`` "after" screenshot showed — a resident sheet with a
+    still-decoding word must NOT spawn (would draw the sheet with no
+    word); the reverse (word ready, sheet not) is the same bug mirrored
+    and is covered by the sheet-readiness check already."""
+    library = FxLibrary(spec)
+    library.check_capability()
+    player = FxPlayer(spec, seed=0)
+    assert _wait(lambda: library.get("sheets/ui_confirm_1.png") is not None, library)
+    assert "words/don_ink.png" not in library._textures
+
+    assert library.try_spawn(player, "ui_confirm", 1.0, 1.0, words=True) is False
+    assert len(player._effects) == 0
+    assert library.skipped_spawns == 1
+
+    # Without words, only the sheet matters — spawns fine.
+    assert library.try_spawn(player, "ui_confirm", 1.0, 1.0, words=False) is True
+    assert len(player._effects) == 1
+    library.release()
+
+
+def test_try_spawn_word_already_gates_correctly(gl_context, spec):
+    """``try_spawn_word`` (a bare word, no sheet) already checked
+    residency before this fix — confirms it still does, as a baseline."""
+    library = FxLibrary(spec)
+    library.check_capability()
+    player = FxPlayer(spec, seed=0)
+    assert library.try_spawn_word(player, "gogo", "ink", 1.0, 1.0, size=100.0) is False
+    assert library.skipped_spawns == 1
+    library.release()
+
+
 def test_start_preload_queues_every_key_and_eventually_settles(gl_context, spec):
     """TASK_game_feel_1118 P3: ``start_preload()`` is the fix for 1117's
     "cold on first screen" bug — every sheet/word decodes in the

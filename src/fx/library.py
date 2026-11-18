@@ -404,11 +404,23 @@ class FxLibrary:
     def try_spawn(self, player: FxPlayer, name: str, x: float, y: float, *,
                   mirror: bool | None = None, variant: int | None = None,
                   words: bool = True) -> bool:
-        """Spawn ``name`` on ``player`` if its chosen variant's sheet (and,
-        if ``words``, its word PNGs) are resident; else request them,
-        count it in ``skipped_spawns`` and skip (debug log) — never
-        spawns an effect that would render nothing because its texture
-        is still decoding."""
+        """Spawn ``name`` on ``player`` ONLY when its chosen variant's
+        sheet (every band uploaded — ``in self._textures`` only becomes
+        true in ``_finish()``, never for a half-uploaded ``_InProgress``)
+        AND every word PNG it uses (if ``words``) are ALL resident;
+        else request whatever's missing, count it in ``skipped_spawns``
+        and skip the WHOLE effect (debug log).
+
+        TASK_game_feel_fix_1118 Fix 1: this used to gate on the sheet
+        alone — the word PNGs were requested but never checked, so an
+        effect could spawn with a resident sheet and a still-decoding
+        word, drawing the sheet's frames with no word (or, since a
+        word's own PNG is tiny and often finishes first while a big
+        sheet is still mid-upload, a word with no sheet at all —
+        ``aa_burst.png``'s "after" shot in the P7 report showed exactly
+        that: DON with no burst). An effect must appear all at once or
+        not at all.
+        """
         if self.disabled_reason:
             return False
         effect = self._spec.effects[name]
@@ -416,20 +428,21 @@ class FxLibrary:
         ready = [i for i, v in enumerate(variants) if v["sheet"] in self._textures]
         for v in variants:
             self.request(v["sheet"])
+        word_keys = []
         if words:
             for cue in effect.get("words") or ():
-                self.request(self._spec.word_rel_path(cue["word"], cue["style"]))
-        if variant is not None:
-            if variant not in ready:
-                self.skipped_spawns += 1
-                logger.debug("FxLibrary: bo qua spawn %r bien the %d, chua san sang",
-                            name, variant)
-                return False
-        elif not ready:
+                key = self._spec.word_rel_path(cue["word"], cue["style"])
+                word_keys.append(key)
+                self.request(key)
+        words_ready = all(key in self._textures for key in word_keys)
+        sheet_ready = (variant in ready) if variant is not None else bool(ready)
+        if not sheet_ready or not words_ready:
             self.skipped_spawns += 1
-            logger.debug("FxLibrary: bo qua spawn %r, sheet chua san sang", name)
+            logger.debug(
+                "FxLibrary: bo qua spawn %r (sheet_ready=%s, words_ready=%s), "
+                "chua san sang het", name, sheet_ready, words_ready)
             return False
-        else:
+        if variant is None:
             variant = ready[0]
         player.spawn(name, x, y, mirror=mirror, variant=variant, words=words)
         return True
