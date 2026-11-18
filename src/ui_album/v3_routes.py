@@ -138,11 +138,17 @@ def _sign_in(state, name: str) -> str:
         else:
             state.player = state.player or "guest"
             state.account_key = _account_crypto.GUEST_KEY
+            # TASK_accounts_1119 Phase 5: khách không có tiến trình riêng
+            # — nếu còn history/recent của tài khoản TRƯỚC đó (đăng xuất
+            # rồi vào khách) thì phải dọn, không thì màn chính/bảng xếp
+            # hạng hiện nhầm dữ liệu của người khác.
+            state.history, state.recent = {}, []
             state.go(F.MENU)
     elif name == "link_guest":
         state.focus = None
         state.player = state.player or "guest"
         state.account_key = _account_crypto.GUEST_KEY
+        state.history, state.recent = {}, []
         state.go(F.MENU)
     elif name == "link_forgot":
         # TASK_accounts_1119 Phase 6 làm hộp thoại thật; ở đây giữ nguyên

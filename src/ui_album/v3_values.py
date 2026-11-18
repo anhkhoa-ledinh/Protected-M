@@ -1010,13 +1010,18 @@ def _pvp_rows(rows) -> list:
 
 
 # ---- bảng xếp hạng -----------------------------------------------------
-def _board(state, flow) -> None:
+def _board(state, flow, manifest=None, painter=None) -> None:
+    """TASK_accounts_1119 Phase 5: ``flow.history`` is whatever the
+    SIGNED-IN account loaded at sign-in (``V3UI._load_progress``) and
+    updated after each match since — this just reads it; nothing here
+    needs to know an account was ever involved."""
     best = max([int((flow.last_result or {}).get("score", 0))]
                + [int(r.get("score", 0)) for r in flow.history.values()])
     rank = _board_rank(best)
     state.texts["you_rank"] = str(rank if rank is not None else
                                   len(SAMPLE_BOARD) + 1)
-    state.texts["you_name"] = f"You · {flow.player or 'guest'}"
+    you_name = f"You · {flow.player or 'guest'}"
+    state.texts["you_name"] = _fit_name(manifest, painter, F.BOARD, "you_name", you_name)
     state.texts["you_score"] = str(best)
 
 
@@ -1096,5 +1101,5 @@ def state_for(manifest, painter, flow, game=None, aim=None, accounts=None) -> V3
     elif screen == F.PVP_RESULT:
         _pvp_result(state, flow, manifest, painter)
     elif screen == F.BOARD:
-        _board(state, flow)
+        _board(state, flow, manifest, painter)
     return state

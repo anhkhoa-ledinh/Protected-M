@@ -1608,6 +1608,10 @@ class HcpdApplication:
                         "date": time.strftime("%d/%m/%Y"),
                         "eaten": match.eaten_pct,
                         "score": match.score()}
+                # TASK_accounts_1119 Phase 5: save right after a match
+                # result (a signed-in account) or the one-time guest
+                # toast (never saved) — see V3UI.note_match_finished.
+                self._album.note_match_finished()
             state.go(F.WIN if ended == "win" else F.LOSE)
             self._album.game = None
 
@@ -3262,6 +3266,9 @@ class HcpdApplication:
 
             _prefs.save(self._root, self._window.display_mode,
                         self._window.remembered_rect())
+            # TASK_accounts_1119 Phase 5: save on exit too, not just after
+            # every match result — a no-op for guest/no account signed in.
+            self._album.save_progress()
         self._tracking.stop()
         self._camera.stop()
         if self._renderer is not None:

@@ -150,6 +150,10 @@ class V3UI:
         #: (gọi mỗi khung từ ``tick()``). Nút chính bỏ qua cú bấm lặp lại
         #: trong lúc ``account_busy`` là True.
         self._account_job: tuple | None = None
+        #: TASK_accounts_1119 Phase 5: the guest-only toast fires once
+        #: per PROCESS (not persisted — guest never persists anything),
+        #: the first time a guest match actually finishes.
+        self._guest_toast_shown = False
         if options.guest:
             self.state.player = "guest"
             self.state.account_key = account_crypto.GUEST_KEY
@@ -165,6 +169,7 @@ class V3UI:
                 account_store.save(root, self._account_data)
                 self.state.account_key = resumed_key
                 self.state.player = self._account_data["accounts"][resumed_key]["display"]
+                self._load_progress(resumed_key)
                 self.state.go(F.MENU)
             else:
                 # No session: pre-fill the username field with the last
@@ -512,6 +517,7 @@ class V3UI:
             self.state.player = self._account_data["accounts"][key]["display"]
             self.state.password = self.state.password2 = ""
             self.state.focus = None
+            self._load_progress(key)
             # TASK_accounts_1119 Phase 4: the switch's CURRENT state wins
             # on every sign-in — on means create/refresh a session, off
             # means make sure no stale one from an EARLIER sign-in (with
@@ -571,12 +577,57 @@ class V3UI:
         self.state.go(F.MENU)
         _ = code
 
+    def save_progress(self) -> None:
+        """TASK_accounts_1119 Phase 5: ``history``/``recent``/the best
+        score (derived from ``history``), so the leaderboard "you" row
+        and the menu photo caption/damage survive a restart. Called
+        after every match result, on sign-out and on exit (``app.py``) —
+        a no-op for guest (never saved) or no account signed in at all.
+        """
+        key = self.state.account_key
+        if not key or key == account_crypto.GUEST_KEY:
+            return
+        scores = [float(record.get("score", 0.0)) for record in self.state.history.values()
+                 if isinstance(record, dict)]
+        best_score = max(scores) if scores else None
+        account_store.save_progress(self._account_data, key, self.state.history,
+                                    self.state.recent, best_score)
+        account_store.save(self._account_root, self._account_data)
+
+    def note_match_finished(self) -> None:
+        """TASK_accounts_1119 Phase 5: call once right after a match
+        result is written into ``state.history`` (``app.py``'s
+        ``_tick_album_match``). A signed-in account saves immediately;
+        a guest instead gets a ONE-TIME toast (never saved — this IS the
+        explanation why)."""
+        if self.state.account_key == account_crypto.GUEST_KEY:
+            if not self._guest_toast_shown:
+                self._guest_toast_shown = True
+                F.say(self.state, "Playing as guest — create an album to keep your scores.")
+            return
+        self.save_progress()
+
+    def _load_progress(self, key: str) -> None:
+        """The other half of ``save_progress`` — called right after a
+        successful sign-in (``_apply_sign_in_result``) and on auto
+        sign-in at launch, so ``flow.history``/``recent`` reflect what
+        THIS account saved last time, not whatever a previous
+        guest/account session left in memory."""
+        progress = account_store.load_progress(self._account_data, key)
+        if progress is None:
+            return
+        self.state.history = progress["history"]
+        self.state.recent = progress["recent"]
+
     def sign_out(self) -> None:
         """TASK_accounts_1119 Phase 4: a deliberate sign-out must not
         leave a "remember me" session alive — same ``clear_session`` the
         switch's OFF path uses on a sign-in. Guest "sessions" never had
         one to begin with, but clearing ``session.json`` unconditionally
-        is still correct (and cheap) either way."""
+        is still correct (and cheap) either way. Phase 5: also the LAST
+        chance to persist this session's progress before the account
+        state about to be wiped by app.py's own "logout" handler."""
+        self.save_progress()
         key = self.state.account_key
         if key and key != account_crypto.GUEST_KEY:
             account_store.clear_session(self._account_root, self._account_data, key)
