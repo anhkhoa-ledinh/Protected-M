@@ -10,7 +10,9 @@ import time
 import numpy as np
 import pytest
 
-from src.fx.library import BAND_ROWS, FxLibrary
+from src.fx import screens as fx_screens
+from src.fx.library import (BAND_ROWS, FxLibrary, _all_fx_keys,
+                            _dedupe_priority, _sheet_keys_for)
 from src.fx.player import FxPlayer
 from src.fx.spec import load_spec
 from src.ui_album import v3_flow as F
@@ -242,6 +244,49 @@ def test_start_preload_queues_every_key_and_eventually_settles(gl_context, spec)
     library.start_preload()
     assert library.preload_total == total_before
     library.release()
+
+
+def test_star_five_moved_out_of_the_lowest_priority_catch_all(spec):
+    """TASK_game_feel_fix_1118 Fix 7: ``star_five`` showed nothing in
+    ``fx_win.png`` because its sheet keys only ever reached the decode
+    queue via the lowest-priority catch-all (``_all_fx_keys``), never via
+    ``MENU_SET``/``MATCH_SET`` — a fast first match can reach WIN before
+    that tier's turn comes up. No GL needed — this checks key ORDER, the
+    same logic ``start_preload`` builds its queue from."""
+    assert "star_five" in fx_screens.RESULT_SET
+    result_keys = _sheet_keys_for(spec, fx_screens.RESULT_SET)
+    assert result_keys  # the effect exists and has at least one sheet
+    menu_and_match = (set(_sheet_keys_for(spec, fx_screens.MENU_SET))
+                      | set(_sheet_keys_for(spec, fx_screens.MATCH_SET)))
+    # The sheet itself must be a genuinely new, higher-priority key — not
+    # something menu/match already covered (a shared word, e.g. a "pon"
+    # style, may legitimately already be covered; that's fine).
+    assert "sheets/star_five_1.png" in result_keys
+    assert "sheets/star_five_1.png" not in menu_and_match
+
+    before_fix = _dedupe_priority((
+        _sheet_keys_for(spec, fx_screens.MENU_SET),
+        _sheet_keys_for(spec, fx_screens.MATCH_SET),
+        _all_fx_keys(spec),
+    ))
+    after_fix = _dedupe_priority((
+        _sheet_keys_for(spec, fx_screens.MENU_SET),
+        _sheet_keys_for(spec, fx_screens.MATCH_SET),
+        _sheet_keys_for(spec, fx_screens.RESULT_SET),
+        _all_fx_keys(spec),
+    ))
+    # Every result-set key is guaranteed no worse off than before — and no
+    # longer relies on fx.json's effect ordering to coincidentally place
+    # the sheet early in the catch-all (which is all the old code did).
+    for key in result_keys:
+        assert after_fix.index(key) <= before_fix.index(key)
+    # The sheet's new position is now a GUARANTEE (RESULT_SET membership),
+    # not an accident of dict order: it sits immediately after menu+match,
+    # strictly before any key that comes ONLY from the catch-all.
+    catch_all_only = [k for k in _all_fx_keys(spec) if k not in menu_and_match
+                     and k not in result_keys]
+    star_five_pos = after_fix.index("sheets/star_five_1.png")
+    assert all(star_five_pos < after_fix.index(k) for k in catch_all_only)
 
 
 def test_upload_band_fills_in_fixed_row_bands_until_the_texture_is_done(gl_context, spec):

@@ -7,7 +7,10 @@ TASK_game_feel_1118 P3 replaced the original per-screen LAZY loading
 (``fx_button_primary.png``, ``fx_toast.png``) show no effect at all
 because of it. Now every fx sheet and word is decoded on background
 threads starting at launch (``start_preload``), menu set first, then the
-match set, then everything else, and uploaded in ROW BANDS (~128 rows per
+match set, then the result set (TASK_game_feel_fix_1118 Fix 7 —
+``star_five`` was stuck in the lowest-priority catch-all and could lose
+the race to a fast first match reaching WIN), then everything else, and
+uploaded in ROW BANDS (~128 rows per
 ``glTexSubImage2D`` call) capped at a total upload-time budget per frame
 (``MAX_UPLOAD_MS_PER_FRAME``) so even the biggest atlas never costs one
 frame more than that. Once uploaded, a texture stays resident for the
@@ -244,17 +247,26 @@ class FxLibrary:
             return False
         return True
 
-    # ---- P3: eager preload, menu set -> match set -> everything else ------
+    # ---- P3: eager preload, menu set -> match set -> result set -> rest ---
     def start_preload(self) -> None:
         """Call once, after ``check_capability()`` succeeds. Queues a
         background decode for EVERY fx sheet/word, in priority order, on
         the small SHARED worker pool (see ``_ensure_decode_workers``) —
-        never blocks."""
+        never blocks.
+
+        TASK_game_feel_fix_1118 Fix 7: ``RESULT_SET`` (``star_five``) gets
+        its own tier between ``MATCH_SET`` and the catch-all — WIN is
+        reached as fast as any menu/match screen (often the very first
+        match), so leaving it to the lowest-priority tier let players get
+        there before the sheet had decoded, i.e. the effect silently
+        never spawned (``try_spawn`` just reports "not ready").
+        """
         if self.disabled_reason or self._preload_started_t is not None:
             return
         order = _dedupe_priority((
             _sheet_keys_for(self._spec, fx_screens.MENU_SET),
             _sheet_keys_for(self._spec, fx_screens.MATCH_SET),
+            _sheet_keys_for(self._spec, fx_screens.RESULT_SET),
             _all_fx_keys(self._spec),
         ))
         self._preload_total = len(order)

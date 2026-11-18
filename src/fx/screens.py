@@ -26,6 +26,17 @@ MENU_SET = frozenset({"ui_confirm", "ui_tap", "toast_in"})
 #: PLAY/PVP_HUNT/PVP_HIDE: sprite sheets only, no word effect.
 MATCH_SET = frozenset({"hit_kill", "hit_crit", "hit_block", "star_pop"})
 
+#: TASK_game_feel_fix_1118 Fix 7: WIN/PVP_RESULT — ``star_pop`` is
+#: already in ``MATCH_SET`` above; ``star_five`` was NOT in any
+#: priority-preload set (only ``MENU_SET``/``MATCH_SET`` get decoded
+#: before the low-priority "everything else" catch-all), and WIN is a
+#: screen every player reaches in their very first match, same as the
+#: menu/match screens — a real (if rare) chance the player gets there
+#: before "star_five" has decoded, exactly why ``fx_win.png`` showed
+#: nothing in the 1118 report's own screenshot sequence (fast, automated,
+#: reaching WIN well before the low-priority tier finished).
+RESULT_SET = frozenset({"star_five"})
+
 _MATCH_SCREENS = (F.PLAY, F.PVP_HUNT, F.PVP_HIDE)
 _LOADING_SCREENS = (F.LOADING, F.LOADING_READY)
 _TILT_LOADOUT_SCREENS = (F.TILT, F.LOADOUT)
