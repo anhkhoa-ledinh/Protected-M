@@ -42,3 +42,31 @@ def test_save_can_change_screen_shake(tmp_path):
     assert prefs.load(tmp_path)["screen_shake"] is True
     prefs.save(tmp_path, "fullscreen", screen_shake=False)
     assert prefs.load(tmp_path)["screen_shake"] is False
+
+
+# ---- TASK_game_feel_fix_1118 Fix 10.4: hud_compact, same shape, no env ----
+
+def test_hud_compact_defaults_false_with_no_prefs_file(tmp_path):
+    assert prefs.hud_compact_enabled(tmp_path) is False
+    assert prefs.load(tmp_path)["hud_compact"] is False
+
+
+def test_hud_compact_true_in_prefs_file(tmp_path):
+    path = prefs.prefs_path(tmp_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"hud_compact": True}), encoding="utf-8")
+    assert prefs.hud_compact_enabled(tmp_path) is True
+
+
+def test_save_preserves_hud_compact_when_not_passed(tmp_path):
+    prefs.save(tmp_path, "window", hud_compact=True)
+    assert prefs.load(tmp_path)["hud_compact"] is True
+    prefs.save(tmp_path, "fullscreen")
+    assert prefs.load(tmp_path)["hud_compact"] is True
+
+
+def test_save_can_change_hud_compact(tmp_path):
+    prefs.save(tmp_path, "fullscreen", hud_compact=True)
+    assert prefs.load(tmp_path)["hud_compact"] is True
+    prefs.save(tmp_path, "fullscreen", hud_compact=False)
+    assert prefs.load(tmp_path)["hud_compact"] is False

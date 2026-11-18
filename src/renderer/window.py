@@ -151,6 +151,8 @@ class InputState:
     item_slot: int = 0
     #: TASK_shared_album_1111: U = "Share to album" ở màn chọn ảnh.
     share_to_album: bool = False
+    #: TASK_game_feel_fix_1118 Fix 10.4: H = bật/tắt HUD gọn, mọi súng.
+    hud_compact_toggle: bool = False
 
 
 #: Phím có tác dụng ở chế độ demo (PB-055; quyết định 11/10: demo không có phím
@@ -191,6 +193,7 @@ V3_KEYS = frozenset({
     glfw.KEY_R,                        # chơi lại ở màn kết quả
     glfw.KEY_1, glfw.KEY_2, glfw.KEY_3,  # ô vật phẩm
     glfw.KEY_U,                        # TASK_shared_album_1111: Share to album
+    glfw.KEY_H,                        # TASK_game_feel_fix_1118 Fix 10.4: HUD gọn
 })
 
 
@@ -275,6 +278,7 @@ class GlfwWindow:
         self._replay_requested = False
         self._item_slot_requested = 0
         self._share_to_album_requested = False
+        self._hud_compact_requested = False
         self._dropped_paths: list[str] = []
         #: TASK_album_ui_1106: chuột và chữ, chỉ giao diện album đọc tới.
         self._clicks: list[tuple[float, float]] = []
@@ -489,6 +493,7 @@ class GlfwWindow:
             replay=self._replay_requested,
             item_slot=self._item_slot_requested,
             share_to_album=self._share_to_album_requested,
+            hud_compact_toggle=self._hud_compact_requested,
             # Giao diện v3: Esc là "lùi một bước", và app tự quyết khi nào cú
             # lùi ấy nghĩa là thoát (``v3_routes.on_back``).
             quit_app=(False if self._ui_v3 else
@@ -525,6 +530,7 @@ class GlfwWindow:
         self._replay_requested = False
         self._item_slot_requested = 0
         self._share_to_album_requested = False
+        self._hud_compact_requested = False
         return result
 
     # ---- D1: chế độ hiển thị -------------------------------------------
@@ -973,6 +979,8 @@ class GlfwWindow:
             self._item_slot_requested = key - glfw.KEY_1 + 1
         elif key == glfw.KEY_U:
             self._share_to_album_requested = True
+        elif key == glfw.KEY_H:
+            self._hud_compact_requested = True
 
     def _on_drop(self, window, paths) -> None:
         _ = window

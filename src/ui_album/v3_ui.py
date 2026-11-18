@@ -16,11 +16,13 @@ from pathlib import Path
 from OpenGL import GL
 
 from src.config import prefs as _prefs
+from src.fx.anim import Spring
 from src.fx.library import FxLibrary
 from src.fx.player import FxPlayer
 from src.fx.spec import load_spec
 from src.ui_album import v3_routes, v3_values
 from src.ui_album import v3_flow as F
+from src.ui_album.hud_cards import card_index_for_point, cards_for_screen
 from src.ui_album.scope import ScopeState
 from src.ui_album.shot_feel import ShotFeel
 from src.ui_album.v3 import V3Manifest, V3Painter, draw_screen, hit_test, shot_state
@@ -76,6 +78,15 @@ _RANK_UP_DELAY_S = 0.5
 _TOAST_XY = (640.0, 648.0)
 _TOAST_PHOTOS_XY = (640.0, 596.0)
 
+#: TASK_game_feel_fix_1118 Fix 10.2/10.3: HUD card fade — unscoped
+#: proximity (crosshair within a card's rect, grown by this much) drops
+#: that one card to this alpha; scoped drops EVERY fadeable card to 0.
+#: Spring constants are the task's own numbers, shared by both targets —
+#: only ``.to`` differs.
+_HUD_FADE_GROW_PX = 48.0
+_HUD_FADE_PROXIMITY_ALPHA = 0.22
+_HUD_FADE_SPRING_K, _HUD_FADE_SPRING_D = 420.0, 26.0
+
 
 class V3UI:
     """Giao diện v3 gắn vào một cửa sổ GLFW đã có context."""
@@ -84,6 +95,10 @@ class V3UI:
         self.manifest = V3Manifest(root)
         self.painter = V3Painter(self.manifest, shader_dir)
         self.state = F.V3Flow()
+        #: TASK_game_feel_fix_1118 Fix 10.4: loaded once at startup, like
+        #: ``screen_shake``/``fx`` below — ``toggle_hud_compact`` and
+        #: ``app.py`` own writing it back to disk from then on.
+        self.state.hud_compact = _prefs.hud_compact_enabled(root)
         self.options = options
         self.game = None
         self.mouse = (0.0, 0.0)
@@ -105,6 +120,12 @@ class V3UI:
         #: right-mouse hold, finer-aim crosshair. ``app.py``'s
         #: ``_tick_scope`` drives it via the methods below.
         self._scope = ScopeState()
+        #: TASK_game_feel_fix_1118 Fix 10.2/10.3: one Spring per fadeable
+        #: HUD card on the CURRENT gun screen (``_tick_hud_fade``) — reset
+        #: whenever the screen changes, since PLAY/PVP_HUNT can have
+        #: different card layouts.
+        self._hud_springs: dict[int, Spring] = {}
+        self._hud_springs_screen: str | None = None
         #: Khung webcam đã lên GPU: ô ``camera`` của màn cài đặt / thử nghiêng.
         self._camera_entry = None
         self._camera_token = None
@@ -305,10 +326,56 @@ class V3UI:
         self._hover_last_t = now
         self._hover_fx.step(self.state.screen, self.hover(), dt)
         self._shot_feel.step(dt)
+        self._tick_hud_fade(dt)
         if self._fx_enabled:
             fx_dt = 0.0 if self._fx_last_t is None else max(0.0, now - self._fx_last_t)
             self._fx_last_t = now
             self._fx_player.step(fx_dt)
+
+    def _tick_hud_fade(self, dt: float) -> None:
+        """TASK_game_feel_fix_1118 Fix 10.2/10.3: one Spring per fadeable
+        card on the current gun screen (PLAY/PVP_HUNT — PVP_HIDE has no
+        gun/crosshair, same scope as the kick/shake/crit-impact block in
+        ``draw()``). Unscoped: the card under the (grown) crosshair fades
+        to ``_HUD_FADE_PROXIMITY_ALPHA``, every other card eases back to
+        1.0. Scoped: EVERY fadeable card fades to 0, regardless of
+        proximity. Stepped every ``tick()`` regardless of which screen
+        ``draw()`` ends up painting, so a spring already mid-flight keeps
+        converging even across a one-frame screen flicker."""
+        name = self.state.screen
+        if name not in (F.PLAY, F.PVP_HUNT):
+            self._hud_springs = {}
+            self._hud_springs_screen = None
+            return
+        cards = cards_for_screen(self.manifest, name)
+        if self._hud_springs_screen != name:
+            self._hud_springs = {index: Spring(1.0, _HUD_FADE_SPRING_K, _HUD_FADE_SPRING_D)
+                                 for index, card in enumerate(cards) if card.fades}
+            self._hud_springs_screen = name
+        if self.scope_visually_active:
+            for spring in self._hud_springs.values():
+                spring.to = 0.0
+        else:
+            near = card_index_for_point(cards, self.mouse, grow=_HUD_FADE_GROW_PX)
+            for index, spring in self._hud_springs.items():
+                spring.to = _HUD_FADE_PROXIMITY_ALPHA if index == near else 1.0
+        for spring in self._hud_springs.values():
+            spring.step(dt)
+
+    @property
+    def hud_card_alpha(self) -> dict:
+        """``{card index: current alpha}`` for ``v3.py``'s per-card draw —
+        empty on any screen without card-fade Springs (``state.card_alpha``
+        then defaults every index to 1.0, i.e. no fade)."""
+        return {index: spring.x for index, spring in self._hud_springs.items()}
+
+    def toggle_hud_compact(self) -> bool:
+        """TASK_game_feel_fix_1118 Fix 10.4: H key — flip in-memory state;
+        ``app.py`` owns persisting it to ``user_prefs.json`` (same split
+        as ``toggle_display``/``_apply_display_mode``). Returns the new
+        value."""
+        self.state.hud_compact = not self.state.hud_compact
+        return self.state.hud_compact
 
     def set_camera_frame(self, frame) -> None:
         """
@@ -347,6 +414,10 @@ class V3UI:
             state.pressed = self.mouse_down and state.hover is not None
             state.hover_fx = self._hover_fx
             state.camera_tex = self._camera_entry
+            #: TASK_game_feel_fix_1118 Fix 10.4: every HUD screen (incl.
+            #: PVP_HIDE — the hider's own HUD also gets the compact
+            #: toggle), copied from the persistent flow each frame.
+            state.hud_compact = self.state.hud_compact
             if scene_draw is not None:
                 state.viewport_draw = lambda rect: self._scene(rect, scene_draw)
             if self._window is not None:
@@ -367,6 +438,10 @@ class V3UI:
                 # zoom spring easing back to 1.0 after release.
                 state.scope_zoom = (self._scope.z
                                     if self.scope_visually_active else 1.0)
+                # TASK_game_feel_fix_1118 Fix 10.2/10.3: card alpha for
+                # THIS screen's cards — ``_tick_hud_fade`` (in ``tick()``)
+                # already stepped the Springs; this just reads them.
+                state.card_alpha = self.hud_card_alpha
         if self._fx_enabled:
             if name != self._fx_screen:
                 self._fx_library.enter_screen(name, self._fx_player)

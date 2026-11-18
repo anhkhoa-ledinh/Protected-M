@@ -197,6 +197,9 @@ class V3Flow:
     #: Đường dẫn app phải tải lên NGAY (khác ``shared_album_pending``: ô này
     #: không vẽ hộp thoại nào, chỉ là tín hiệu bàn giao cho ``_album_action``).
     shared_album_upload_path: str = ""
+    #: TASK_game_feel_fix_1118 Fix 10.4: HUD gọn, mọi súng — H bật/tắt,
+    #: nhớ qua ``assets/config/user_prefs.json`` ("hud_compact").
+    hud_compact: bool = False
 
     # ---- bảng cấp --------------------------------------------------------
     def level_name(self) -> str:

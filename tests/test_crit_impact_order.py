@@ -4,7 +4,9 @@ TASK_game_feel_fix_1118 Fix 4: the crit impact frame must draw BEFORE
 after, which painted the wash straight over the opaque cards, darkening
 them (``hud_layer_check.png``/G3). Real GL + manifest (``draw_screen``'s
 call tree needs every real painter method) with ``_draw_crit_impact``
-and ``painter.layer`` wrapped to record call ORDER, not their output.
+and ``painter.layer_region`` (Fix 10.1: PLAY's top.png now draws per
+HUD card, not as one ``painter.layer`` call — see
+``v3._draw_hud_top_cards``) wrapped to record call ORDER, not output.
 """
 
 from __future__ import annotations
@@ -31,19 +33,19 @@ def test_crit_impact_draws_before_the_top_layer(gl_context, monkeypatch):
 
     order: list = []
     real_crit_impact = v3._draw_crit_impact
-    real_layer = v3.V3Painter.layer
+    real_layer_region = v3.V3Painter.layer_region
 
     def tracking_crit_impact(painter_arg, state_arg):
         order.append("crit_impact")
         return real_crit_impact(painter_arg, state_arg)
 
-    def tracking_layer(self, rect, relative):
+    def tracking_layer_region(self, rect, relative, alpha=1.0):
         if relative == manifest.screens[F.PLAY].get("top"):
             order.append("top_layer")
-        return real_layer(self, rect, relative)
+        return real_layer_region(self, rect, relative, alpha)
 
     monkeypatch.setattr(v3, "_draw_crit_impact", tracking_crit_impact)
-    monkeypatch.setattr(v3.V3Painter, "layer", tracking_layer)
+    monkeypatch.setattr(v3.V3Painter, "layer_region", tracking_layer_region)
 
     painter.bind_screen(F.PLAY, v3_values.extra_files(manifest, F.PLAY, state))
     painter.begin()

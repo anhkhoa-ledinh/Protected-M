@@ -106,6 +106,11 @@ class HcpdApplication:
         # TASK_game_feel_1118 P6: Precision-gun scope — dt tracker for
         # stepping the zoom spring (``_tick_scope``).
         self._scope_last_t = None
+        # TASK_game_feel_fix_1118 Fix 10.4: one-shot onboarding toast, the
+        # first time a solo match actually starts (``_start_album_match``)
+        # — never shown again this process, and skipped entirely if the
+        # player already has compact mode on (loaded from prefs).
+        self._hud_compact_hint_shown = False
         # PB-055: demo đọc content.demo.json, không ghi file config nào, chỉ nhận
         # G, T, F6, kéo-thả, F4, Esc (lọc ở GlfwWindow).
         self._demo = bool(demo)
@@ -682,6 +687,8 @@ class HcpdApplication:
             state.slot_selected = int(input_state.item_slot)
         if input_state.share_to_album and state.screen == album.flow.PHOTOS:
             self._album_action(album.activate("btn_Share to album"), now)
+        if input_state.hud_compact_toggle:
+            self._apply_hud_compact(album.toggle_hud_compact())
         # Thanh âm lượng: bấm HOẶC kéo. Kéo phải đọc trạng thái phím chuột,
         # không đọc được qua danh sách cú bấm.
         if (state.screen == album.flow.SETTINGS
@@ -708,6 +715,16 @@ class HcpdApplication:
             self._album.state.display = mode
         P.save(self._root, mode, self._window.remembered_rect())
         self._refresh_window_plane()
+
+    def _apply_hud_compact(self, enabled: bool) -> None:
+        """Ghi lại HUD gọn (Fix 10.4) — cùng khuôn với
+        ``_apply_display_mode``: ``album`` đã tự đổi trạng thái trong bộ
+        nhớ (``toggle_hud_compact``), đây chỉ ghi xuống đĩa, giữ nguyên
+        display/window_rect đang có."""
+        from src.config import prefs as P
+
+        P.save(self._root, self._window.display_mode,
+               self._window.remembered_rect(), hud_compact=enabled)
 
     def _refresh_window_plane(self) -> None:
         """
@@ -2114,6 +2131,14 @@ class HcpdApplication:
                         weapon, spec.mag, spec.fire_s, spec.reload_s)
         self._album.game = match
         state.go(F.PLAY)
+        # TASK_game_feel_fix_1118 Fix 10.4: "Press H for a compact HUD" —
+        # once per process, the first time a match actually starts.
+        # Solo-only (the common first path to a gun screen); a player who
+        # reaches PvP has, in practice, already been through here once.
+        if (self._album_options.is_v3 and not self._hud_compact_hint_shown
+                and not state.hud_compact):
+            self._hud_compact_hint_shown = True
+            F.say(state, "Press H for a compact HUD")
 
     def _album_shots_step(self) -> None:
         """

@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 import logging
 import math
+import re
 from collections import OrderedDict
 from pathlib import Path
 
@@ -28,6 +29,7 @@ from PIL import Image, ImageDraw
 
 from src.renderer.shader import ShaderProgram
 from src.ui_album.fonts import FontBook
+from src.ui_album.hud_cards import element_card_map, cards_for_screen
 from src.ui_album.manifest import letterbox
 from src.ui_album.scope import (RETICLE_ARM_PX, RETICLE_COL, RETICLE_GAP_PX,
                                 RETICLE_THICK_PX, VIGNETTE_ALPHA,
@@ -382,6 +384,12 @@ TOAST_RECT = (340.0, 626.0, 600.0, 44.0)
 TOAST_RADIUS = 22.0
 TOAST_BG, TOAST_FG = "#24415F", "#FFFFFF"
 TOAST_FONT = {"ff": "Nunito", "fw": 800, "fs": 15.0, "col": TOAST_FG}
+
+#: TASK_game_feel_fix_1118 Fix 10: screens with a gameplay HUD — the
+#: card-fade/compact-toggle machinery only applies here (menus/results
+#: draw their ``top.png`` the old, single-quad way).
+HUD_CARD_SCREENS = frozenset({"v3_08_gameplay_hud", "v3_12a_pvp_hunter_hud",
+                              "v3_12b_pvp_bug_hud"})
 
 #: Code-drawn album buttons, with fixed rectangles matching the manifest
 #: hotspots. Share sits on the memory caption row; Random in the drop card.
@@ -774,6 +782,22 @@ class V3Painter:
         if entry:
             self.quad(rect, entry[0])
 
+    def layer_region(self, rect, relative: str | None, alpha: float = 1.0) -> None:
+        """TASK_game_feel_fix_1118 Fix 10.1: a SUB-RECT of a full-canvas
+        ``base``/``top`` layer image, own alpha — ``rect`` is one HUD
+        card's design-space rect (from ``hud_cards``). The image still
+        covers the WHOLE design canvas (same file as ``layer()`` draws),
+        so the UV sub-rect is just ``rect`` divided by ``DESIGN_SIZE`` —
+        this is what lets one card fade independently without the art
+        being baked into separate files per card."""
+        entry = self.screen_image(relative, big=True)
+        if not entry:
+            return
+        width, height = DESIGN_SIZE
+        x, y, w, h = rect
+        uv = (x / width, y / height, (x + w) / width, (y + h) / height)
+        self.quad(rect, entry[0], (1.0, 1.0, 1.0, float(alpha)), uv)
+
     def sprite(self, rect, relative: str | None, alpha: float = 1.0,
                mirror: bool = False) -> None:
         """``mirror`` lật ngang bằng UV — không cần file sprite thứ hai."""
@@ -957,7 +981,8 @@ class V3Painter:
             self.quad((rect[0], rect[1], entry[1] / scale, entry[2] / scale),
                       entry[0], colour)
 
-    def pip(self, rect, shape: str, radius: float, style: dict) -> None:
+    def pip(self, rect, shape: str, radius: float, style: dict,
+           alpha: float = 1.0) -> None:
         """
         Một pip: bầu dục hoặc chữ nhật bo góc, tô và/hoặc viền.
 
@@ -993,9 +1018,9 @@ class V3Painter:
         entry = self.pil.get(key, build)
         if entry:
             self.quad((rect[0], rect[1], entry[1] / scale, entry[2] / scale),
-                      entry[0])
+                      entry[0], (1.0, 1.0, 1.0, float(alpha)))
 
-    def pill(self, record: dict, text: str, style: dict) -> None:
+    def pill(self, record: dict, text: str, style: dict, alpha: float = 1.0) -> None:
         """
         Viên thuốc: nền bo góc + chữ canh giữa, dựng thành **một** texture.
 
@@ -1044,7 +1069,57 @@ class V3Painter:
 
         entry = self.pil.get(key, build)
         if entry:
-            self.quad((x, y, entry[1] / scale, entry[2] / scale), entry[0])
+            self.quad((x, y, entry[1] / scale, entry[2] / scale), entry[0],
+                      (1.0, 1.0, 1.0, float(alpha)))
+
+    def outlined_label(self, centre, text: str, font_spec: dict, fg: str,
+                       outline_col: str, outline_px: float,
+                       alpha: float = 1.0) -> None:
+        """TASK_game_feel_fix_1118 Fix 10.3: free-floating outlined text,
+        centred at ``centre`` — the scope's mini readout (ammo/timer/kills
+        just outside the ring), no background chip (unlike ``pill``).
+        PIL's own ``stroke_width``/``stroke_fill`` draw the outline —
+        cached the same way every other PIL-built label here is
+        (``_PilCache.get`` wants ``build()`` -> ``(array, meta)``; this one
+        has no use for ``meta``, pixel dims come back via ``entry[1:3]``
+        same as ``pill``'s own quad placement below)."""
+        k = self.k
+        scale = self.scale
+        size = float(font_spec["fs"])
+        spacing = float(font_spec.get("ls") or 0.0)
+        stroke_px = max(1, int(round(outline_px * scale)))
+        key = ("outlined_label", text, font_spec["ff"], font_spec["fw"],
+              round(size, 3), round(spacing, 3), fg, outline_col, stroke_px,
+              round(scale, 5))
+
+        def build():
+            metric = self.fonts.get(font_spec["ff"], font_spec["fw"], round(size * k))
+            glyph = self.fonts.get(font_spec["ff"], font_spec["fw"], round(size * scale))
+            total = _run_width(metric, text, spacing * k) / k
+            ascent_k, descent_k = metric.getmetrics()
+            ascent, descent = ascent_k / k, descent_k / k
+            pad = stroke_px + 2
+            design_w = total + 2.0 * pad / scale
+            width = max(2, int(round(design_w * scale)))
+            height = max(2, int(round((ascent + descent) * scale))) + 2 * pad
+            image = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+            pen = ImageDraw.Draw(image)
+            cursor = float(pad)
+            baseline = float(pad) + ascent * scale
+            fill, stroke_fill = _byte(fg), _byte(outline_col)
+            for char in text:
+                pen.text((cursor, baseline), char, font=glyph, fill=fill,
+                         stroke_width=stroke_px, stroke_fill=stroke_fill,
+                         anchor="ls")
+                cursor += (metric.getlength(char) / k + spacing) * scale
+            return np.asarray(image, dtype=np.uint8), None
+
+        entry = self.pil.get(key, build)
+        if entry:
+            cx, cy = float(centre[0]), float(centre[1])
+            design_w, design_h = entry[1] / scale, entry[2] / scale
+            self.quad((cx - design_w * 0.5, cy - design_h * 0.5, design_w, design_h),
+                      entry[0], (1.0, 1.0, 1.0, float(alpha)))
 
     # ---- ảnh người dùng --------------------------------------------------
     def cover(self, rect, source, clip=None) -> bool:
@@ -1100,7 +1175,8 @@ class V3State:
                  "extra", "mirror", "aim", "shots", "aim_ready", "confirm",
                  "text_rect", "fx_on", "fx_draw", "selected", "pressed",
                  "hover_fx", "aim_kick_scale", "hit_markers",
-                 "crit_impact_alpha", "scene_shake", "scope_zoom")
+                 "crit_impact_alpha", "scene_shake", "scope_zoom",
+                 "card_alpha", "hud_compact")
 
     def __init__(self) -> None:
         #: ``key`` → chuỗi (thay run đầu) hoặc danh sách chuỗi (thay từng run).
@@ -1191,6 +1267,14 @@ class V3State:
         #: TASK_game_feel_1118 P6: Precision-gun scope zoom, 1.0 = not
         #: scoped (no vignette/reticle drawn) up to 2.5 at full zoom.
         self.scope_zoom: float = 1.0
+        #: TASK_game_feel_fix_1118 Fix 10: card index (``hud_cards``) ->
+        #: current alpha 0-1 — ``v3_ui.py`` owns the Springs across
+        #: frames and fills this in each ``draw()`` for PLAY/PVP_HUNT/
+        #: PVP_HIDE; missing index = 1.0 (not faded).
+        self.card_alpha: dict = {}
+        #: Fix 10.4: H toggles this, persisted in prefs as "hud_compact".
+        #: Cards hide; small edge pills replace them.
+        self.hud_compact: bool = False
 
 
 def shot_state(manifest: V3Manifest, screen: str) -> V3State:
@@ -1296,13 +1380,30 @@ def draw_screen(painter: V3Painter, manifest: V3Manifest, screen: str,
     # scoped", a bigger, deliberate redesign rather than a one-line
     # reorder like this one.
     _draw_crit_impact(painter, state)
-    painter.layer(full, record.get("top"))
+    # TASK_game_feel_fix_1118 Fix 10: on a gameplay HUD screen, top.png
+    # draws per-CARD (its own alpha per card — proximity/scope fade,
+    # Fix 10.2/10.3) instead of one single full-canvas quad; "compact"
+    # mode (Fix 10.4) skips the cards entirely (edge pills instead).
+    is_hud = screen in HUD_CARD_SCREENS
+    compact = bool(state.hud_compact) and is_hud
+    card_map = element_card_map(manifest, screen) if is_hud else {}
+    if is_hud:
+        if not compact:
+            _draw_hud_top_cards(painter, manifest, screen, record, state)
+    else:
+        painter.layer(full, record.get("top"))
     _draw_scope_vignette(painter, state)
-    _draw_bars(painter, record, state)
-    _draw_pips(painter, record, state)
-    _draw_pills(painter, record, state)
-    _draw_sprites(painter, manifest, screen, record, state)
-    _draw_texts(painter, record, state)
+    _draw_bars(painter, record, state, card_map, compact)
+    _draw_pips(painter, record, state, card_map, compact)
+    _draw_pills(painter, record, state, card_map, compact)
+    _draw_sprites(painter, manifest, screen, record, state, card_map, compact)
+    _draw_texts(painter, record, state, card_map, compact)
+    if compact:
+        _draw_compact_hud(painter, state)
+    # Fix 10.3: drawn LAST of the HUD layer, on top of the (now-fading)
+    # cards — ammo/timer/kills must stay legible for the whole fade, not
+    # just once alpha hits exactly 0.
+    _draw_scope_mini_readout(painter, state)
     _draw_choose_photo_extra(painter, screen, state)
     _draw_shots(painter, state)
     _draw_aim(painter, state)
@@ -1361,10 +1462,133 @@ def _cover_texture(painter, rect, entry, mirror: bool = False) -> None:
     GL.glDisable(GL.GL_SCISSOR_TEST)
 
 
-def _draw_bars(painter, record, state) -> None:
+#: TASK_game_feel_fix_1118 Fix 10.4: item-slot family — "free" (no card),
+#: but shrunk to 70% in compact mode ("Item slots keep keys/icons at 70%
+#: size").
+_COMPACT_SHRINK_PREFIXES = ("islot", "ikey", "iused")
+_COMPACT_SHRINK = 0.70
+
+
+def _compact_shrunk_rect(rect):
+    x, y, w, h = (float(v) for v in rect)
+    nw, nh = w * _COMPACT_SHRINK, h * _COMPACT_SHRINK
+    return (x + (w - nw) * 0.5, y + (h - nh) * 0.5, nw, nh)
+
+
+def _card_fade(card_map: dict, state: V3State, key: str) -> tuple[int | None, float]:
+    """``(card index or None, current alpha)`` for ``key`` — 1.0/None for
+    anything free (never faded, never hidden by compact mode)."""
+    index = card_map.get(key)
+    if index is None:
+        return None, 1.0
+    return index, float(state.card_alpha.get(index, 1.0))
+
+
+def _draw_hud_top_cards(painter, manifest, screen, record, state) -> None:
+    """TASK_game_feel_fix_1118 Fix 10.1: draw ``top.png`` per CARD, each
+    at its own current alpha, instead of one single full-canvas quad —
+    this is what lets one card fade out while the rest of the HUD stays
+    put."""
+    top = record.get("top")
+    for index, card in enumerate(cards_for_screen(manifest, screen)):
+        alpha = float(state.card_alpha.get(index, 1.0)) if card.fades else 1.0
+        painter.layer_region(card.rect, top, alpha)
+
+
+#: TASK_game_feel_fix_1118 Fix 10.4: compact-mode edge pills — "manifest
+#: pills[] style" (white 0.92, #24415F text, radius h/2). ``bg`` carries
+#: its own alpha as an 8-digit hex (``rgba()`` parses it); 0.92*255 = 235
+#: = 0xEB.
+_COMPACT_PILL_H = 28.0
+_COMPACT_PILL_FONT = {"ff": "Nunito", "fw": 800, "fs": 13.0, "ls": 0.4}
+_COMPACT_PILL_STYLE = {"bg": "#FFFFFFEB", "fg": INK}
+_COMPACT_PAD = 12.0
+_COMPACT_MARGIN = 16.0
+
+
+def _compact_pill_spec(x: float, y: float) -> dict:
+    return {"rect": (x, y, 0.0, _COMPACT_PILL_H), "radius": _COMPACT_PILL_H / 2.0,
+            "pad": _COMPACT_PAD, "font": _COMPACT_PILL_FONT}
+
+
+def _compact_pill_width(painter: "V3Painter", text: str) -> float:
+    return painter.text_width([_COMPACT_PILL_FONT], [text]) + 2.0 * _COMPACT_PAD
+
+
+def _level_number_prefix(state: V3State) -> str:
+    """"Lv {N} · " from ``level_tab``'s own text ("LEVEL 5 · ..."), or ""
+    on a screen whose level_tab has no number (PvP's "PVP · ...")."""
+    match = re.search(r"\d+", str(state.texts.get("level_tab") or ""))
+    return f"Lv {match.group()} · " if match else ""
+
+
+def _joined_text(value) -> str:
+    if isinstance(value, (list, tuple)):
+        return "".join(str(v) for v in value)
+    return "" if value is None else str(value)
+
+
+def _draw_compact_hud(painter: "V3Painter", state: V3State) -> None:
+    """TASK_game_feel_fix_1118 Fix 10.4: ``draw_screen`` already skipped
+    every carded bar/pip/pill/text/sprite above — this is what replaces
+    them. Reads the SAME already-computed display strings the normal
+    cards show (``state.texts``/``state.bars``, filled in identically by
+    ``v3_values.py`` regardless of compact mode), just laid out as four
+    small edge pills instead of full panels."""
+    layer = str(state.texts.get("layer") or "").title()
+    top_left = f"{_level_number_prefix(state)}{layer}".strip()
+
+    kills = state.texts.get("kills")
+    if kills is None:
+        kills = state.texts.get("kills_you")
+    centre_parts = [str(state.texts.get("timer") or "")]
+    if kills is not None:
+        centre_parts.append(_joined_text(kills))
+    intact = state.texts.get("intact_value")   # already e.g. ["84", "%"]
+    if intact is not None:
+        centre_parts.append(_joined_text(intact))
+    top_centre = " · ".join(p for p in centre_parts if p)
+
+    hp = state.texts.get("hp_value")
+    bottom_left = f"♥ {hp}" if hp is not None else ""
+    st = state.texts.get("st_value")
+    if st is not None and "st" not in state.hidden:
+        bottom_left = f"{bottom_left} · {st}" if bottom_left else str(st)
+
+    ammo = state.texts.get("ammo")
+    if ammo is not None:
+        weapon = str(state.texts.get("weapon_name") or "")
+        bottom_right = f"{weapon} {_joined_text(ammo)}".strip()
+    else:
+        exposure = state.texts.get("exposure_value")
+        bottom_right = f"Exposure {exposure}" if exposure is not None else ""
+
+    design_w = DESIGN_SIZE[0]
+    if top_left:
+        painter.pill(_compact_pill_spec(_COMPACT_MARGIN, _COMPACT_MARGIN),
+                    top_left, _COMPACT_PILL_STYLE)
+    if top_centre:
+        width = _compact_pill_width(painter, top_centre)
+        painter.pill(_compact_pill_spec((design_w - width) * 0.5, _COMPACT_MARGIN),
+                    top_centre, _COMPACT_PILL_STYLE)
+    if bottom_left:
+        y = DESIGN_SIZE[1] - _COMPACT_MARGIN - _COMPACT_PILL_H
+        painter.pill(_compact_pill_spec(_COMPACT_MARGIN, y),
+                    bottom_left, _COMPACT_PILL_STYLE)
+    if bottom_right:
+        width = _compact_pill_width(painter, bottom_right)
+        x = design_w - _COMPACT_MARGIN - width
+        y = DESIGN_SIZE[1] - _COMPACT_MARGIN - _COMPACT_PILL_H
+        painter.pill(_compact_pill_spec(x, y), bottom_right, _COMPACT_PILL_STYLE)
+
+
+def _draw_bars(painter, record, state, card_map, compact: bool) -> None:
     for bar in record.get("bars", ()):
         key = bar["key"]
         if key in state.hidden:
+            continue
+        card_index, fade = _card_fade(card_map, state, key)
+        if compact and card_index is not None:
             continue
         x, y, w, h = (float(v) for v in bar["rect"])
         radius = float(bar.get("radius", 0.0))
@@ -1373,11 +1597,11 @@ def _draw_bars(painter, record, state) -> None:
             fraction = float(bar.get("sample_frac", 0.0))
         fraction = max(0.0, min(1.0, float(fraction)))
         if bar.get("rest_col"):
-            painter.rounded((x, y, w, h), radius, rgba(bar["rest_col"]))
+            painter.rounded((x, y, w, h), radius, rgba(bar["rest_col"], fade))
         # Không bao giờ hẹp hơn 2×radius (README): một viên bo góc bị bóp
         # dưới mức đó thành vệt nhòn nhọn, không còn là "thanh đầy 0 %".
         painter.rounded((x, y, max(w * fraction, 2.0 * radius), h), radius,
-                        rgba(bar["col"]))
+                        rgba(bar["col"], fade))
 
 
 def _pip_flags(spec: dict, state: V3State) -> list[bool]:
@@ -1392,10 +1616,13 @@ def _pip_flags(spec: dict, state: V3State) -> list[bool]:
     return [i < int(value) for i in range(total)]
 
 
-def _draw_pips(painter, record, state) -> None:
+def _draw_pips(painter, record, state, card_map, compact: bool) -> None:
     for spec in record.get("pips", ()):
         key = spec["key"]
         if key in state.hidden:
+            continue
+        card_index, fade = _card_fade(card_map, state, key)
+        if compact and card_index is not None:
             continue
         flags = _pip_flags(spec, state)
         limit = state.pips.get(f"{key}:limit")
@@ -1404,13 +1631,16 @@ def _draw_pips(painter, record, state) -> None:
                 continue          # pip vượt quá N thì ẩn hẳn (HUD lớp/đạn)
             style = spec["on"] if flags[index] else spec["off"]
             painter.pip(rect, spec.get("shape", "rect"),
-                        float(spec.get("radius", 0.0)), style)
+                        float(spec.get("radius", 0.0)), style, fade)
 
 
-def _draw_pills(painter, record, state) -> None:
+def _draw_pills(painter, record, state, card_map, compact: bool) -> None:
     for spec in record.get("pills", ()):
         key = spec["key"]
         if key in state.hidden:
+            continue
+        card_index, fade = _card_fade(card_map, state, key)
+        if compact and card_index is not None:
             continue
         text, style_name = state.pills.get(key, (None, None))
         if text is None:
@@ -1419,18 +1649,30 @@ def _draw_pills(painter, record, state) -> None:
         style = styles.get(style_name) if style_name else None
         if style is None:
             style = next(iter(styles.values()))
-        painter.pill(spec, str(text), style)
+        painter.pill(spec, str(text), style, fade)
 
 
-def _draw_sprites(painter, manifest, screen, record, state) -> None:
+def _draw_sprites(painter, manifest, screen, record, state, card_map,
+                  compact: bool) -> None:
     for sprite in record.get("sprites", ()):
         key = sprite["key"]
         if key in state.hidden or key not in state.sprites:
             continue
+        card_index, fade = _card_fade(card_map, state, key)
+        if compact and card_index is not None:
+            continue
         where = state.sprites[key]
         rect = sprite["rect"] if where is True else where
+        if compact and key.startswith(_COMPACT_SHRINK_PREFIXES):
+            rect = _compact_shrunk_rect(rect)
         painter.sprite(rect, sprite.get("file"),
-                       float(state.alpha.get(key, 1.0)), key in state.mirror)
+                       float(state.alpha.get(key, 1.0)) * fade, key in state.mirror)
+    # TASK_game_feel_fix_1118 Fix 10: borrowed sprites (a non-Precision
+    # weapon's icon, lent from the loadout screen) deliberately skip card
+    # fade/compact-hide here — a rare path (2 of 3 weapons), own rect
+    # already matches "weapon_icon:Precision gun"'s card above, and the
+    # only thing Fix 10 actually needs from it (not crashing, not
+    # double-drawing) already holds.
     for label, (other, key, rect) in state.borrowed.items():
         borrowed = manifest.sprite(other, key)
         if borrowed is not None:
@@ -1440,15 +1682,20 @@ def _draw_sprites(painter, manifest, screen, record, state) -> None:
     _ = screen
 
 
-def _draw_texts(painter, record, state) -> None:
+def _draw_texts(painter, record, state, card_map, compact: bool) -> None:
     for spec in record.get("texts", ()):
         key = spec["key"]
         if key in state.hidden:
             continue
+        card_index, fade = _card_fade(card_map, state, key)
+        if compact and card_index is not None:
+            continue
         runs = _runs_for(spec, state)
         texts = _texts_for(spec, state)
-        alpha = float(state.alpha.get(key, 1.0))
+        alpha = float(state.alpha.get(key, 1.0)) * fade
         rect = [float(v) for v in state.text_rect.get(key, spec["rect"])]
+        if compact and key.startswith(_COMPACT_SHRINK_PREFIXES):
+            rect = list(_compact_shrunk_rect(rect))
         if spec.get("wrap") and state.wrap:
             line_h = float(spec.get("line_h") or rect[3])
             lines = _wrap_lines(painter, runs, texts, rect[2])
@@ -1735,6 +1982,57 @@ def _draw_scope_vignette(painter, state) -> None:
     if entry is not None:
         size = half * 2.0
         painter.quad((cx - half, cy - half, size, size), entry[0])
+
+
+#: TASK_game_feel_fix_1118 Fix 10.3: scope mini readout — Nunito 800,
+#: white, 2px #24415F outline, 18 design px, "just outside the ring".
+_SCOPE_READOUT_FONT = {"ff": "Nunito", "fw": 800, "fs": 18.0}
+_SCOPE_READOUT_FG = "#FFFFFF"
+_SCOPE_READOUT_OUTLINE_COL = "#24415F"
+_SCOPE_READOUT_OUTLINE_PX = 2.0
+#: Clear of the ring's own soft edge (``VIGNETTE_SOFT_PX``) plus room for
+#: the label's own half-height, so it never overlaps the vignette.
+_SCOPE_READOUT_MARGIN_PX = 34.0
+_SCOPE_READOUT_RADIUS_PX = VIGNETTE_RADIUS_PX + _SCOPE_READOUT_MARGIN_PX
+#: "lower-right ~40°" (task's own wording) — mirrored for the lower-left
+#: kills readout; "top" for the timer is the vertical case (90°).
+_SCOPE_READOUT_SIDE_DEG = 40.0
+
+
+def _draw_scope_mini_readout(painter, state) -> None:
+    """TASK_game_feel_fix_1118 Fix 10.3: while scoped, the cards have
+    faded to 0 (``_card_fade``/``state.card_alpha``, driven by
+    ``v3_ui.py``'s Springs) — this is what replaces them: ammo "9/12"
+    lower-right, timer top, kills lower-left, all just outside the scope
+    ring, so the player still has the three numbers that matter without
+    the cards blocking their aim."""
+    if (state.shot or state.aim is None
+            or state.scope_zoom <= 1.0 + ZOOM_SETTLED_EPS):
+        return
+    cx, cy = float(state.aim[0]), float(state.aim[1])
+    r = _SCOPE_READOUT_RADIUS_PX
+    rad = math.radians(_SCOPE_READOUT_SIDE_DEG)
+    dx, dy = math.cos(rad), math.sin(rad)
+
+    ammo = state.texts.get("ammo")
+    if ammo is not None:
+        _draw_scope_readout_label(painter, (cx + r * dx, cy + r * dy),
+                                  _joined_text(ammo))
+    timer = state.texts.get("timer")
+    if timer is not None:
+        _draw_scope_readout_label(painter, (cx, cy - r), str(timer))
+    kills = state.texts.get("kills")
+    if kills is None:
+        kills = state.texts.get("kills_you")
+    if kills is not None:
+        _draw_scope_readout_label(painter, (cx - r * dx, cy + r * dy),
+                                  _joined_text(kills))
+
+
+def _draw_scope_readout_label(painter, centre, text: str) -> None:
+    painter.outlined_label(centre, text, _SCOPE_READOUT_FONT,
+                           _SCOPE_READOUT_FG, _SCOPE_READOUT_OUTLINE_COL,
+                           _SCOPE_READOUT_OUTLINE_PX)
 
 
 def _draw_scope_reticle(painter, state) -> None:
