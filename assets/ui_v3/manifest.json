@@ -215,6 +215,29 @@
      ],
      "sample": "••••••••",
      "lines": 1
+    },
+    {
+     "key": "hint",
+     "rect": [
+      488.0,
+      471.3,
+      240.0,
+      18.0
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "Username already taken",
+       "ff": "Nunito",
+       "fw": 700,
+       "fs": 13.0,
+       "col": "#E8676B",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Username already taken",
+     "lines": 1
     }
    ],
    "bars": [],
@@ -327,6 +350,23 @@
       18
      ],
      "default": true
+    },
+    {
+     "key": "hint_bad",
+     "file": "sprites/v3_01b_sign_up__hint_bad.png",
+     "rect": [
+      462.0,
+      472.0,
+      18.0,
+      18.0
+     ],
+     "anchor": [
+      462,
+      472,
+      18,
+      18
+     ],
+     "default": false
     }
    ],
    "notes": [
@@ -383,6 +423,29 @@
       }
      ],
      "sample": "••••••",
+     "lines": 1
+    },
+    {
+     "key": "error",
+     "rect": [
+      487.0,
+      367.0,
+      260.0,
+      20.0
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "Wrong password. Try again.",
+       "ff": "Nunito",
+       "fw": 700,
+       "fs": 13.0,
+       "col": "#E8676B",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "Wrong password. Try again.",
      "lines": 1
     }
    ],
@@ -1643,11 +1706,21 @@
     },
     {
      "n": "dropzone",
-     "rect": [84, 172, 600, 400]
+     "rect": [
+      84,
+      172,
+      600,
+      400
+     ]
     },
     {
      "n": "recent_memory",
-     "rect": [728, 176, 488, 262]
+     "rect": [
+      728,
+      176,
+      488,
+      262
+     ]
     }
    ],
    "sprites": [

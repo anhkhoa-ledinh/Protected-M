@@ -214,6 +214,22 @@ def test_hint_ok_when_nothing_touched_has_a_problem(manifest, painter_stub):
     assert state.sprites.get("hint_bad") is None
 
 
+def test_hint_text_key_is_explicitly_hidden_when_ok(manifest, painter_stub):
+    """Regression: ``_draw_texts`` falls back to the manifest's own
+    SAMPLE text (``v3_01b_sign_up``'s "hint" run is literally "Username
+    already taken", so every screen has placeholder content for
+    --ui-shots) whenever a key is ABSENT from ``state.texts`` — found by
+    rendering v3_01b with a real GL context and seeing the green
+    hint_ok sprite overlap with red leftover sample text. The "ok"
+    branch must explicitly hide "hint", not just skip setting it."""
+    flow = _flow(F.SIGN_UP)
+    flow.player, flow.password, flow.password2 = "gooduser", "password123", "password123"
+    flow.touched = {"field_user", "field_pass", "field_pass2"}
+    state = _signup_state(manifest, painter_stub, flow, {"accounts": {}})
+    assert "hint" in state.hidden
+    assert state.texts.get("hint") is None
+
+
 def test_hint_hidden_until_the_field_is_touched(manifest, painter_stub):
     """A field with a problem that has NOT been typed into yet must not
     show a hint — the task's own "shown only once the user has typed
@@ -230,6 +246,72 @@ def test_sign_in_error_screen_shows_the_dynamic_error_text(manifest, painter_stu
     flow.sign_in_error = "Wrong password. Try again."
     state = _signup_state(manifest, painter_stub, flow)
     assert state.texts.get("error") == "Wrong password. Try again."
+
+
+# ---- name fitting: every username slot, measured with the real font -------
+
+@pytest.fixture
+def real_painter(gl_context, manifest):
+    from src.ui_album.v3 import V3Painter
+
+    painter = V3Painter(manifest, ROOT / "assets" / "shaders")
+    painter.initialize()
+    yield painter
+    painter.release()
+
+
+#: (screen, key) for every slot TASK_accounts_1119 names: player_name
+#: (menu), the PvP you_name/host_name/opp_name slots. Initials are a
+#: single char — never need fitting, not included here.
+NAME_SLOTS = [
+    ("v3_02a_menu", "player_name"),
+    ("v3_11a_pvp_searching", "you_name"),
+    ("v3_11b_pvp_invite", "host_name"),
+    ("v3_11c_pvp_found", "you_name"),
+    ("v3_11c_pvp_found", "opp_name"),
+    ("v3_13_pvp_result", "you_name"),
+    ("v3_13_pvp_result", "opp_name"),
+]
+
+
+@pytest.mark.parametrize("screen,key", NAME_SLOTS)
+def test_sixteen_char_name_fits_every_slot(manifest, real_painter, screen, key):
+    name16 = "A" * 16
+    fitted = v3_values._fit_name(manifest, real_painter, screen, key, name16)
+    record = manifest.text(screen, key)
+    width = real_painter.text_width([record["runs"][0]], [fitted])
+    assert width <= float(record["rect"][2])
+
+
+def test_fit_name_truncates_with_ellipsis_when_too_long(manifest, real_painter):
+    fitted = v3_values._fit_name(manifest, real_painter, "v3_02a_menu",
+                                 "player_name", "A" * 16)
+    assert fitted.endswith("…")
+    assert fitted != "A" * 16
+
+
+def test_fit_name_leaves_a_short_name_unchanged(manifest, real_painter):
+    fitted = v3_values._fit_name(manifest, real_painter, "v3_02a_menu", "player_name", "ab")
+    assert fitted == "ab"
+
+
+def test_fit_name_handles_a_missing_painter_gracefully(manifest):
+    fitted = v3_values._fit_name(manifest, None, "v3_02a_menu", "player_name", "A" * 16)
+    assert fitted == "A" * 16   # unfitted, not a crash — the --ui-shots path
+
+
+def test_network_supplied_opponent_name_is_fitted_in_the_real_flow(manifest, real_painter):
+    """The PvP opponent's name arrives over the wire with no length
+    promise from this side — the live _pvp_lobby/_pvp_result code paths
+    (not just the pure _fit_name helper) must fit it too."""
+    flow = _flow(F.PVP_FOUND)
+    flow.mode = F.PVP_MODES[0]
+    flow.pvp_opponent_name = "B" * 40
+    state = v3_values.state_for(manifest, real_painter, flow, accounts={"accounts": {}})
+    record = manifest.text(F.PVP_FOUND, "opp_name")
+    width = real_painter.text_width([record["runs"][0]], [state.texts["opp_name"]])
+    assert width <= float(record["rect"][2])
+    assert state.texts["opp_name"] != "B" * 40
 
 
 # ---- end-to-end async flow through V3UI (real GL, no fx) -------------------

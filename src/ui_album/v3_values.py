@@ -61,6 +61,49 @@ def _initial(name: str) -> str:
     return text[:1].upper() if text else "?"
 
 
+#: TASK_accounts_1119: ellipsis for a username slot that doesn't fit —
+#: one character, so it costs almost nothing of the (narrow) rect it's
+#: cut INTO.
+_NAME_ELLIPSIS = "…"
+
+
+def _fit_name(manifest, painter, screen: str, key: str, text: str) -> str:
+    """Cuts ``text`` with "…" so it fits ``key``'s own rect on ``screen``,
+    measured with the REAL font (``painter.text_width`` — FreeType glyph
+    advances, not a character-count guess). Every text slot that shows a
+    username (``player_name``, the PvP ``you_name``/``host_name``/
+    ``opp_name`` — the LAST one is NETWORK-SUPPLIED, another player's
+    display name, so it must never be trusted to already fit) goes
+    through this.
+
+    ``painter`` may be ``None`` (``--ui-shots``' ``shot_state`` path, and
+    a couple of tests that don't need a real one) — returns ``text``
+    unfitted rather than crash; the manifest's own baked layout already
+    assumes its SAMPLE name fits, so this only matters for live data.
+    """
+    if painter is None or manifest is None:
+        return text
+    record = manifest.text(screen, key)
+    if record is None:
+        return text
+    run = record["runs"][0]
+    max_width = float(record["rect"][2])
+    if painter.text_width([run], [text]) <= max_width:
+        return text
+    if painter.text_width([run], [_NAME_ELLIPSIS]) > max_width:
+        return _NAME_ELLIPSIS       # pathological: rect too narrow even for "…"
+    lo, hi, best = 0, len(text), _NAME_ELLIPSIS
+    while lo <= hi:
+        mid = (lo + hi) // 2
+        candidate = text[:mid] + _NAME_ELLIPSIS
+        if painter.text_width([run], [candidate]) <= max_width:
+            best = candidate
+            lo = mid + 1
+        else:
+            hi = mid - 1
+    return best
+
+
 def _stem(path) -> str:
     from pathlib import Path
 
@@ -199,15 +242,23 @@ def _sign_in(state, flow, accounts: dict | None = None) -> None:
         problem = _signup_problem(flow, accounts)
         if problem is None:
             state.sprites["hint_ok"] = True
+            # Chưa đặt ``state.texts["hint"]`` KHÔNG có nghĩa là ẩn —
+            # lớp vẽ coi khoá vắng mặt là "giữ nguyên chữ mẫu trong
+            # manifest" (để màn nào cũng đủ chữ cho --ui-shots), nên
+            # phải ẩn THẬT bằng ``state.hidden`` ở đây, nếu không chữ
+            # mẫu "Username already taken" đè lên đúng lúc hint_ok xanh
+            # đang hiện.
+            state.hidden.add("hint")
         else:
             state.sprites["hint_bad"] = True
             state.texts["hint"] = problem
 
 
 # ---- màn chính ---------------------------------------------------------
-def _menu(state, flow) -> None:
-    state.texts["player_name"] = flow.player or "guest"
-    state.texts["player_initial"] = _initial(flow.player or "guest")
+def _menu(state, flow, manifest=None, painter=None) -> None:
+    name = flow.player or "guest"
+    state.texts["player_name"] = _fit_name(manifest, painter, F.MENU, "player_name", name)
+    state.texts["player_initial"] = _initial(name)
     photo = flow.photo or (flow.recent[0] if flow.recent else None)
     state.photo = photo
     index = (len(flow.history) % 99) + 1
@@ -861,14 +912,14 @@ def _board_rank(score: int) -> int | None:
 
 
 # ---- PvP ---------------------------------------------------------------
-def _pvp_lobby(state, flow, now) -> None:
+def _pvp_lobby(state, flow, now, manifest=None, painter=None) -> None:
     screen = flow.screen
     state.texts["eyebrow"] = (f"PVP · {flow.mode.upper()}"
                               if screen == F.PVP_INVITE else
                               f"PVP · {flow.mode.upper()} · LEVEL {flow.level}")
     name = flow.player or "guest"
     for key in ("you_name", "host_name"):
-        state.texts[key] = name
+        state.texts[key] = _fit_name(manifest, painter, screen, key, name)
     for key in ("you_initial", "host_initial"):
         state.texts[key] = _initial(name)
     if screen == F.PVP_SEARCH:
@@ -882,8 +933,12 @@ def _pvp_lobby(state, flow, now) -> None:
         state.focus = "field_join" if flow.focus == "field_join" else None
     elif screen == F.PVP_FOUND:
         state.texts["countdown"] = str(max(1, 3 - int(now - flow.found_at_s)))
+        # TASK_accounts_1119: NETWORK-SUPPLIED — the opponent's own typed
+        # display name, arrives over the wire with no length guarantee
+        # from this side. Fitting it is the one case here that is not
+        # just cosmetic.
         opp_name = flow.pvp_opponent_name or "Opponent"
-        state.texts["opp_name"] = opp_name
+        state.texts["opp_name"] = _fit_name(manifest, painter, screen, "opp_name", opp_name)
         state.texts["opp_initial"] = _initial(opp_name)
         # TASK_pvp_fix_1116: tính lại mỗi khung (app._pvp_lobby_message),
         # không phải một toast F.say 30 s — nếu không thì "đè" lên giá trị
@@ -893,7 +948,7 @@ def _pvp_lobby(state, flow, now) -> None:
             state.message = flow.pvp_lobby_message
 
 
-def _pvp_result(state, flow, manifest) -> None:
+def _pvp_result(state, flow, manifest=None, painter=None) -> None:
     """
     TASK_pvp_lan_1116: dữ liệu THẬT — ``flow.last_result`` được ``app.py``
     đổ từ thông điệp ``end`` của server (``winner``/``scores``/``rows``/
@@ -910,11 +965,12 @@ def _pvp_result(state, flow, manifest) -> None:
     state.colours["title"] = SAFE if won else DANGER
     state.texts["eyebrow"] = f"PVP · {flow.mode.upper()} · LEVEL {flow.level}"
     name = flow.player or "guest"
-    state.texts["you_name"] = name
+    state.texts["you_name"] = _fit_name(manifest, painter, screen, "you_name", name)
     state.texts["you_initial"] = _initial(name)
     state.texts["you_score"] = str(you)
+    # TASK_accounts_1119: NETWORK-SUPPLIED, same as _pvp_lobby's opp_name.
     opp_name = result.get("opp_name") or "Opponent"
-    state.texts["opp_name"] = opp_name
+    state.texts["opp_name"] = _fit_name(manifest, painter, screen, "opp_name", opp_name)
     state.texts["opp_initial"] = _initial(opp_name)
     state.texts["opp_score"] = str(opponent)
     state.pills["you_pill"] = ("won this match" if won else "runner-up",
@@ -1006,7 +1062,7 @@ def state_for(manifest, painter, flow, game=None, aim=None, accounts=None) -> V3
     if screen in F.LOCKED:
         _sign_in(state, flow, accounts)
     elif screen == F.MENU:
-        _menu(state, flow)
+        _menu(state, flow, manifest, painter)
     elif screen == F.SETTINGS:
         _settings(state, flow)
     elif screen == F.OFFLINE:
@@ -1036,9 +1092,9 @@ def state_for(manifest, painter, flow, game=None, aim=None, accounts=None) -> V3
         _result(state, flow, manifest, win=False)
         state.photo = flow.photo
     elif screen in (F.PVP_SEARCH, F.PVP_INVITE, F.PVP_FOUND):
-        _pvp_lobby(state, flow, now)
+        _pvp_lobby(state, flow, now, manifest, painter)
     elif screen == F.PVP_RESULT:
-        _pvp_result(state, flow, manifest)
+        _pvp_result(state, flow, manifest, painter)
     elif screen == F.BOARD:
         _board(state, flow)
     return state
