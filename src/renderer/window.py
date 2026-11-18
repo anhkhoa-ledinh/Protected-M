@@ -37,6 +37,31 @@ def viewport_size(
     return int(fallback[0]), int(fallback[1])
 
 
+def letterbox_rect(
+    framebuffer_size: tuple[int, int],
+    aspect: tuple[int, int] = ASPECT,
+) -> tuple[int, int, int, int]:
+    """
+    TASK_game_feel_fix_1118 Fix 9: the largest ``aspect``-ratio box that
+    fits centred inside ``framebuffer_size``, as ``(x, y, w, h)`` pixels
+    (origin at the bottom-left, matching GL viewport convention).
+
+    Pure/no-GL so the resize-drag blit path's geometry is unit-testable —
+    ``(0, 0, 0, 0)`` for a degenerate (zero-area) framebuffer, same "don't
+    divide by zero" posture as :func:`viewport_size` above.
+    """
+    width, height = int(framebuffer_size[0]), int(framebuffer_size[1])
+    if width <= 0 or height <= 0:
+        return (0, 0, 0, 0)
+    aw, ah = aspect
+    box_w, box_h = width, round(width * ah / aw)
+    if box_h > height:
+        box_h = height
+        box_w = round(height * aw / ah)
+    box_w, box_h = max(1, int(box_w)), max(1, int(box_h))
+    return ((width - box_w) // 2, (height - box_h) // 2, box_w, box_h)
+
+
 def fullscreen_target(
     enabled: bool,
     monitor,
@@ -197,6 +222,19 @@ class GlfwWindow:
         self._refresh_handler = None
         self._logged_dpi = False
         self._window = None
+        #: TASK_game_feel_fix_1118 Fix 9: True trong lúc ``glfw.poll_events()``
+        #: đang chạy — khi kéo cạnh cửa sổ (Windows modal loop) đây có thể
+        #: kéo dài suốt cả lượt kéo, với callback vẽ-lại nổ ra NHIỀU lần
+        #: trước khi ``poll_events()`` trả về. Chỉ để đo/log; đường vẽ-lại
+        #: (``draw_last_frame_letterboxed``) không rẽ nhánh theo cờ này —
+        #: nó rẻ đủ để luôn an toàn, bất kể cờ.
+        self._poll_events_active = False
+        #: Fix 9: bản chụp khung vừa vẽ xong, để vẽ-lại RẺ (chỉ blit, không
+        #: vẽ lại toàn cảnh) trong lúc kéo cạnh. Cấp lại khi cỡ đổi.
+        self._last_frame_fbo = None
+        self._last_frame_tex = None
+        self._last_frame_alloc_size: tuple[int, int] | None = None
+        self._last_frame_valid_size: tuple[int, int] | None = None
         #: TASK_ui_sakuga_1117 Phase 5: con trỏ OS theo hình — tạo một lần
         #: mỗi hình, nhớ lại tránh gọi ``glfw.set_cursor`` lại mỗi khung khi
         #: hình không đổi.
@@ -367,6 +405,24 @@ class GlfwWindow:
         if self._settings.msaa_samples > 0:
             GL.glEnable(GL.GL_MULTISAMPLE)
 
+    @property
+    def poll_events_active(self) -> bool:
+        """TASK_game_feel_fix_1118 Fix 9: True while a ``glfw.poll_events()``
+        call from this window is on the stack — covers both a long modal
+        resize drag and a short programmatic one (``set_display_mode``/
+        ``resize_window``). Diagnostic only: the refresh handler's blit
+        path is cheap and correct either way, so nothing branches on this
+        — it exists so resize profiling can tell "happened while blocked
+        in poll_events" apart from any other refresh."""
+        return self._poll_events_active
+
+    def _poll_events(self) -> None:
+        self._poll_events_active = True
+        try:
+            glfw.poll_events()
+        finally:
+            self._poll_events_active = False
+
     def pump_events(self) -> None:
         """
         Lấy message Windows giữa các bước khởi động (PB-051), chưa đọc phím.
@@ -376,11 +432,11 @@ class GlfwWindow:
         "Not Responding" và app mất focus (run12, 16/10). Cờ phím callback đặt
         ở đây vẫn được ``poll_input`` đọc ở khung đầu.
         """
-        glfw.poll_events()
+        self._poll_events()
 
     def poll_input(self) -> InputState:
         """Poll events and return movement input for dev/testing."""
-        glfw.poll_events()
+        self._poll_events()
         move_x = move_y = move_z = 0.0
 
         # Demo (PB-055): không dịch pose bằng tay — bỏ qua WASD/QE.
@@ -529,27 +585,34 @@ class GlfwWindow:
         mode = "fullscreen" if str(mode) == "fullscreen" else "window"
         if self._window is None or mode == self._display:
             return False
-        if mode == "window":
-            rect = self._window_rect
-            if not rect:
-                pos, size, _refresh = self.monitor_geometry()
-                rect = default_rect(pos, size)
-            self._apply_window_style()
-            glfw.set_window_monitor(self._window, None, int(rect[0]),
-                                    int(rect[1]), int(rect[2]), int(rect[3]),
-                                    glfw.DONT_CARE)
-        else:
-            # Ghi lại khung ĐANG dùng trước khi phủ kín màn: không nhớ thì lần
-            # quay về cửa sổ sẽ nhảy ra giữa màn, mất chỗ người dùng đã kê.
-            self._window_rect = self.window_rect()
-            monitor = glfw.get_primary_monitor()
-            pos, size, refresh = self.monitor_geometry(monitor)
-            glfw.set_window_monitor(self._window, monitor, int(pos[0]),
-                                    int(pos[1]), int(size[0]), int(size[1]),
-                                    refresh)
-        self._display = mode
-        glfw.swap_interval(1 if self._settings.vsync else 0)
-        glfw.poll_events()
+        # Fix 9: flag covers set_window_monitor too, not just the explicit
+        # poll_events() below — GLFW can deliver the framebuffer-size
+        # callback synchronously from inside set_window_monitor itself.
+        self._poll_events_active = True
+        try:
+            if mode == "window":
+                rect = self._window_rect
+                if not rect:
+                    pos, size, _refresh = self.monitor_geometry()
+                    rect = default_rect(pos, size)
+                self._apply_window_style()
+                glfw.set_window_monitor(self._window, None, int(rect[0]),
+                                        int(rect[1]), int(rect[2]), int(rect[3]),
+                                        glfw.DONT_CARE)
+            else:
+                # Ghi lại khung ĐANG dùng trước khi phủ kín màn: không nhớ thì lần
+                # quay về cửa sổ sẽ nhảy ra giữa màn, mất chỗ người dùng đã kê.
+                self._window_rect = self.window_rect()
+                monitor = glfw.get_primary_monitor()
+                pos, size, refresh = self.monitor_geometry(monitor)
+                glfw.set_window_monitor(self._window, monitor, int(pos[0]),
+                                        int(pos[1]), int(size[0]), int(size[1]),
+                                        refresh)
+            self._display = mode
+            glfw.swap_interval(1 if self._settings.vsync else 0)
+            glfw.poll_events()
+        finally:
+            self._poll_events_active = False
         fb = glfw.get_framebuffer_size(self._window)
         self._set_framebuffer_size(fb[0], fb[1])
         logger.info("Display mode: %s — cua so %s, framebuffer %dx%d",
@@ -564,10 +627,14 @@ class GlfwWindow:
         pos, size, _refresh = self.monitor_geometry()
         width = min(int(width), int(size[0]))
         height = min(int(height), int(size[1]))
-        glfw.set_window_size(self._window, width, height)
-        glfw.set_window_pos(self._window, pos[0] + (size[0] - width) // 2,
-                            pos[1] + (size[1] - height) // 2)
-        glfw.poll_events()
+        self._poll_events_active = True
+        try:
+            glfw.set_window_size(self._window, width, height)
+            glfw.set_window_pos(self._window, pos[0] + (size[0] - width) // 2,
+                                pos[1] + (size[1] - height) // 2)
+            glfw.poll_events()
+        finally:
+            self._poll_events_active = False
 
     def toggle_display(self) -> str:
         """F11: đổi qua lại hai chế độ. Trả chế độ sau khi đổi."""
@@ -754,8 +821,81 @@ class GlfwWindow:
         """Present the back buffer."""
         glfw.swap_buffers(self._window)
 
+    # ---- Fix 9: last-frame cache for cheap resize-drag redraws -----------
+    def _ensure_last_frame_storage(self, width: int, height: int) -> None:
+        if self._last_frame_alloc_size == (width, height) and self._last_frame_fbo is not None:
+            return
+        self._release_last_frame_storage()
+        self._last_frame_fbo = GL.glGenFramebuffers(1)
+        self._last_frame_tex = GL.glGenTextures(1)
+        GL.glBindTexture(GL.GL_TEXTURE_2D, self._last_frame_tex)
+        GL.glTexImage2D(GL.GL_TEXTURE_2D, 0, GL.GL_RGBA8, width, height, 0,
+                        GL.GL_RGBA, GL.GL_UNSIGNED_BYTE, None)
+        GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MIN_FILTER, GL.GL_LINEAR)
+        GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MAG_FILTER, GL.GL_LINEAR)
+        GL.glBindTexture(GL.GL_TEXTURE_2D, 0)
+        GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, self._last_frame_fbo)
+        GL.glFramebufferTexture2D(GL.GL_FRAMEBUFFER, GL.GL_COLOR_ATTACHMENT0,
+                                  GL.GL_TEXTURE_2D, self._last_frame_tex, 0)
+        GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, 0)
+        self._last_frame_alloc_size = (width, height)
+
+    def _release_last_frame_storage(self) -> None:
+        if self._last_frame_fbo is not None:
+            GL.glDeleteFramebuffers(1, [self._last_frame_fbo])
+            self._last_frame_fbo = None
+        if self._last_frame_tex is not None:
+            GL.glDeleteTextures(1, [self._last_frame_tex])
+            self._last_frame_tex = None
+        self._last_frame_alloc_size = None
+        self._last_frame_valid_size = None
+
+    def capture_last_frame(self) -> None:
+        """Call once, right before ``swap_buffers()``, after every NORMAL
+        (full-render) frame — copies the just-drawn back buffer into an
+        FBO-backed texture, reallocated only when the size actually
+        changes. ``draw_last_frame_letterboxed`` blits this back out
+        during a resize drag instead of re-running the full draw."""
+        width, height = self._fb_size
+        if width <= 0 or height <= 0:
+            return
+        self._ensure_last_frame_storage(width, height)
+        GL.glBindFramebuffer(GL.GL_READ_FRAMEBUFFER, 0)
+        GL.glBindFramebuffer(GL.GL_DRAW_FRAMEBUFFER, self._last_frame_fbo)
+        GL.glBlitFramebuffer(0, 0, width, height, 0, 0, width, height,
+                             GL.GL_COLOR_BUFFER_BIT, GL.GL_NEAREST)
+        GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, 0)
+        self._last_frame_valid_size = (width, height)
+
+    def draw_last_frame_letterboxed(self, bg_colour: tuple = (0.05, 0.06, 0.08)) -> bool:
+        """The entire resize-drag redraw: clear to ``bg_colour``, blit the
+        cached last frame letterboxed (16:9) into the CURRENT framebuffer
+        size, swap. No scene/UI redraw — this is what keeps a drag smooth.
+        Returns ``False`` (no-op) if nothing has been captured yet, e.g. a
+        resize before the very first frame."""
+        if self._last_frame_fbo is None or self._last_frame_valid_size is None:
+            return False
+        width, height = self._fb_size
+        if width <= 0 or height <= 0:
+            return False
+        GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, 0)
+        GL.glViewport(0, 0, width, height)
+        GL.glClearColor(bg_colour[0], bg_colour[1], bg_colour[2], 1.0)
+        GL.glClear(GL.GL_COLOR_BUFFER_BIT)
+        dst_x, dst_y, dst_w, dst_h = letterbox_rect((width, height))
+        src_w, src_h = self._last_frame_valid_size
+        GL.glBindFramebuffer(GL.GL_READ_FRAMEBUFFER, self._last_frame_fbo)
+        GL.glBindFramebuffer(GL.GL_DRAW_FRAMEBUFFER, 0)
+        GL.glBlitFramebuffer(0, 0, src_w, src_h,
+                             dst_x, dst_y, dst_x + dst_w, dst_y + dst_h,
+                             GL.GL_COLOR_BUFFER_BIT, GL.GL_LINEAR)
+        GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, 0)
+        self.swap_buffers()
+        return True
+
     def destroy(self) -> None:
         """Destroy window and terminate GLFW."""
+        self._release_last_frame_storage()
         if self._window is not None:
             glfw.destroy_window(self._window)
             self._window = None

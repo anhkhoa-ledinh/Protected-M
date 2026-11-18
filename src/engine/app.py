@@ -794,12 +794,21 @@ class HcpdApplication:
 
     def _draw_frame_only(self, scene) -> None:
         """
-        TASK_game_feel_1118 P1: vẽ ĐÚNG MỘT khung ở cỡ framebuffer HIỆN
-        TẠI bằng ``scene`` đã dựng sẵn (đóng gói pose/khung webcam từ lúc
-        dựng, không tự đọc gì mới) — một đường mã DUY NHẤT cho cả khung
-        bình thường của main loop lẫn khung vẽ-lại khi cửa sổ đang bị kéo
-        cạnh (``_on_refresh``). Không đọc input, không tick ván/PvP,
-        không đọc webcam, không gọi ``pump_events``.
+        Vẽ ĐÚNG MỘT khung toàn cảnh ở cỡ framebuffer HIỆN TẠI bằng ``scene``
+        đã dựng sẵn (đóng gói pose/khung webcam từ lúc dựng, không tự đọc
+        gì mới) — dùng cho khung bình thường của main loop. Không đọc
+        input, không tick ván/PvP, không đọc webcam, không gọi
+        ``pump_events``.
+
+        TASK_game_feel_fix_1118 Fix 9: trước đây đường mã này CŨNG là
+        đường vẽ-lại khi kéo cạnh cửa sổ (``_on_refresh`` gọi thẳng vào
+        đây) — chạy lại TOÀN BỘ full draw (bake HUD bằng PIL, upload lại
+        texture, v.v.) mỗi bước cỡ trong vòng modal resize của Windows là
+        quá chậm, đúng như báo lại của người dùng (khung rớt, không thấy
+        cửa sổ đã to tới đâu). Giờ ``_on_refresh`` không gọi hàm này nữa —
+        nó chỉ blit lại khung ĐÃ vẽ (xem ``Window.draw_last_frame_letterboxed``).
+        Hàm này vẫn là full draw duy nhất, và chụp lại khung vừa vẽ (TRƯỚC
+        khi swap) để đường blit đó có cái mà dùng.
         """
         if self._album is not None:
             if not self._album.has_viewport():
@@ -810,15 +819,21 @@ class HcpdApplication:
             self._album_draw_guarded(scene)
         else:
             scene()
+        self._window.capture_last_frame()
         self._window.swap_buffers()
 
     def _on_refresh(self) -> None:
         """
         ``window.set_refresh_handler``: GLFW báo cửa sổ cần vẽ lại NGAY —
         đang kéo cạnh (modal loop bên trong ``glfw.poll_events()``, main
-        loop không chạy tới lượt) hoặc vừa đổi cỡ. Vẽ lại bằng
-        ``self._last_scene`` (pose/khung webcam LẦN CUỐI main loop tính,
-        đúng như tài liệu P1 mô tả "the last eye position").
+        loop không chạy tới lượt) hoặc vừa đổi cỡ.
+
+        TASK_game_feel_fix_1118 Fix 9: KHÔNG chạy lại full draw nữa (xem
+        ``_draw_frame_only``'s docstring) — chỉ blit khung đã chụp sẵn,
+        letterbox 16:9 vào cỡ framebuffer MỚI. Khung đầy đủ, đúng cỡ
+        cuối cùng, vẽ ở lượt KẾ TIẾP của main loop, một lần, sau khi
+        ``poll_events()`` trả về — không cần gọi gì thêm ở đây cho việc
+        đó, main loop tự nhiên làm điều này.
 
         Chặn lồng nhau: một refresh nổ ra TRONG một refresh khác, hoặc
         trong lúc main loop đang tự vẽ khung của nó, thì bỏ qua — không
@@ -828,7 +843,7 @@ class HcpdApplication:
             return
         self._drawing = True
         try:
-            self._draw_frame_only(self._last_scene)
+            self._window.draw_last_frame_letterboxed()
         finally:
             self._drawing = False
 
