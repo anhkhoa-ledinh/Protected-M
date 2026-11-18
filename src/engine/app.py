@@ -416,14 +416,18 @@ class HcpdApplication:
         album = self._album
         sakuga_shots = os.environ.get("HCPD_UI_SHOTS_1117") == "1"
         scope_bench = os.environ.get("HCPD_SCOPE_BENCH") == "1"
-        if not sakuga_shots and not scope_bench:
+        evidence_1118 = os.environ.get("HCPD_EVIDENCE_1118") == "1"
+        if not sakuga_shots and not scope_bench and not evidence_1118:
             # TASK_ui_sakuga_1117: lượt chụp 20 ảnh tự đặt ``album.mouse``
             # cho từng bước (hover_*/press_*) — con trỏ OS thật ghi đè lên
             # đúng mỗi khung thì KHÔNG BAO GIỜ thấy hover, bất kể bước nào
             # (``album.mouse`` luôn là vị trí chuột thật, không phải vị trí
             # hotspot bước đó muốn trỏ tới). TASK_game_feel_1118 P7:
             # ``HCPD_SCOPE_BENCH=1`` drives its OWN circular crosshair —
-            # see ``_tick_scope_bench``.
+            # see ``_tick_scope_bench``. TASK_game_feel_fix_1118:
+            # ``HCPD_EVIDENCE_1118=1`` drives its own FIXED crosshair per
+            # step — see ``_build_evidence_steps``, which calls
+            # ``_tick_scope`` itself with its own chosen raw mouse.
             raw_mouse = album.design_mouse(*self._window.cursor_pos())
             album.mouse = self._tick_scope(now, raw_mouse)
         fx_bench_heavy = (os.environ.get("HCPD_FX_BENCH") == "1"
@@ -471,6 +475,7 @@ class HcpdApplication:
         self._tick_album_automatch(now)
         self._tick_fx_bench(now)
         self._tick_scope_bench(now)
+        self._tick_evidence_1118(now)
         self._tick_album_match(now)
         self._tick_pvp(now)
         self._tick_pvp_auto(now)
@@ -1101,7 +1106,13 @@ class HcpdApplication:
         phải" (xem ở đó), nên hàm này chỉ còn việc đưa tâm ngắm vòng tròn
         và bắn theo nhịp.
         """
-        if os.environ.get("HCPD_SCOPE_BENCH") != "1" or not self._album_options.is_v3:
+        if (os.environ.get("HCPD_SCOPE_BENCH") != "1" or not self._album_options.is_v3
+                or os.environ.get("HCPD_EVIDENCE_1118") == "1"):
+            # TASK_game_feel_fix_1118: the evidence hook flips
+            # HCPD_SCOPE_BENCH itself (so _tick_scope treats it as "held"
+            # for ITS OWN fixed crosshair) — this bench must not also
+            # react to that and take mouse control away with its own
+            # circular motion.
             return
         F = self._album.flow
         if self._album.state.screen != F.PLAY:
@@ -1132,6 +1143,155 @@ class HcpdApplication:
             logger.info("SCOPE_BENCH: %d khung trong 10s, FPS median %.1f, "
                         "zoom cuoi %.2f", n, fps, self._album.scope_zoom)
             self._window.request_close()
+
+    def _tick_evidence_1118(self, now: float) -> None:
+        """``HCPD_EVIDENCE_1118=1`` (with ``HCPD_ALBUM_AUTOMATCH=1`` +
+        ``HCPD_V3_SCREEN=v3_08_gameplay_hud``): one-off screenshot
+        sequence into ``results/game_feel_fix_1118/`` for the fix
+        report's evidence section, then self-closes — same spirit as
+        ``HCPD_FX_BENCH``/``HCPD_SCOPE_BENCH``, not meant to ship."""
+        if os.environ.get("HCPD_EVIDENCE_1118") != "1" or not self._album_options.is_v3:
+            return
+        F = self._album.flow
+        if self._album.state.screen not in (F.PLAY, F.WIN):
+            return
+        if not hasattr(self, "_evidence_step"):
+            if not self._measurement_ready():
+                return
+            self._evidence_step = 0
+            self._evidence_step_t = now
+            self._evidence_out = self._root / "results" / "game_feel_fix_1118"
+            self._evidence_steps = self._build_evidence_steps()
+            return
+        if self._evidence_step >= len(self._evidence_steps):
+            self._window.request_close()
+            return
+        name, setup, hold_s = self._evidence_steps[self._evidence_step]
+        setup(self)
+        if now - self._evidence_step_t >= hold_s:
+            if name is not None:
+                from OpenGL import GL
+
+                from src.ui_album.shots import save_framebuffer
+
+                self._window.restore_and_focus()
+                self._window.pump_events()
+                # Force an explicit, synchronous redraw against the
+                # state THIS tick just set, instead of trusting whatever
+                # the main loop's own next render happens to land on —
+                # this hook runs during the TICK phase, one step removed
+                # from the render/swap phase, and a one-shot state change
+                # (go_win()) was observed to still show the PREVIOUS
+                # screen's content without this. Reuse the last real
+                # scene closure (Fix 9's own ``_last_scene``, same thing
+                # ``_on_refresh`` redraws with) for steps that DO have a
+                # 3D viewport (scope/HUD proximity) — a no-op would
+                # render those as an empty void instead of the real scene.
+                scene = self._last_scene or (lambda: None)
+                if not self._album.has_viewport():
+                    self._album.draw_hidden_scene(scene)
+                self._album_draw_guarded(scene)
+                width, height = self._window.framebuffer_size()
+                if width >= 2 and height >= 2:
+                    GL.glFinish()
+                    save_framebuffer(self._evidence_out / f"{name}.png", width, height)
+                    logger.info("EVIDENCE_1118: %s.png (screen=%s game=%s)",
+                               name, self._album.state.screen,
+                               self._album.game is not None)
+                self._window.swap_buffers()
+            self._evidence_step += 1
+            self._evidence_step_t = now
+
+    def _build_evidence_steps(self) -> list:
+        def crosshair(xy):
+            def setup(app):
+                app._album.mouse = xy
+            return setup
+
+        def scoped(xy):
+            # Drives the REAL _tick_scope pipeline (entering, camera
+            # sync, zoom spring, finer-aim) with a FIXED raw mouse — not
+            # just setting ``album.mouse``/``scope_zoom`` by hand, which
+            # would move the 2D overlay number without ever warping the
+            # 3D camera (exactly the 1118 report's own scope_in.png bug:
+            # evidence that didn't come from an actually-magnified render).
+            def setup(app):
+                import os as _os
+
+                _os.environ["HCPD_SCOPE_BENCH"] = "1"
+                app._album.mouse = app._tick_scope(time.perf_counter(), xy)
+            return setup
+
+        def unscoped(xy):
+            def setup(app):
+                import os as _os
+
+                _os.environ.pop("HCPD_SCOPE_BENCH", None)
+                app._album.mouse = app._tick_scope(time.perf_counter(), xy)
+            return setup
+
+        def compact(enabled):
+            def setup(app):
+                if app._album.state.hud_compact != enabled:
+                    app._album.toggle_hud_compact()
+            return setup
+
+        def crit_impact(active):
+            # ``crit_impact_alpha`` is a read-only property, computed from
+            # ``_crit_impact_age`` — go through the real ``on_shot()``
+            # entry point (same as an actual crit would) instead of
+            # poking a private field, except for turning it back OFF
+            # (nothing public does that early; the real path is just
+            # waiting out CRIT_IMPACT_S).
+            def setup(app):
+                feel = app._album._shot_feel
+                if active:
+                    if feel._crit_impact_age is None:
+                        feel.on_shot("Precision gun", (640.0, 360.0),
+                                     hit=True, crit=True)
+                else:
+                    feel._crit_impact_age = None
+            return setup
+
+        def go_win():
+            def setup(app):
+                if app._album.state.screen != app._album.flow.WIN:
+                    app._album.state.go(app._album.flow.WIN)
+            return setup
+
+        centre, corner, edge = (640.0, 360.0), (120.0, 120.0), (1180.0, 620.0)
+        return [
+            # G2: scope magnification, 3 crosshair positions, eye frozen.
+            ("scope_proof_centre_unscoped", unscoped(centre), 1.0),
+            ("scope_proof_centre_scoped", scoped(centre), 1.5),
+            ("scope_proof_corner_unscoped", unscoped(corner), 1.0),
+            ("scope_proof_corner_scoped", scoped(corner), 1.5),
+            ("scope_proof_edge_unscoped", unscoped(edge), 1.0),
+            ("scope_proof_edge_scoped", scoped(edge), 1.5),
+            # G3: crit impact frame vs normal, crosshair away from cards.
+            # Reset the scope zoom spring back to 1.0 first — the edge
+            # step above left it scoped, and nothing after this touches
+            # _tick_scope again, so a stale zoom would leak into every
+            # later step's vignette otherwise.
+            (None, unscoped(centre), 0.6),
+            ("hud_layer_check_normal", crit_impact(False), 0.5),
+            ("hud_layer_check_crit",
+             lambda app: (crit_impact(True)(app), crosshair((640.0, 360.0))(app)),
+             0.5),
+            (None, crit_impact(False), 0.1),   # reset before continuing
+            # G12: proximity fade (crosshair over a weapon card).
+            ("hud_proximity", crosshair((1130.0, 650.0)), 1.0),
+            # G3/10.3: scoped near the user's own screenshot spot.
+            ("hud_scope", scoped((980.0, 560.0)), 1.5),
+            (None, unscoped(centre), 0.6),
+            # Fix 10.4: compact HUD.
+            ("hud_compact", compact(True), 0.5),
+            (None, compact(False), 0.1),
+            # Fix 7: star_five on WIN.
+            # star_five's own duration is 0.95s — capture mid-burst, not
+            # after it's already faded to its final tiny-particle frames.
+            ("fx_win", go_win(), 0.5),
+        ]
 
     def _album_action(self, action: str, now: float) -> None:
         """Thực hiện một hành động mà giao diện album yêu cầu."""
