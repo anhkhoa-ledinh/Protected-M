@@ -72,6 +72,26 @@ def steadied_eye(eye, anchor, z):
     return tuple(anchor[i] + (eye[i] - anchor[i]) / z for i in range(len(anchor)))
 
 
+def screen_scope_transform(point, crosshair, z):
+    """TASK_game_feel_fix_1118 Fix 5: ``c + z(g - c)`` directly in DESIGN
+    PX — the 2D screen-space twin of ``scoped_kooima_corners`` (that one
+    warps the CAMERA's glass-metre corners; this is for overlays that
+    already live in design px: shot marks, and scene-anchored Sakuga fx).
+
+    The 1118 report's "fixed point" argument (``c + z(c - c) = c``) only
+    proves a mark drawn exactly AT THE CURRENT crosshair is unaffected —
+    true, but irrelevant to a mark left behind at an OLDER crosshair
+    position ``A`` once the crosshair has since moved to a new ``c``.
+    That mark must track the GLASS POINT it was originally over, which
+    means re-deriving its screen position every frame from ``A`` (stored,
+    unzoomed, once — see ``g`` in the signature below) through THIS
+    frame's current ``c``/``z``, not drawing it at the frozen ``A``.
+    """
+    gx, gy = point
+    cx, cy = crosshair
+    return (cx + z * (gx - cx), cy + z * (gy - cy))
+
+
 class ScopeState:
     """Input-side scope state: right-mouse hold, the zoom spring, and the
     finer-aim crosshair. One instance lives as long as the ``V3UI`` that

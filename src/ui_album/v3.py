@@ -32,7 +32,8 @@ from src.ui_album.manifest import letterbox
 from src.ui_album.scope import (RETICLE_ARM_PX, RETICLE_COL, RETICLE_GAP_PX,
                                 RETICLE_THICK_PX, VIGNETTE_ALPHA,
                                 VIGNETTE_COL, VIGNETTE_RADIUS_PX,
-                                VIGNETTE_SOFT_PX, ZOOM_SETTLED_EPS)
+                                VIGNETTE_SOFT_PX, ZOOM_SETTLED_EPS,
+                                screen_scope_transform)
 from src.ui_album.shot_feel import (CRIT_IMPACT_COL,
                                     HITMARK_ANGLES_DEG, HITMARK_COL,
                                     HITMARK_CRIT_COL, HITMARK_CRIT_SCALE,
@@ -1475,6 +1476,22 @@ def _hole(painter, x: float, y: float, size: float, colour) -> None:
     painter.disc((x - size * 0.5, y - size * 0.5, size, size), colour)
 
 
+def _scope_adjust(x: float, y: float, state) -> tuple[float, float, bool]:
+    """TASK_game_feel_fix_1118 Fix 5: a scene-anchored overlay point
+    (stored once, un-zoomed, at spawn time — the glass point ``g``) ->
+    its CURRENT screen position while scoped, ``c_now + z_now·(g -
+    c_now)``, or unchanged when not scoped. Third element: ``False`` if
+    the (possibly moved) point now falls outside the scope's own vignette
+    circle — "hide them outside the scope circle" — the caller should
+    skip drawing in that case."""
+    if state.scope_zoom <= 1.0 + ZOOM_SETTLED_EPS or state.aim is None:
+        return x, y, True
+    sx, sy = screen_scope_transform((x, y), state.aim, state.scope_zoom)
+    if math.hypot(sx - state.aim[0], sy - state.aim[1]) > VIGNETTE_RADIUS_PX:
+        return sx, sy, False
+    return sx, sy, True
+
+
 def _draw_shots(painter, state) -> None:
     """
     Lỗ đạn ở chỗ vừa bắn, cộng một chớp xanh khi trúng bọ.
@@ -1482,12 +1499,20 @@ def _draw_shots(painter, state) -> None:
     Giữ nguyên lỗ gần như suốt tuổi thọ rồi mới mờ hẳn ở quãng cuối: lỗ đạn
     trên ảnh thì không nhạt dần ngay, và người chơi cần nhìn lại được mình
     vừa bắn chệch về phía nào. Giữ vài phát gần nhất chứ không chỉ phát cuối.
+
+    TASK_game_feel_fix_1118 Fix 5: each mark's stored ``(x, y)`` is the
+    glass point it was fired at (unzoomed design px, by construction —
+    see ``game_bridge.fire``'s own comment) — ``_scope_adjust`` re-derives
+    where that point sits on screen THIS frame, scoped or not.
     """
     if state.shot:
         return
     for x, y, age, hit in state.shots:
         age = float(age)
         if age >= HOLE_LIFE_S:
+            continue
+        x, y, visible = _scope_adjust(x, y, state)
+        if not visible:
             continue
         # Mờ dần CHỈ ở quãng cuối, trước đó giữ nguyên độ đậm.
         left = min(1.0, max(0.0, (HOLE_LIFE_S - age) / HOLE_FADE_S))
@@ -1638,11 +1663,20 @@ def _draw_tracers(painter, state) -> None:
 
 def _draw_hit_markers(painter, state) -> None:
     """TASK_game_feel_1118 P4: four ticks at 45° around the crosshair on a
-    hit, outlined, fading over 0.18 s — bigger and ``#E8676B`` on a crit."""
+    hit, outlined, fading over 0.18 s — bigger and ``#E8676B`` on a crit.
+
+    TASK_game_feel_fix_1118 Fix 5: a hit marker is spawned at the
+    crosshair's position AT THE TIME of the shot — same scene-anchored
+    treatment as shot marks (``_scope_adjust``) once the crosshair has
+    since moved while still scoped.
+    """
     if state.shot:
         return
     for x, y, age, crit in state.hit_markers:
         if age >= HITMARK_LIFE_S:
+            continue
+        x, y, visible = _scope_adjust(x, y, state)
+        if not visible:
             continue
         fade = 1.0 - age / HITMARK_LIFE_S
         scale = HITMARK_CRIT_SCALE if crit else 1.0

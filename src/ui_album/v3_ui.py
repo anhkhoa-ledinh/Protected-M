@@ -375,8 +375,25 @@ class V3UI:
             self._fx_library.pump()
             state.fx_on = True
             shake = state.scene_shake
+            # TASK_game_feel_fix_1118 Fix 5: a scene-anchored effect
+            # (hit_kill/hit_crit/hit_block, spawned at the crosshair AT
+            # THE TIME) must track its glass point while scoped, not stay
+            # frozen at the old design-px spot — same treatment as shot
+            # marks/hit markers (``_scope_adjust`` in ``v3.py``), applied
+            # here via ``FxLibrary.draw``'s ``transform``/``hide_beyond``.
+            if name in (F.PLAY, F.PVP_HUNT) and state.scope_zoom > 1.0 + 1e-3:
+                from src.ui_album.scope import (VIGNETTE_RADIUS_PX,
+                                               screen_scope_transform)
+
+                crosshair, zoom = self.mouse, state.scope_zoom
+                fx_transform = lambda p: screen_scope_transform(p, crosshair, zoom)
+                fx_hide_beyond = (crosshair[0], crosshair[1], VIGNETTE_RADIUS_PX)
+            else:
+                fx_transform = None
+                fx_hide_beyond = None
             state.fx_draw = lambda: self._fx_library.draw(
-                self.painter, self._fx_player, offset=shake)
+                self.painter, self._fx_player, offset=shake,
+                transform=fx_transform, hide_beyond=fx_hide_beyond)
         self.painter.bind_screen(name, v3_values.extra_files(self.manifest,
                                                              name, state))
         self.painter.begin()

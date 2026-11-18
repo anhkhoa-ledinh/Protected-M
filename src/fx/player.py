@@ -165,7 +165,13 @@ class FxPlayer:
                     keys.add(self._spec.word_rel_path(ws.cue["word"], ws.cue["style"]))
         return keys
 
-    def draw_list(self) -> list:
+    def draw_list(self, transform=None) -> list:
+        """``transform``, if given, is a ``(x, y) -> (x, y)`` callable
+        applied to every CORNER of every command (TASK_game_feel_fix_1118
+        Fix 5: the scope's ``c + z(g - c)`` — applying it per-corner, not
+        just to each effect's anchor, scales a live effect the same way
+        the rest of the magnified scene is scaled, not just repositions
+        it)."""
         commands = []
         for effect in self._effects:
             variant = self._variant(effect)
@@ -175,15 +181,16 @@ class FxPlayer:
                 if 0 <= frame_index < len(frames):
                     frame = frames[frame_index]
                     if frame is not None:
-                        commands.append(self._sprite_command(effect, variant, frame))
+                        commands.append(
+                            self._sprite_command(effect, variant, frame, transform))
             if effect.words_enabled:
                 for ws in effect.word_states:
                     if ws.current is not None:
-                        commands.append(self._word_command(ws))
+                        commands.append(self._word_command(ws, transform))
         return commands
 
     def _sprite_command(self, effect: _ActiveEffect, variant: dict,
-                        frame: dict) -> FxDrawCommand:
+                        frame: dict, transform=None) -> FxDrawCommand:
         scale = self._spec.image_scale
         rx, ry, rw, rh = frame["rect"]
         ox, oy = frame["offset"]
@@ -201,9 +208,11 @@ class FxPlayer:
         x1 = x0 + rw / scale
         y1 = y0 + rh / scale
         corners = ((x0, y0), (x1, y0), (x1, y1), (x0, y1))
+        if transform is not None:
+            corners = tuple(transform(p) for p in corners)
         return FxDrawCommand(sheet_key, corners, (u0, v0, u1, v1), 1.0)
 
-    def _word_command(self, ws: _ActiveWord) -> FxDrawCommand:
+    def _word_command(self, ws: _ActiveWord, transform=None) -> FxDrawCommand:
         cx, cy, sc, angle = ws.current
         word, style = ws.cue["word"], ws.cue["style"]
         png_w, png_h = _word_png_size(self._spec, word, style,
@@ -217,6 +226,8 @@ class FxPlayer:
         # clockwise on screen.
         corners = tuple((cx + lx * cos_a - ly * sin_a,
                          cy + lx * sin_a + ly * cos_a) for lx, ly in local)
+        if transform is not None:
+            corners = tuple(transform(p) for p in corners)
         key = self._spec.word_rel_path(word, style)
         return FxDrawCommand(key, corners, (0.0, 0.0, 1.0, 1.0), 1.0)
 

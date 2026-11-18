@@ -30,6 +30,7 @@ importable and testable with no OpenGL context.
 from __future__ import annotations
 
 import logging
+import math
 import queue
 import threading
 import time
@@ -546,7 +547,8 @@ class FxLibrary:
         player.clear(lambda name: not _in_scope(name, effect_names, word_pairs))
 
     # ---- drawing -----------------------------------------------------
-    def draw(self, painter, player: FxPlayer, offset: tuple = (0.0, 0.0)) -> None:
+    def draw(self, painter, player: FxPlayer, offset: tuple = (0.0, 0.0), *,
+            transform=None, hide_beyond: tuple | None = None) -> None:
         """Draw every live effect's current frame/words. Silently skips
         any command whose texture isn't resident yet.
 
@@ -560,10 +562,23 @@ class FxLibrary:
         layer (along with the 3D scene viewport, elsewhere) but never the
         HUD — every corner is shifted by this design-px ``(dx, dy)``
         before drawing; ``(0.0, 0.0)`` (the default) is a no-op.
+
+        ``transform``/``hide_beyond`` (TASK_game_feel_fix_1118 Fix 5):
+        while scoped, a scene-anchored effect (``hit_kill``/``hit_crit``/
+        ``hit_block``, spawned at the crosshair's position AT THE TIME)
+        must track the GLASS POINT it was spawned over, not stay frozen
+        at that old design-px spot — ``transform`` is
+        ``scope.screen_scope_transform`` bound to the CURRENT crosshair/
+        zoom, passed straight to ``player.draw_list()`` (applied per
+        CORNER there, so the effect scales with the magnified scene, not
+        just repositions). ``hide_beyond``, if given, is
+        ``(cx, cy, radius)`` — a command whose (transformed) corner
+        centroid is further than ``radius`` from ``(cx, cy)`` is skipped
+        ("hide them outside the scope circle").
         """
         if self.disabled_reason:
             return
-        commands = player.draw_list()
+        commands = player.draw_list(transform=transform)
         if not commands:
             return
         dx, dy = offset
@@ -578,6 +593,12 @@ class FxLibrary:
                 corners = command.corners
                 if dx or dy:
                     corners = tuple((px + dx, py + dy) for px, py in corners)
+                if hide_beyond is not None:
+                    hx, hy, radius = hide_beyond
+                    cx = sum(p[0] for p in corners) / len(corners)
+                    cy = sum(p[1] for p in corners) / len(corners)
+                    if math.hypot(cx - hx, cy - hy) > radius:
+                        continue
                 painter.quad_corners(corners, texture,
                                      tint=(1.0, 1.0, 1.0, command.alpha), uv=command.uv)
         finally:
