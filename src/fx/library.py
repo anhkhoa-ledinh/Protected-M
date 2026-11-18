@@ -108,6 +108,12 @@ def _decode_worker_loop() -> None:
 class _Decoded:
     key: str
     array: np.ndarray | None
+    #: TASK_game_feel_fix_1118 Fix 2: per-file stage timing (background
+    #: thread) — seconds, measured around PIL ``Image.open``/``asarray``
+    #: and ``bleed_transparent`` separately, so a slow file's cause is
+    #: visible without guessing.
+    decode_s: float = 0.0
+    bleed_s: float = 0.0
 
 
 @dataclass
@@ -122,6 +128,10 @@ class _InProgress:
     array: np.ndarray
     max_level: int | None
     next_row: int = 0
+    #: TASK_game_feel_fix_1118 Fix 2: cumulative ``glTexSubImage2D`` time
+    #: (seconds) across however many ``pump()`` calls/bands this file
+    #: took — the "upload" stage, per file.
+    upload_s: float = 0.0
 
 
 def _word_key(name: str) -> tuple | None:
@@ -208,6 +218,17 @@ class FxLibrary:
         self._preload_total = 0
         self._preload_started_t: float | None = None
         self._preload_done_t: float | None = None
+        #: TASK_game_feel_fix_1118 Fix 2: per-file stage timing (seconds)
+        #: — ``{"decode_s", "bleed_s", "mipmap_s", "upload_s"}``, filled
+        #: in as each stage finishes (decode/bleed on the background
+        #: thread in ``_decode``, mipmap/upload on the GL thread in
+        #: ``pump()``). Never cleared — a diagnostic log, not live state.
+        self.stage_times: dict[str, dict[str, float]] = {}
+        #: This frame's GL-thread cost (seconds) — reset at the top of
+        #: every ``pump()`` call, so a caller measuring a whole frame's
+        #: wall time can tell how much of it was fx mipmap/upload work.
+        self._frame_mipmap_s = 0.0
+        self._frame_upload_s = 0.0
 
     # ---- capability --------------------------------------------------
     def check_capability(self) -> bool:
@@ -259,6 +280,31 @@ class FxLibrary:
             return None
         return self._preload_done_t - self._preload_started_t
 
+    @property
+    def frame_mipmap_s(self) -> float:
+        """Seconds spent in ``glGenerateMipmap`` during the LAST
+        ``pump()`` call."""
+        return self._frame_mipmap_s
+
+    @property
+    def frame_upload_s(self) -> float:
+        """Seconds spent in ``glTexSubImage2D`` during the LAST
+        ``pump()`` call."""
+        return self._frame_upload_s
+
+    def slowest_file(self, stage: str) -> tuple[str, float] | None:
+        """``(key, seconds)`` of the file with the largest recorded
+        ``stage`` time (one of "decode_s"/"bleed_s"/"mipmap_s"/
+        "upload_s"), or ``None`` if nothing has that stage recorded yet."""
+        best: tuple[str, float] | None = None
+        for key, stages in self.stage_times.items():
+            value = stages.get(stage)
+            if value is None:
+                continue
+            if best is None or value > best[1]:
+                best = (key, value)
+        return best
+
     # ---- residency -----------------------------------------------------
     def request(self, key: str) -> None:
         """Queue a background decode for ``key`` if not already resident
@@ -274,16 +320,21 @@ class FxLibrary:
 
     def _decode(self, key: str) -> None:
         path = self._spec.root / key
+        decode_s = bleed_s = 0.0
         try:
+            t0 = time.perf_counter()
             with Image.open(path) as image:
                 array = np.asarray(image.convert("RGBA"), dtype=np.uint8)
+            t1 = time.perf_counter()
             # Loang màu ở LUỒNG NỀN này (CPU, có thể chậm), không phải ở
             # ``pump()`` (luồng GL chính).
             array = bleed_transparent(array)
+            t2 = time.perf_counter()
+            decode_s, bleed_s = t1 - t0, t2 - t1
         except (OSError, ValueError) as err:
             logger.warning("FxLibrary: khong doc duoc %s (%s)", path, err)
             array = None
-        self._queue.put(_Decoded(key, array))
+        self._queue.put(_Decoded(key, array, decode_s=decode_s, bleed_s=bleed_s))
 
     def pump(self) -> None:
         """Main GL thread, once per frame:
@@ -297,7 +348,14 @@ class FxLibrary:
            frame. A texture that finishes gets its mipmap chain
            generated, becomes resident, and its CPU-side array is
            dropped.
+
+        TASK_game_feel_fix_1118 Fix 2: ``frame_mipmap_s``/``frame_upload_s``
+        are reset here and accumulated below — THIS call's GL-thread cost
+        attributable to fx, so a caller measuring a whole frame's wall
+        time can tell whether fx (not something else) was the slow part.
         """
+        self._frame_mipmap_s = 0.0
+        self._frame_upload_s = 0.0
         if self.disabled_reason:
             return
         while True:
@@ -310,6 +368,8 @@ class FxLibrary:
                 self._failed.add(decoded.key)
                 self._note_if_preload_done()
                 continue
+            self.stage_times[decoded.key] = {
+                "decode_s": decoded.decode_s, "bleed_s": decoded.bleed_s}
             self._in_progress.append(self._allocate(decoded.key, decoded.array))
         if not self._in_progress:
             return
@@ -344,6 +404,7 @@ class FxLibrary:
         return _InProgress(key, texture, width, height, array, max_level)
 
     def _upload_band(self, item: _InProgress) -> None:
+        t0 = time.perf_counter()
         band = min(BAND_ROWS, item.height - item.next_row)
         rows = np.ascontiguousarray(item.array[item.next_row:item.next_row + band])
         GL.glBindTexture(GL.GL_TEXTURE_2D, item.texture)
@@ -351,11 +412,20 @@ class FxLibrary:
         GL.glTexSubImage2D(GL.GL_TEXTURE_2D, 0, 0, item.next_row,
                            item.width, band, GL.GL_RGBA, GL.GL_UNSIGNED_BYTE, rows)
         item.next_row += band
+        elapsed = time.perf_counter() - t0
+        item.upload_s += elapsed
+        self._frame_upload_s += elapsed
 
     def _finish(self, item: _InProgress) -> None:
+        t0 = time.perf_counter()
         GL.glBindTexture(GL.GL_TEXTURE_2D, item.texture)
         GL.glGenerateMipmap(GL.GL_TEXTURE_2D)
+        mipmap_s = time.perf_counter() - t0
+        self._frame_mipmap_s += mipmap_s
         self._textures[item.key] = (item.texture, item.width, item.height)
+        stage = self.stage_times.setdefault(item.key, {})
+        stage["mipmap_s"] = mipmap_s
+        stage["upload_s"] = item.upload_s
         item.array = None          # giải phóng bản CPU — đã lên GPU xong
         resident = self.resident_bytes()
         if resident > self._max_resident_bytes:

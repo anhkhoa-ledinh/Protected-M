@@ -135,7 +135,7 @@ class LayersRevisionTest(unittest.TestCase):
         self.assertEqual(r.layers_revision, 0)
         with mock.patch.object(cp, "TexturedMesh", dummy), \
              mock.patch.object(cp.ContentPlaneRenderer, "_create_rgba_texture",
-                               lambda self, a: 0):
+                               lambda self, a, **kw: 0):
             baked = _bake_stub(cs, r._last_depth_rgb, depth)
             r._apply_bake(baked, "t.png")
             self.assertEqual(r.layers_revision, 1)

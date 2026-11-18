@@ -211,7 +211,7 @@ class DrawPathUsesGeometryTest(unittest.TestCase):
         with mock.patch.object(cp, "layer_geometry", return_value=marker), \
              mock.patch.object(cp, "TexturedMesh", dummy), \
              mock.patch.object(cp.ContentPlaneRenderer, "_create_rgba_texture",
-                               lambda self, a: 0):
+                               lambda self, a, **kw: 0):
             r._apply_bake(_bake_stub(cs, r._last_depth_rgb, depth), "t.png")
 
         recs = r.layer_records()

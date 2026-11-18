@@ -299,3 +299,38 @@ def test_pump_stops_uploading_once_the_per_frame_budget_is_spent(gl_context, spe
     import OpenGL.GL as GL
     GL.glDeleteTextures(1, [item_b.texture])
     library.release()
+
+
+# ---- TASK_game_feel_fix_1118 Fix 2: per-stage preload timing -------------
+def test_stage_times_records_all_four_stages_per_file(gl_context, spec):
+    library = FxLibrary(spec)
+    library.check_capability()
+    key = "sheets/ui_tap_1.png"
+    assert _wait(lambda: library.get(key) is not None, library)
+    stages = library.stage_times[key]
+    for name in ("decode_s", "bleed_s", "mipmap_s", "upload_s"):
+        assert name in stages
+        assert stages[name] >= 0.0
+    library.release()
+
+
+def test_frame_upload_and_mipmap_reset_each_pump_call(gl_context, spec):
+    library = FxLibrary(spec)
+    library.check_capability()
+    assert _wait(lambda: library.get("sheets/ui_tap_1.png") is not None, library)
+    # Once settled (nothing left to upload this call), both must be 0 —
+    # proves these are THIS call's cost, not a running total.
+    library.pump()
+    assert library.frame_upload_s == 0.0
+    assert library.frame_mipmap_s == 0.0
+
+
+def test_slowest_file_picks_the_largest_recorded_stage(gl_context, spec):
+    library = FxLibrary(spec)
+    library.check_capability()
+    library.stage_times["a.png"] = {"decode_s": 0.001}
+    library.stage_times["b.png"] = {"decode_s": 0.050}
+    library.stage_times["c.png"] = {"decode_s": 0.010, "bleed_s": 0.200}
+    assert library.slowest_file("decode_s") == ("b.png", 0.050)
+    assert library.slowest_file("bleed_s") == ("c.png", 0.200)
+    assert library.slowest_file("upload_s") is None

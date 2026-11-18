@@ -1075,6 +1075,8 @@ class HcpdApplication:
         if self._album.state.screen != F.PLAY:
             return
         if not hasattr(self, "_scope_bench_start"):
+            if not self._measurement_ready():
+                return
             self._scope_bench_start = now
             self._scope_bench_last_shot = now
             self._scope_bench_last_frame_t = now
@@ -1190,6 +1192,30 @@ class HcpdApplication:
             return
         self._start_album_match(now)
 
+    def _measurement_ready(self) -> bool:
+        """
+        TASK_game_feel_fix_1118 "Measurement hygiene": a bench/screenshot
+        hook's measured window starts only once ALL of — fx preload done,
+        depth layers built, 2 s have passed since — hold. Logs the wait
+        once. Benches that measured through the preload/layer-build
+        window (the 1118 report's own ``bench_precision.log``: preload
+        still finishing 11 s in, 16 skipped spawns, first 5 s at 16.6
+        FPS) were measuring one-time launch cost, not steady-state play.
+        """
+        fx = getattr(self._album, "_fx_library", None)
+        fx_ready = fx is None or not self._album.fx_enabled or fx.preload_remaining == 0
+        depth_ready = not self._renderer.waiting_for_depth
+        now = time.perf_counter()
+        if not (fx_ready and depth_ready):
+            self._measurement_ready_since = None
+            return False
+        since = getattr(self, "_measurement_ready_since", None)
+        if since is None:
+            self._measurement_ready_since = now
+            logger.info("Do luong: fx+lop da xong, cho on dinh 2s truoc khi bat dau do")
+            return False
+        return (now - since) >= 2.0
+
     def _tick_fx_bench(self, now: float) -> None:
         """
         Móc đo ``HCPD_FX_BENCH=1`` (dùng cùng ``HCPD_ALBUM_AUTOMATCH=1``):
@@ -1200,10 +1226,17 @@ class HcpdApplication:
 
         TASK_game_feel_1118 P7: ``HCPD_BENCH_WEAPON`` (one of
         ``WEAPONS_SPEC``'s keys) also exercises that weapon's
-        ``shot_feel`` (kick/tracer/shake/hit marker) via ``register_shot``
-        on each cycled shot — and for the Heavy-mag gun specifically,
-        holds the (fake) trigger down the whole 20 s so the REAL
+        ``shot_feel`` (kick/shake/hit marker) via ``register_shot`` on
+        each cycled shot — and for the Heavy-mag gun specifically, holds
+        the (fake) trigger down the whole 20 s so the REAL
         ``_tick_auto_fire`` path fires, instead of the synthetic cycle.
+
+        TASK_game_feel_fix_1118 "Measurement hygiene": does not start its
+        20 s window until ``_measurement_ready()`` holds — see there.
+        Also logs, for the single slowest frame in the window, how much
+        of it was fx GL-thread work (mipmap+upload) versus everything
+        else, and the single slowest decode/bleed/mipmap/upload file
+        recorded across the whole window (G6's own check).
         """
         if os.environ.get("HCPD_FX_BENCH") != "1" or not self._album_options.is_v3:
             return
@@ -1211,10 +1244,13 @@ class HcpdApplication:
         if self._album.state.screen != F.PLAY:
             return
         if not hasattr(self, "_fx_bench_start"):
+            if not self._measurement_ready():
+                return
             self._fx_bench_start = now
             self._fx_bench_last_shot = now
             self._fx_bench_last_frame_t = now
             self._fx_bench_frame_times: list = []
+            self._fx_bench_fx_times: list = []
             self._fx_bench_cycle = 0
             requested = os.environ.get("HCPD_BENCH_WEAPON", "").strip()
             from src.ui_album.game_bridge import WEAPONS_SPEC
@@ -1228,6 +1264,9 @@ class HcpdApplication:
             self._fx_bench_weapon_applied = True
         self._fx_bench_frame_times.append(now - self._fx_bench_last_frame_t)
         self._fx_bench_last_frame_t = now
+        fx = getattr(self._album, "_fx_library", None)
+        self._fx_bench_fx_times.append(
+            (fx.frame_mipmap_s + fx.frame_upload_s) if fx is not None else 0.0)
         if weapon == "Heavy-mag gun":
             # P7: "holds the button so auto-fire is exercised" — the real
             # click-and-hold path (``_tick_auto_fire``), not the
@@ -1257,7 +1296,31 @@ class HcpdApplication:
                         f" ({weapon})" if weapon else "", n, fps,
                         p99_dt * 1000.0, hitches,
                         max(times) * 1000.0 if times else 0.0)
+            self._log_slowest_frame_stage(self._fx_bench_frame_times,
+                                          self._fx_bench_fx_times, fx)
             self._window.request_close()
+
+    def _log_slowest_frame_stage(self, frame_times: list, fx_times: list, fx) -> None:
+        """TASK_game_feel_fix_1118 Fix 2: breaks down the single slowest
+        frame in a bench window into fx GL-thread cost vs everything
+        else, and names the single slowest file per stage across the
+        whole window — "no frame > 50ms whose slowest stage is fx
+        decode, bleed or upload" (G6) needs this to actually check."""
+        if not frame_times:
+            return
+        worst_i = max(range(len(frame_times)), key=lambda i: frame_times[i])
+        worst_ms = frame_times[worst_i] * 1000.0
+        fx_ms = (fx_times[worst_i] * 1000.0) if worst_i < len(fx_times) else 0.0
+        logger.info(
+            "Khung cham nhat: %.1f ms tong, fx (mipmap+upload) %.1f ms, "
+            "con lai %.1f ms", worst_ms, fx_ms, worst_ms - fx_ms)
+        if fx is not None:
+            for stage in ("decode_s", "bleed_s", "mipmap_s", "upload_s"):
+                found = fx.slowest_file(stage)
+                if found is not None:
+                    key, seconds = found
+                    logger.info("  %s cham nhat: %s (%.1f ms)",
+                               stage, key, seconds * 1000.0)
 
     def _apply_bench_weapon(self, weapon_name: str) -> None:
         """TASK_game_feel_1118 P7: force the live match onto

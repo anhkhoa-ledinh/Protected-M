@@ -1215,7 +1215,9 @@ class ContentPlaneRenderer:
             # Dựng texture SAU khi đã chốt rgba: ở chế độ pad là mảng đã đệm.
             # Dựng sẵn từ ``layer.rgba`` ở đầu vòng rồi dựng lại sẽ rò một
             # texture GL mỗi lớp mỗi lần nạp ảnh.
-            texture = self._create_rgba_texture(rgba_l)
+            # TASK_game_feel_fix_1118 Fix 2: ``apply_bleed=False`` — xem
+            # docstring ``_create_rgba_texture``.
+            texture = self._create_rgba_texture(rgba_l, apply_bleed=False)
             self._warn_if_front_layer_too_wide(layer_idx, layer, t_mm, width_s)
             overscan_lines.append(
                 f"L{layer_idx} t={t_mm:.0f}mm {note} x{scale:.3f} "
@@ -1327,12 +1329,33 @@ class ContentPlaneRenderer:
             ", ".join(f"{lyr.coverage:.0%}" for lyr in layers),
         )
 
-    def _create_rgba_texture(self, rgba: npt.NDArray[np.uint8]) -> int:
+    def _create_rgba_texture(self, rgba: npt.NDArray[np.uint8], *,
+                             apply_bleed: bool = True) -> int:
+        """
+        ``apply_bleed=False`` (TASK_game_feel_fix_1118 Fix 2): photo LAYER
+        arrays never need it. ``extract_layer_rgba`` keeps the full
+        graded-photo RGB at every pixel, even where alpha is 0 — "RGB is
+        kept everywhere (not zeroed outside the cluster) so the soft edge
+        blends the true image colors" (its own docstring) — and
+        ``_pad_layer``'s border is ``cv2.BORDER_REPLICATE`` (copies the
+        real edge pixel outward), never zero-fill. So a layer's RGB under
+        a transparent pixel was never black to begin with; the bug
+        ``bleed_transparent`` exists for (straight-alpha PNGs whose
+        AUTHORING pipeline left RGB=0 under alpha=0) does not apply here.
+        Skipping it removes a 6-iteration box-blur pass over a full-
+        resolution array from the MAIN RENDER THREAD (``_apply_bake``,
+        called from ``update()``'s per-frame tick path — every OTHER
+        caller already does its own GL-only work, per that method's own
+        docstring; this blur broke that invariant). The layer-SHADOW
+        texture (``_build_layer_shadows``) is a different, small,
+        procedurally generated array — not verified safe, keeps bleeding
+        (the default).
+        """
         # TASK_game_feel_1118 P2: loang màu TRƯỚC ``flipud`` — loang không
         # quan tâm hướng trục, và làm trên mảng gốc (liên tục trong bộ
         # nhớ) rẻ hơn làm sau khi lật.
-        data = np.ascontiguousarray(
-            np.flipud(bleed_transparent(rgba)), dtype=np.uint8)
+        bled = bleed_transparent(rgba) if apply_bleed else rgba
+        data = np.ascontiguousarray(np.flipud(bled), dtype=np.uint8)
         h, w = data.shape[:2]
         texture = int(GL.glGenTextures(1))
         GL.glBindTexture(GL.GL_TEXTURE_2D, texture)
