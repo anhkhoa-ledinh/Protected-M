@@ -134,7 +134,18 @@ class AlbumMatch:
 
         Hết viên cuối thì tự nạp: không có đường nạp thì bắn hết băng là ván
         tắc, mà bản vẽ không có nút nạp đạn nào.
+
+        TASK_game_feel_fix_1118 Fix 3: ``tick_reload(now)`` first, right
+        here — not just in ``app.py``'s ``_tick_auto_fire`` (the 1118
+        patch). That only closed the race for full-auto; a REGULAR CLICK
+        landing on the exact frame the reload deadline passes hit the
+        same race (``reloading(now)`` already false, ``rounds_left``
+        still 0 because nothing had called ``tick_reload`` yet this
+        frame) — rare for a discrete click, but still a real bug, and the
+        fix belongs at the one place every firing path already goes
+        through, not duplicated in every caller.
         """
+        self.tick_reload(now)
         if self.reloading(now) or not self.ready_to_fire(now):
             return False
         if self.rounds_left <= 0:

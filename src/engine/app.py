@@ -972,24 +972,19 @@ class HcpdApplication:
         gun — button up, weapon switch, or leaving the match screen — any
         of those ends the bloom bump started below.
 
-        Calls ``match.tick_reload(now)`` itself, BEFORE the readiness
-        check — ``_tick_album_match`` (which normally owns that call, via
-        ``match.tick()``) only runs LATER this same frame. Without this,
-        on the exact frame the reload deadline passes, this method's
-        check sees "not reloading" (the deadline IS past) while
-        ``rounds_left`` is STILL 0 (not yet refilled) — ``take_round``
-        then re-triggers ANOTHER reload right there, and since this runs
-        every single held frame (not a rare discrete click), that race
-        was hit on nearly every reload, reload never actually finishing
-        while the button stayed held. Calling it here first closes that
-        window; the later call from ``match.tick()`` becomes a no-op.
+        TASK_game_feel_fix_1118 Fix 3: the reload re-trigger race (fire
+        landing on the exact frame the reload deadline passes, before
+        anything has refilled ``rounds_left`` yet this frame) used to be
+        patched HERE with an explicit ``match.tick_reload(now)`` call —
+        but that only covered THIS call path, not a regular click. Fixed
+        at the root instead: ``AlbumMatch.take_round()`` calls
+        ``tick_reload(now)`` itself now, so every firing path (this one,
+        and ``pop_clicks()`` above) is covered without a duplicate call.
         """
         if not self._album_options.is_v3:
             return
         F = self._album.flow
         match = self._album.game
-        if match is not None:
-            match.tick_reload(now)
         firing = (match is not None
                  and self._album.state.screen in (F.PLAY, F.PVP_HUNT)
                  and match.weapon_name == "Heavy-mag gun"
