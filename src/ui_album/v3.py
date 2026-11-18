@@ -436,6 +436,33 @@ def _byte(colour: str | None, alpha: float = 1.0) -> tuple[int, int, int, int]:
     return tuple(int(round(c * 255)) for c in rgba(colour, alpha))
 
 
+#: TASK_game_feel_fix_1118 Fix 11: every PIL ``ImageDraw``-built shape in
+#: this module (``rounded_frame``, the rounded cap, ``disc``, ``pip``,
+#: ``pill``) draws at this many times the final size, then downsamples
+#: with a box filter — ``ImageDraw`` itself has no antialiasing, so a
+#: curved or diagonal edge drawn straight at the final (small) size comes
+#: out a hard 1px staircase (the user's own 18:24 report: the focus ring
+#: around the Password field).
+_AA_FACTOR = 4
+
+
+def _aa_build(width_px: int, height_px: int, draw):
+    """Shared AA path: a fresh ``(width_px*_AA_FACTOR, height_px*_AA_FACTOR)``
+    RGBA canvas, ``draw(pen, big_w, big_h)`` draws the shape (and, for
+    ``pill``, its text) onto it at that bigger size, then
+    ``Image.reduce(_AA_FACTOR)`` box-filters it back down to EXACTLY
+    ``width_px x height_px`` — the cache key and every downstream UV/size
+    calculation in the caller are computed at the final size and never
+    need to know AA happened at all. Callers multiply their own
+    scale/radius/stroke-width numbers by ``_AA_FACTOR`` inside ``draw``;
+    using the ``big_w``/``big_h`` passed in (not ``width_px*_AA_FACTOR``
+    re-derived) keeps every edge coordinate exact."""
+    big_w, big_h = width_px * _AA_FACTOR, height_px * _AA_FACTOR
+    image = Image.new("RGBA", (big_w, big_h), (0, 0, 0, 0))
+    draw(ImageDraw.Draw(image), big_w, big_h)
+    return np.asarray(image.reduce(_AA_FACTOR), dtype=np.uint8)
+
+
 class V3Manifest:
     """Bản kê v3 đã nạp. Chỉ đọc; không giữ trạng thái vẽ nào."""
 
@@ -713,14 +740,15 @@ class V3Painter:
                round(radius * scale, 2))
 
         def build():
-            image = Image.new("RGBA", (w_px, h_px), (0, 0, 0, 0))
-            pen = ImageDraw.Draw(image)
-            sw = max(1, int(round(width * scale)))
-            half = sw / 2.0
-            pen.rounded_rectangle(
-                [half, half, w_px - 1 - half, h_px - 1 - half],
-                radius=radius * scale, outline=(255, 255, 255, 255), width=sw)
-            return np.asarray(image, dtype=np.uint8), None
+            def draw(pen, big_w, big_h):
+                sw = max(1, int(round(width * scale * _AA_FACTOR)))
+                half = sw / 2.0
+                pen.rounded_rectangle(
+                    [half, half, big_w - 1 - half, big_h - 1 - half],
+                    radius=radius * scale * _AA_FACTOR,
+                    outline=(255, 255, 255, 255), width=sw)
+
+            return _aa_build(w_px, h_px, draw), None
 
         entry = self.pil.get(key, build)
         if entry:
@@ -933,11 +961,13 @@ class V3Painter:
         def build():
             width = max(2, int(round(cap_w * scale)))
             height = max(2, int(round(h * scale)))
-            image = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-            ImageDraw.Draw(image).rounded_rectangle(
-                [0, 0, width - 1, height - 1], radius=radius * scale,
-                fill=(255, 255, 255, 255))
-            return np.asarray(image, dtype=np.uint8), None
+
+            def draw(pen, big_w, big_h):
+                pen.rounded_rectangle([0, 0, big_w - 1, big_h - 1],
+                                      radius=radius * scale * _AA_FACTOR,
+                                      fill=(255, 255, 255, 255))
+
+            return _aa_build(width, height, draw), None
 
         entry = self.pil.get(key, build)
         if not entry:
@@ -971,10 +1001,12 @@ class V3Painter:
         def build():
             width = size + 1
             height = max(1, int(round(float(rect[3]) * scale))) + 1
-            image = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-            ImageDraw.Draw(image).ellipse([0, 0, width - 1, height - 1],
-                                          fill=(255, 255, 255, 255))
-            return np.asarray(image, dtype=np.uint8), None
+
+            def draw(pen, big_w, big_h):
+                pen.ellipse([0, 0, big_w - 1, big_h - 1],
+                           fill=(255, 255, 255, 255))
+
+            return _aa_build(width, height, draw), None
 
         entry = self.pil.get(key, build)
         if entry:
@@ -1001,19 +1033,21 @@ class V3Painter:
         def build():
             width = max(1, int(round(rect[2] * scale))) + 1
             height = max(1, int(round(rect[3] * scale))) + 1
-            image = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-            pen = ImageDraw.Draw(image)
             fill = (_byte(style["fill"], float(style.get("fill_op", 1.0) or 1.0))
                     if style.get("fill") else None)
             outline = _byte(style["stroke"]) if style.get("stroke") else None
-            stroke_px = max(1, int(round(float(style.get("sw", 1) or 1) * scale)))
-            box = [0, 0, width - 1, height - 1]
-            if shape == "ellipse":
-                pen.ellipse(box, fill=fill, outline=outline, width=stroke_px)
-            else:
-                pen.rounded_rectangle(box, radius=radius * scale, fill=fill,
-                                      outline=outline, width=stroke_px)
-            return np.asarray(image, dtype=np.uint8), None
+
+            def draw(pen, big_w, big_h):
+                stroke_px = max(1, int(round(float(style.get("sw", 1) or 1)
+                                             * scale * _AA_FACTOR)))
+                box = [0, 0, big_w - 1, big_h - 1]
+                if shape == "ellipse":
+                    pen.ellipse(box, fill=fill, outline=outline, width=stroke_px)
+                else:
+                    pen.rounded_rectangle(box, radius=radius * scale * _AA_FACTOR,
+                                          fill=fill, outline=outline, width=stroke_px)
+
+            return _aa_build(width, height, draw), None
 
         entry = self.pil.get(key, build)
         if entry:
@@ -1043,29 +1077,37 @@ class V3Painter:
             size = float(font_spec["fs"])
             metric = self.fonts.get(font_spec["ff"], font_spec["fw"],
                                     round(size * k))
-            glyph = self.fonts.get(font_spec["ff"], font_spec["fw"],
-                                   round(size * scale))
             spacing = float(font_spec.get("ls") or 0.0)
             # Công thức bề rộng của preview.py, kể cả chỗ nó nhân ``ls`` với
             # ``len`` chứ không phải ``len - 1``.
             design_w = metric.getlength(text) / k + spacing * len(text) + 2.0 * pad
             width = max(2, int(round(design_w * scale))) + 1
             height = max(2, int(round(h * scale))) + 1
-            image = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-            pen = ImageDraw.Draw(image)
-            pen.rounded_rectangle([0, 0, width - 1, height - 1],
-                                  radius=radius * scale, fill=_byte(style.get("bg")))
             total = _run_width(metric, text, spacing * k) / k
             ascent_k, descent_k = metric.getmetrics()
             ascent, descent = ascent_k / k, descent_k / k
-            cursor = (width - 1 - total * scale) * 0.5
-            baseline = (height - 1 - (ascent + descent) * scale) * 0.5 + ascent * scale
             colour = _byte(style.get("fg"))
-            for char in text:
-                pen.text((cursor, baseline), char, font=glyph, fill=colour,
-                         anchor="ls")
-                cursor += (metric.getlength(char) / k + spacing) * scale
-            return np.asarray(image, dtype=np.uint8), design_w
+            bg = _byte(style.get("bg"))
+
+            def draw(pen, big_w, big_h):
+                # Fix 11: the pill's TEXT gets supersampled right along
+                # with its background — same canvas, same reduce() — a
+                # sharper glyph at ``scale*_AA_FACTOR`` is a free upgrade
+                # over FreeType's own hinting at the final (small) size.
+                big_scale = scale * _AA_FACTOR
+                glyph = self.fonts.get(font_spec["ff"], font_spec["fw"],
+                                       round(size * big_scale))
+                pen.rounded_rectangle([0, 0, big_w - 1, big_h - 1],
+                                      radius=radius * big_scale, fill=bg)
+                cursor = (big_w - 1 - total * big_scale) * 0.5
+                baseline = ((big_h - 1 - (ascent + descent) * big_scale) * 0.5
+                           + ascent * big_scale)
+                for char in text:
+                    pen.text((cursor, baseline), char, font=glyph, fill=colour,
+                             anchor="ls")
+                    cursor += (metric.getlength(char) / k + spacing) * big_scale
+
+            return _aa_build(width, height, draw), design_w
 
         entry = self.pil.get(key, build)
         if entry:
