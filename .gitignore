@@ -71,6 +71,17 @@ assets/config/shared_album.json
 # Commit `pvp.example.json` thay cho nó.
 assets/config/pvp.json
 
+# TASK_accounts_1119: tài khoản cục bộ, chỉ sống trên máy này — không có
+# server nào giữ bản sao. accounts.json chứa mật khẩu đã băm (scrypt) và
+# tiến trình đã lưu của từng người; .bak là bản trước đó, giữ lại mỗi lần
+# ghi; accounts.corrupt-*.json là file hỏng được đổi tên sang khi cả hai
+# bản chính lẫn .bak đều không đọc được. session.json chứa token "remember
+# me" của phiên đang nhớ trên máy này.
+assets/config/accounts.json
+assets/config/accounts.json.bak
+assets/config/accounts.corrupt-*.json
+assets/config/session.json
+
 # ─── IDE và hệ điều hành ──────────────────────────────────────────────────
 .idea/
 .vscode/
