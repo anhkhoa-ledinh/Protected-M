@@ -1437,6 +1437,17 @@ class HcpdApplication:
             logger.info("DEBUG MATCH: dat tay %d bo", len(props))
             return
         self._start_album_match(now)
+        # TASK_hud_fix_1119 Fix 4: the real-click SendInput check needs a
+        # SPECIFIC gun (Spread, mag 8) rather than automatch's always-
+        # Precision default -- reuses ``_apply_bench_weapon`` (until now
+        # only reachable via ``HCPD_FX_BENCH``) so ``HCPD_BENCH_WEAPON``
+        # alone, without the 20 s synthetic-fire loop, picks the weapon.
+        weapon = os.environ.get("HCPD_BENCH_WEAPON", "").strip()
+        if weapon:
+            from src.ui_album.game_bridge import WEAPONS_SPEC
+
+            if weapon in WEAPONS_SPEC:
+                self._apply_bench_weapon(weapon)
 
     def _measurement_ready(self) -> bool:
         """
