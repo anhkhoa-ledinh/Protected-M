@@ -432,19 +432,49 @@ _DIALOG_DIM_ALPHA = 0.45
 _FIELD_BG_COL = "#F1F6FC"
 _FIELD_LABEL_COL = "#8DA3BA"
 _FIELD_VALUE_FONT = {"ff": "Nunito", "fw": 800, "fs": 16.0, "ls": 0.0, "col": INK}
-_FIELD_LABEL_FONT = {"ff": "Nunito", "fw": 700, "fs": 11.0, "ls": 0.0,
+#: TASK_perf_textures_1119 Fix 5: measured off v3_01a_sign_in/base.png's
+#: own baked "Username"/"Password" labels — cropped the baked "U" glyph
+#: (design-space ink height ~8.67px at image_scale 1.5) and solved
+#: ``size = ink_height / (Nunito-700's OS/2.sCapHeight / unitsPerEm)``
+#: = 8.67 / 0.705 ≈ 12.3, rounds to 12. The dialog's own labels were
+#: fs=11 — one step smaller than the screen they overlay, not a huge
+#: gap but a real, measurable one, and visible once side by side.
+_FIELD_LABEL_FONT = {"ff": "Nunito", "fw": 700, "fs": 12.0, "ls": 0.0,
                      "col": _FIELD_LABEL_COL}
 _DANGER_COL = "#E8676B"
 
-RECOVERY_CARD_RECT = (380.0, 170.0, 520.0, 380.0)
+#: TASK_perf_textures_1119 Fix 5: both dialogs below used to leave a
+#: dead gap between their last content row and their buttons (recovery:
+#: 102px between the code box and Copy/I-saved-it; forgot: 62px between
+#: the error line and Reset password) — the card rect's own height was
+#: just set too tall for what the content actually needs. Every y/height
+#: below is now derived from the row above it plus one of these two
+#: gaps, not an independent hand-picked number, so the two can't drift
+#: apart again if a row's own height ever changes.
+_DIALOG_ROW_GAP = 20.0
+_DIALOG_BOTTOM_PAD = 24.0
+
+RECOVERY_CARD_X, RECOVERY_CARD_Y, RECOVERY_CARD_W = 380.0, 170.0, 520.0
 RECOVERY_TITLE_FONT = {"ff": "Baloo 2", "fw": 800, "fs": 22.0, "ls": 0.0, "col": INK}
 RECOVERY_BODY_FONT = {"ff": "Nunito", "fw": 700, "fs": 14.0, "ls": 0.0, "col": INK}
 RECOVERY_CODE_FONT = {"ff": "Nunito", "fw": 900, "fs": 26.0, "ls": 2.0,
                       "col": BUTTON_PRIMARY_COL}
-RECOVERY_COPY_RECT = (420.0, 460.0, 200.0, 48.0)
-RECOVERY_SAVED_RECT = (660.0, 460.0, 200.0, 48.0)
+#: Fixed-at-2-lines layout (the body string is a constant; verified at
+#: this card width) — ``_draw_recovery_dialog`` still wraps it for real
+#: and uses ``len(lines)`` for the code box, so a future body edit that
+#: changes the line count shifts the code box correctly; only the
+#: BUTTONS/card-height below stay keyed to this known-good line count.
+_RECOVERY_BODY_LINES = 2
+_recovery_code_y = (RECOVERY_CARD_Y + 28.0 + 44.0
+                    + _RECOVERY_BODY_LINES * 20.0 + _DIALOG_ROW_GAP)
+_recovery_code_bottom = _recovery_code_y + 56.0
+RECOVERY_COPY_RECT = (420.0, _recovery_code_bottom + _DIALOG_ROW_GAP, 200.0, 48.0)
+RECOVERY_SAVED_RECT = (660.0, _recovery_code_bottom + _DIALOG_ROW_GAP, 200.0, 48.0)
+RECOVERY_CARD_RECT = (RECOVERY_CARD_X, RECOVERY_CARD_Y, RECOVERY_CARD_W,
+                      RECOVERY_COPY_RECT[1] + RECOVERY_COPY_RECT[3]
+                      + _DIALOG_BOTTOM_PAD - RECOVERY_CARD_Y)
 
-FORGOT_CARD_RECT = (330.0, 90.0, 620.0, 540.0)
+FORGOT_CARD_X, FORGOT_CARD_Y, FORGOT_CARD_W = 330.0, 90.0, 620.0
 FORGOT_TITLE_FONT = {"ff": "Baloo 2", "fw": 800, "fs": 22.0, "ls": 0.0, "col": INK}
 FORGOT_FIELD_H = 56.0
 FORGOT_FIELD_X = 378.0
@@ -457,8 +487,13 @@ FORGOT_FIELDS = (
     ("field_forgot_pass2", "Confirm new password", 390.0, True),
 )
 FORGOT_ERROR_RECT = (378.0, 458.0, 524.0, 20.0)
-FORGOT_SUBMIT_RECT = (378.0, 540.0, 524.0, 48.0)
-FORGOT_CANCEL_RECT = (378.0, 596.0, 524.0, 20.0)
+_forgot_error_bottom = FORGOT_ERROR_RECT[1] + FORGOT_ERROR_RECT[3]
+FORGOT_SUBMIT_RECT = (378.0, _forgot_error_bottom + _DIALOG_ROW_GAP, 524.0, 48.0)
+FORGOT_CANCEL_RECT = (378.0, FORGOT_SUBMIT_RECT[1] + FORGOT_SUBMIT_RECT[3] + 16.0,
+                      524.0, 20.0)
+FORGOT_CARD_RECT = (FORGOT_CARD_X, FORGOT_CARD_Y, FORGOT_CARD_W,
+                    FORGOT_CANCEL_RECT[1] + FORGOT_CANCEL_RECT[3]
+                    + _DIALOG_BOTTOM_PAD - FORGOT_CARD_Y)
 FORGOT_ERROR_FONT = {"ff": "Nunito", "fw": 700, "fs": 13.0, "ls": 0.0,
                      "col": _DANGER_COL}
 FORGOT_CANCEL_FONT = {"ff": "Nunito", "fw": 700, "fs": 13.0, "ls": 0.0,
