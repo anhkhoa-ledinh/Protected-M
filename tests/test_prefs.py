@@ -44,29 +44,28 @@ def test_save_can_change_screen_shake(tmp_path):
     assert prefs.load(tmp_path)["screen_shake"] is False
 
 
-# ---- TASK_game_feel_fix_1118 Fix 10.4: hud_compact, same shape, no env ----
+# ---- TASK_hud_fix_1119 Fix 1: the old "hud_compact" key is just ignored ---
 
-def test_hud_compact_defaults_false_with_no_prefs_file(tmp_path):
-    assert prefs.hud_compact_enabled(tmp_path) is False
-    assert prefs.load(tmp_path)["hud_compact"] is False
-
-
-def test_hud_compact_true_in_prefs_file(tmp_path):
+def test_old_hud_compact_key_is_absent_from_the_loaded_dict(tmp_path):
+    """A machine upgraded from the old compact-HUD build may still have
+    this key in its real file -- load() must not surface it at all."""
     path = prefs.prefs_path(tmp_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({"hud_compact": True}), encoding="utf-8")
-    assert prefs.hud_compact_enabled(tmp_path) is True
+    assert "hud_compact" not in prefs.load(tmp_path)
 
 
-def test_save_preserves_hud_compact_when_not_passed(tmp_path):
-    prefs.save(tmp_path, "window", hud_compact=True)
-    assert prefs.load(tmp_path)["hud_compact"] is True
-    prefs.save(tmp_path, "fullscreen")
-    assert prefs.load(tmp_path)["hud_compact"] is True
+def test_save_no_longer_accepts_hud_compact():
+    import inspect
+
+    assert "hud_compact" not in inspect.signature(prefs.save).parameters
 
 
-def test_save_can_change_hud_compact(tmp_path):
-    prefs.save(tmp_path, "fullscreen", hud_compact=True)
-    assert prefs.load(tmp_path)["hud_compact"] is True
-    prefs.save(tmp_path, "fullscreen", hud_compact=False)
-    assert prefs.load(tmp_path)["hud_compact"] is False
+def test_save_drops_a_pre_existing_hud_compact_key(tmp_path):
+    path = prefs.prefs_path(tmp_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"display": "window", "hud_compact": True}),
+                    encoding="utf-8")
+    prefs.save(tmp_path, "window")
+    on_disk = json.loads(path.read_text(encoding="utf-8"))
+    assert "hud_compact" not in on_disk

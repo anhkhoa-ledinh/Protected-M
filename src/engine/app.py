@@ -73,13 +73,6 @@ HOOK_ENV_VARS = (
 )
 
 
-def hud_compact_hint_text(compact: bool) -> str:
-    """TASK_perf_textures_1119 Fix 7: the one-time first-match toast,
-    worded for whichever HUD mode is CURRENTLY active so the player
-    always knows how to reach the other one."""
-    return "Press H for the full HUD" if compact else "Press H for a compact HUD"
-
-
 def is_scripted_run(*, demo: bool, shots: bool, ui_shots: bool) -> bool:
     """TASK_perf_textures_1119 Fix 8: standalone so it's checkable BEFORE
     ``HcpdApplication`` exists (account storage redirect needs to happen
@@ -138,11 +131,6 @@ class HcpdApplication:
         # TASK_game_feel_1118 P6: Precision-gun scope — dt tracker for
         # stepping the zoom spring (``_tick_scope``).
         self._scope_last_t = None
-        # TASK_game_feel_fix_1118 Fix 10.4: one-shot onboarding toast, the
-        # first time a solo match actually starts (``_start_album_match``)
-        # — never shown again this process, and skipped entirely if the
-        # player already has compact mode on (loaded from prefs).
-        self._hud_compact_hint_shown = False
         # PB-055: demo đọc content.demo.json, không ghi file config nào, chỉ nhận
         # G, T, F6, kéo-thả, F4, Esc (lọc ở GlfwWindow).
         self._demo = bool(demo)
@@ -724,8 +712,6 @@ class HcpdApplication:
             state.slot_selected = int(input_state.item_slot)
         if input_state.share_to_album and state.screen == album.flow.PHOTOS:
             self._album_action(album.activate("btn_Share to album"), now)
-        if input_state.hud_compact_toggle:
-            self._apply_hud_compact(album.toggle_hud_compact())
         if album.pop_account_corrupt_toast():
             album.flow.say(state, "Your saved accounts file was unreadable — started a fresh one.")
         if input_state.paste_requested:
@@ -763,18 +749,6 @@ class HcpdApplication:
         if not self._is_scripted_run():
             P.save(self._root, mode, self._window.remembered_rect())
         self._refresh_window_plane()
-
-    def _apply_hud_compact(self, enabled: bool) -> None:
-        """Ghi lại HUD gọn (Fix 10.4) — cùng khuôn với
-        ``_apply_display_mode``: ``album`` đã tự đổi trạng thái trong bộ
-        nhớ (``toggle_hud_compact``), đây chỉ ghi xuống đĩa, giữ nguyên
-        display/window_rect đang có."""
-        from src.config import prefs as P
-
-        if self._is_scripted_run():
-            return
-        P.save(self._root, self._window.display_mode,
-               self._window.remembered_rect(), hud_compact=enabled)
 
     def _refresh_window_plane(self) -> None:
         """
@@ -1303,12 +1277,6 @@ class HcpdApplication:
                 app._album.mouse = app._tick_scope(time.perf_counter(), xy)
             return setup
 
-        def compact(enabled):
-            def setup(app):
-                if app._album.state.hud_compact != enabled:
-                    app._album.toggle_hud_compact()
-            return setup
-
         def crit_impact(active):
             # ``crit_impact_alpha`` is a read-only property, computed from
             # ``_crit_impact_age`` — go through the real ``on_shot()``
@@ -1357,9 +1325,6 @@ class HcpdApplication:
             # G3/10.3: scoped near the user's own screenshot spot.
             ("hud_scope", scoped((980.0, 560.0)), 1.5),
             (None, unscoped(centre), 0.6),
-            # Fix 10.4: compact HUD.
-            ("hud_compact", compact(True), 0.5),
-            (None, compact(False), 0.1),
             # Fix 7: star_five on WIN.
             # star_five's own duration is 0.95s — capture mid-burst, not
             # after it's already faded to its final tiny-particle frames.
@@ -2382,20 +2347,6 @@ class HcpdApplication:
                         weapon, spec.mag, spec.fire_s, spec.reload_s)
         self._album.game = match
         state.go(F.PLAY)
-        # TASK_game_feel_fix_1118 Fix 10.4: "Press H for a compact HUD" —
-        # once per process, the first time a match actually starts.
-        # Solo-only (the common first path to a gun screen); a player who
-        # reaches PvP has, in practice, already been through here once.
-        #
-        # TASK_perf_textures_1119 Fix 7: this used to skip the toast
-        # entirely when hud_compact was ALREADY on (a player who'd set
-        # it in an earlier session never saw any hint at all) — now it
-        # always fires once, worded for whichever mode is CURRENTLY
-        # active, so the player always knows the other one is a press
-        # away.
-        if self._album_options.is_v3 and not self._hud_compact_hint_shown:
-            self._hud_compact_hint_shown = True
-            F.say(state, hud_compact_hint_text(state.hud_compact))
 
     def _album_shots_step(self) -> None:
         """

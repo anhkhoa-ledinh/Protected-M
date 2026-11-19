@@ -105,10 +105,6 @@ class V3UI:
         self.manifest = V3Manifest(root)
         self.painter = V3Painter(self.manifest, shader_dir)
         self.state = F.V3Flow()
-        #: TASK_game_feel_fix_1118 Fix 10.4: loaded once at startup, like
-        #: ``screen_shake``/``fx`` below — ``toggle_hud_compact`` and
-        #: ``app.py`` own writing it back to disk from then on.
-        self.state.hud_compact = _prefs.hud_compact_enabled(root)
         self.options = options
         self.game = None
         self.mouse = (0.0, 0.0)
@@ -523,14 +519,6 @@ class V3UI:
         then defaults every index to 1.0, i.e. no fade)."""
         return {index: spring.x for index, spring in self._hud_springs.items()}
 
-    def toggle_hud_compact(self) -> bool:
-        """TASK_game_feel_fix_1118 Fix 10.4: H key — flip in-memory state;
-        ``app.py`` owns persisting it to ``user_prefs.json`` (same split
-        as ``toggle_display``/``_apply_display_mode``). Returns the new
-        value."""
-        self.state.hud_compact = not self.state.hud_compact
-        return self.state.hud_compact
-
     # ---- TASK_accounts_1119: accounts — local store, no server -----------
     @property
     def account_busy(self) -> bool:
@@ -880,10 +868,6 @@ class V3UI:
             state.pressed = self.mouse_down and state.hover is not None
             state.hover_fx = self._hover_fx
             state.camera_tex = self._camera_entry
-            #: TASK_game_feel_fix_1118 Fix 10.4: every HUD screen (incl.
-            #: PVP_HIDE — the hider's own HUD also gets the compact
-            #: toggle), copied from the persistent flow each frame.
-            state.hud_compact = self.state.hud_compact
             if scene_draw is not None:
                 state.viewport_draw = lambda rect: self._scene(rect, scene_draw)
             if self._window is not None:

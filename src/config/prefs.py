@@ -50,10 +50,16 @@ def prefs_path(root: Path) -> Path:
 
 def load(root: Path) -> dict:
     """``{"display": ..., "window_rect": [x, y, w, h] | None, "fx": bool,
-    "screen_shake": bool, "hud_compact": bool}``."""
+    "screen_shake": bool}``.
+
+    TASK_hud_fix_1119 Fix 1: a real ``user_prefs.json`` may still carry an
+    old "hud_compact" key (ignored: absent from the dict above, and
+    never written back by ``save()`` either, so the next real save on
+    that file just drops it).
+    """
     path = prefs_path(root)
     out = {"display": FULLSCREEN, "window_rect": None, "fx": True,
-           "screen_shake": True, "hud_compact": False}
+           "screen_shake": True}
     if not path.exists():
         return out
     try:
@@ -73,18 +79,17 @@ def load(root: Path) -> dict:
             out["window_rect"] = None
     out["fx"] = bool(payload.get("fx", True))
     out["screen_shake"] = bool(payload.get("screen_shake", True))
-    out["hud_compact"] = bool(payload.get("hud_compact", False))
     return out
 
 
 def save(root: Path, display: str, window_rect=None, fx: bool | None = None,
-         screen_shake: bool | None = None, hud_compact: bool | None = None) -> None:
+         screen_shake: bool | None = None) -> None:
     """Ghi lại tuỳ chọn. Lỗi ghi chỉ log, không làm hỏng lượt chạy.
 
-    ``fx=None``/``screen_shake=None``/``hud_compact=None`` giữ nguyên khoá
-    đang có trên đĩa (hoặc giá trị mặc định nếu chưa có) — chỗ gọi hiện tại
-    thường chỉ biết về display/window_rect, không được vì thế mà xoá tuỳ
-    chọn người dùng tự tay thêm vào.
+    ``fx=None``/``screen_shake=None`` giữ nguyên khoá đang có trên đĩa
+    (hoặc giá trị mặc định nếu chưa có) — chỗ gọi hiện tại thường chỉ
+    biết về display/window_rect, không được vì thế mà xoá tuỳ chọn
+    người dùng tự tay thêm vào.
     """
     path = prefs_path(root)
     current = load(root)
@@ -92,12 +97,9 @@ def save(root: Path, display: str, window_rect=None, fx: bool | None = None,
         fx = current["fx"]
     if screen_shake is None:
         screen_shake = current["screen_shake"]
-    if hud_compact is None:
-        hud_compact = current["hud_compact"]
     payload = {"display": display if display in (FULLSCREEN, WINDOW) else FULLSCREEN,
                "window_rect": list(window_rect) if window_rect else None,
-               "fx": bool(fx), "screen_shake": bool(screen_shake),
-               "hud_compact": bool(hud_compact)}
+               "fx": bool(fx), "screen_shake": bool(screen_shake)}
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
@@ -119,13 +121,6 @@ def screen_shake_enabled(root: Path) -> bool:
     if os.environ.get(NO_SHAKE_ENV):
         return False
     return load(root)["screen_shake"]
-
-
-def hud_compact_enabled(root: Path) -> bool:
-    """TASK_game_feel_fix_1118 Fix 10.4: compact HUD on at startup? Just
-    the "hud_compact" prefs key (default False) — no env override, unlike
-    fx/screen_shake, since nothing benches this one."""
-    return load(root)["hud_compact"]
 
 
 def default_rect(monitor_pos, monitor_size) -> list[int]:
