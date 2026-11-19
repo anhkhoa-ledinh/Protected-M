@@ -2270,6 +2270,7 @@ class HcpdApplication:
         F = self._album.flow
         from src.ui_album.game_bridge import start_match
 
+        from src.content.hidden_props_search import exposure_count
         from src.ui_album.viewport_filter import filter_props
 
         state = self._album.state
@@ -2284,8 +2285,37 @@ class HcpdApplication:
             glass, centre = self._glass_mm()
             kept, outside = filter_props(self._game.props, rest, count, glass,
                                          self._viewport_rect(), centre)
-            logger.info("Album bo: xin %d · dat %d · ngoai o %d",
-                        count, len(kept), outside)
+            # TASK_hud_fix_1119 Fix 3: ``kept`` is only "inside the
+            # viewport" — place_props' own reveal scan (hidden_props_search
+            # ._candidate) only walked ONE axis at a time, so a spot that
+            # never reveals on the 2D peek range (both axes moving
+            # together, the shape a real lean actually takes) could still
+            # slip through and reach the player as an unwinnable bug,
+            # exactly logs/game_20261119_150429.log's t22.png case (1 bug
+            # placed behind the cat, 0/191 khung co vat lo, every shot's
+            # alpha=0.00). Double-check with a real 5x5 grid over the
+            # peek range, at the screen (rest) distance, and drop anything
+            # that's exposed at NONE of the 25 positions.
+            winnable = []
+            for prop in kept:
+                exposed_n = exposure_count(self._game_planes, prop["pos_mm"],
+                                           prop["radius_mm"], rest[:2], rest[2])
+                logger.info("Album bo tai (%.0f, %.0f, %.0f): lo o %d/25 vi tri mat",
+                           *prop["pos_mm"], exposed_n)
+                if exposed_n > 0:
+                    winnable.append(prop)
+            dropped_unwinnable = len(kept) - len(winnable)
+            kept = winnable
+            logger.info("Album bo: xin %d · dat %d · ngoai o %d · khong the lo %d",
+                        count, len(kept), outside, dropped_unwinnable)
+            if not kept:
+                # Không còn chỗ nào THẬT SỰ lộ được — đừng mở ván không thể
+                # thắng (F3.3's own gap). Ở lại màn chọn ảnh, nói thẳng tại
+                # sao, như lời báo "can only hide N" bên dưới.
+                F.say(state, "This photo has no spot a bug can be found "
+                             "from — pick a photo with more depth", 6.0)
+                state.go(F.PHOTOS)
+                return
             if self._album_options.is_v3 and len(kept) < count:
                 # Màn chọn cấp hứa 12 con mà ván chỉ có 1 thì người chơi
                 # tưởng hỏng. Nói thẳng ra: lỗi ở tấm ảnh, không ở họ.
