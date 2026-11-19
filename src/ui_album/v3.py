@@ -394,7 +394,7 @@ TOAST_BG, TOAST_FG = "#24415F", "#FFFFFF"
 TOAST_FONT = {"ff": "Nunito", "fw": 800, "fs": 15.0, "col": TOAST_FG}
 
 #: TASK_game_feel_fix_1118 Fix 10: screens with a gameplay HUD — the
-#: per-card fade machinery (proximity, scope) only applies
+#: per-card fade machinery (proximity, scope, H-hide) only applies
 #: here (menus/results draw their ``top.png`` the old, single-quad way).
 HUD_CARD_SCREENS = frozenset({"v3_08_gameplay_hud", "v3_12a_pvp_hunter_hud",
                               "v3_12b_pvp_bug_hud"})
@@ -1371,7 +1371,7 @@ class V3State:
                  "text_rect", "fx_on", "fx_draw", "selected", "pressed",
                  "hover_fx", "aim_kick_scale", "hit_markers",
                  "crit_impact_alpha", "scene_shake", "scope_zoom",
-                 "card_alpha", "recovery_code", "forgot_open",
+                 "card_alpha", "hud_hidden_alpha", "recovery_code", "forgot_open",
                  "forgot_focus")
 
     def __init__(self) -> None:
@@ -1468,6 +1468,14 @@ class V3State:
         #: frames and fills this in each ``draw()`` for PLAY/PVP_HUNT/
         #: PVP_HIDE; missing index = 1.0 (not faded).
         self.card_alpha: dict = {}
+        #: TASK_hud_fix_1119 Fix 2: H toggles the TARGET this eases
+        #: toward (1.0 visible, 0.0 hidden) — session-only, never
+        #: persisted. ``_card_fade`` multiplies it into every HUD
+        #: card/dynamic-element's alpha except the always-visible
+        #: sprites (crosshair, bite); ``_draw_sprites``'s borrowed loop
+        #: and ``_draw_texts``'s ``state.extra`` loop apply it directly
+        #: for item slots, which have no card of their own.
+        self.hud_hidden_alpha: float = 1.0
         #: TASK_accounts_1119 Phase 6: the one-time recovery code dialog
         #: (``recovery_code`` non-empty = open, same ``""``-means-closed
         #: convention as ``confirm`` above) and the forgot-password
@@ -1670,13 +1678,28 @@ def _cover_texture(painter, rect, entry, mirror: bool = False) -> None:
     GL.glDisable(GL.GL_SCISSOR_TEST)
 
 
+#: TASK_hud_fix_1119 Fix 2: these two sprite keys stay drawn at full
+#: alpha even while H has hidden the HUD — everything else (every card,
+#: its dynamic contents, and the "free" item-slot/head-tracking/effect
+#: elements that have no card of their own) fades with
+#: ``state.hud_hidden_alpha``.
+_ALWAYS_VISIBLE_SPRITE_KEYS = frozenset({"crosshair", "bite"})
+
+
 def _card_fade(card_map: dict, state: V3State, key: str) -> tuple[int | None, float]:
-    """``(card index or None, current alpha)`` for ``key`` — 1.0/None for
-    anything free (never faded)."""
+    """``(card index or None, current alpha)`` for ``key``.
+
+    ``index=None`` ("free" — no card under this element) used to always
+    mean alpha 1.0 (proximity/scope fade never touched it). Now a free
+    element ALSO fades when the HUD is hidden (TASK_hud_fix_1119 Fix 2)
+    — except the couple of sprite keys in ``_ALWAYS_VISIBLE_SPRITE_KEYS``,
+    which stay visible either way.
+    """
     index = card_map.get(key)
-    if index is None:
-        return None, 1.0
-    return index, float(state.card_alpha.get(index, 1.0))
+    base = 1.0 if index is None else float(state.card_alpha.get(index, 1.0))
+    if key in _ALWAYS_VISIBLE_SPRITE_KEYS:
+        return index, base
+    return index, base * float(state.hud_hidden_alpha)
 
 
 def _draw_hud_top_cards(painter, manifest, screen, record, state) -> None:
@@ -1770,13 +1793,18 @@ def _draw_sprites(painter, manifest, screen, record, state, card_map) -> None:
         rect = sprite["rect"] if where is True else where
         painter.sprite(rect, sprite.get("file"),
                        float(state.alpha.get(key, 1.0)) * fade, key in state.mirror)
-    # Borrowed sprites (item-slot icons/badges, a non-Precision weapon's
-    # icon lent from the loadout screen) have no card of their own.
+    # TASK_hud_fix_1119 Fix 2: borrowed sprites (item-slot icons/badges,
+    # a non-Precision weapon's icon lent from the loadout screen) have
+    # no card of their own, so they fade with ``hud_hidden_alpha``
+    # directly instead of through ``_card_fade`` — none of them are in
+    # the always-visible whitelist (that's only crosshair/bite, neither
+    # ever borrowed).
     for label, (other, key, rect) in state.borrowed.items():
         borrowed = manifest.sprite(other, key)
         if borrowed is not None:
             painter.sprite(rect, borrowed.get("file"),
-                           float(state.alpha.get(label, 1.0)),
+                           float(state.alpha.get(label, 1.0))
+                           * float(state.hud_hidden_alpha),
                            label in state.mirror)
     _ = screen
 
@@ -1803,8 +1831,10 @@ def _draw_texts(painter, record, state, card_map) -> None:
             painter.fill((right + CARET_GAP,
                           rect[1] + (rect[3] - CARET_SIZE[1]) * 0.5,
                           CARET_SIZE[0], CARET_SIZE[1]), rgba(CARET_COL))
+    # TASK_hud_fix_1119 Fix 2: item-slot key/name/count text (no card of
+    # its own, same reasoning as the borrowed-sprite loop above).
     for rect, runs, texts, align in state.extra:
-        painter.line(rect, runs, texts, align)
+        painter.line(rect, runs, texts, align, float(state.hud_hidden_alpha))
 
 
 def _hole(painter, x: float, y: float, size: float, colour) -> None:

@@ -153,8 +153,8 @@ class InputState:
     item_slot: int = 0
     #: TASK_shared_album_1111: U = "Share to album" ở màn chọn ảnh.
     share_to_album: bool = False
-    #: TASK_game_feel_fix_1118 Fix 10.4: H = bật/tắt HUD gọn, mọi súng.
-    hud_compact_toggle: bool = False
+    #: TASK_hud_fix_1119 Fix 2: H = ẩn/hiện HUD (không lưu, chỉ trong phiên).
+    hud_hide_toggle: bool = False
     #: TASK_accounts_1119: Ctrl+V dán vào ô đang chọn (kể cả ô mật khẩu).
     paste_requested: bool = False
 
@@ -297,7 +297,7 @@ class GlfwWindow:
         self._replay_requested = False
         self._item_slot_requested = 0
         self._share_to_album_requested = False
-        self._hud_compact_requested = False
+        self._hud_hide_requested = False
         self._paste_requested = False
         self._dropped_paths: list[str] = []
         #: TASK_album_ui_1106: chuột và chữ, chỉ giao diện album đọc tới.
@@ -516,7 +516,7 @@ class GlfwWindow:
             replay=self._replay_requested,
             item_slot=self._item_slot_requested,
             share_to_album=self._share_to_album_requested,
-            hud_compact_toggle=self._hud_compact_requested,
+            hud_hide_toggle=self._hud_hide_requested,
             paste_requested=self._paste_requested,
             # Giao diện v3: Esc là "lùi một bước", và app tự quyết khi nào cú
             # lùi ấy nghĩa là thoát (``v3_routes.on_back``).
@@ -554,7 +554,7 @@ class GlfwWindow:
         self._replay_requested = False
         self._item_slot_requested = 0
         self._share_to_album_requested = False
-        self._hud_compact_requested = False
+        self._hud_hide_requested = False
         self._paste_requested = False
         return result
 
@@ -1170,7 +1170,7 @@ class GlfwWindow:
         elif key == glfw.KEY_U:
             self._share_to_album_requested = True
         elif key == glfw.KEY_H:
-            self._hud_compact_requested = True
+            self._hud_hide_requested = True
         elif key == glfw.KEY_V and (mods & glfw.MOD_CONTROL):
             self._paste_requested = True
 

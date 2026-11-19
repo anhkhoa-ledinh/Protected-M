@@ -712,6 +712,8 @@ class HcpdApplication:
             state.slot_selected = int(input_state.item_slot)
         if input_state.share_to_album and state.screen == album.flow.PHOTOS:
             self._album_action(album.activate("btn_Share to album"), now)
+        if input_state.hud_hide_toggle:
+            album.toggle_hud_hidden()
         if album.pop_account_corrupt_toast():
             album.flow.say(state, "Your saved accounts file was unreadable — started a fresh one.")
         if input_state.paste_requested:

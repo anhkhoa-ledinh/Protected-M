@@ -97,6 +97,15 @@ _HUD_FADE_GROW_PX = 48.0
 _HUD_FADE_PROXIMITY_ALPHA = 0.22
 _HUD_FADE_SPRING_K, _HUD_FADE_SPRING_D = 420.0, 26.0
 
+#: TASK_hud_fix_1119 Fix 2: H hide/show — a single Spring (not per-card;
+#: this one drives ``state.hud_hidden_alpha``, the multiplier every card
+#: and "free" HUD element fades with) tuned to settle in ~0.15s: k=600,
+#: d=40 reaches within 2% of its target at t≈0.15s (simulated directly
+#: against ``Spring.step``, 1/60s substeps), with negligible overshoot
+#: (<0.005 past 0 or 1).
+_HUD_HIDE_SPRING_K, _HUD_HIDE_SPRING_D = 600.0, 40.0
+_HUD_HIDDEN_TOAST = "HUD hidden — press H to show"
+
 
 class V3UI:
     """Giao diện v3 gắn vào một cửa sổ GLFW đã có context."""
@@ -132,6 +141,15 @@ class V3UI:
         #: different card layouts.
         self._hud_springs: dict[int, Spring] = {}
         self._hud_springs_screen: str | None = None
+        #: TASK_hud_fix_1119 Fix 2: H hide/show — session-only (never
+        #: persisted), and reset to visible whenever a NEW match begins
+        #: (tracked via ``_hud_hidden_match_screen``: the gun-screen name
+        #: changing TO one of PLAY/PVP_HUNT/PVP_HIDE from something else
+        #: means a fresh match just started, not just a frame redrawing
+        #: the same ongoing one).
+        self._hud_hidden: bool = False
+        self._hud_hide_spring = Spring(1.0, _HUD_HIDE_SPRING_K, _HUD_HIDE_SPRING_D)
+        self._hud_hidden_match_screen: str | None = None
         #: Khung webcam đã lên GPU: ô ``camera`` của màn cài đặt / thử nghiêng.
         self._camera_entry = None
         self._camera_token = None
@@ -477,6 +495,7 @@ class V3UI:
         self._hover_fx.step(self.state.screen, self.hover(), dt)
         self._shot_feel.step(dt)
         self._tick_hud_fade(dt)
+        self._tick_hud_hidden(dt)
         if self._fx_enabled:
             fx_dt = 0.0 if self._fx_last_t is None else max(0.0, now - self._fx_last_t)
             self._fx_last_t = now
@@ -518,6 +537,43 @@ class V3UI:
         empty on any screen without card-fade Springs (``state.card_alpha``
         then defaults every index to 1.0, i.e. no fade)."""
         return {index: spring.x for index, spring in self._hud_springs.items()}
+
+    def _tick_hud_hidden(self, dt: float) -> None:
+        """TASK_hud_fix_1119 Fix 2: steps the H-hide spring every tick
+        (same reasoning as ``_tick_hud_fade`` — keeps converging even
+        across a one-frame screen flicker). A match screen entered FRESH
+        (it wasn't the match screen the tick before) snaps hidden back
+        to visible instantly — "every match starts with the full HUD" —
+        without that re-triggering every single frame of one ongoing
+        match."""
+        name = self.state.screen
+        is_match_screen = name in (F.PLAY, F.PVP_HUNT, F.PVP_HIDE)
+        if is_match_screen and name != self._hud_hidden_match_screen:
+            self._hud_hidden = False
+            self._hud_hide_spring.x = 1.0
+            self._hud_hide_spring.v = 0.0
+            self._hud_hide_spring.to = 1.0
+        self._hud_hidden_match_screen = name if is_match_screen else None
+        self._hud_hide_spring.step(dt)
+
+    @property
+    def hud_hidden_alpha(self) -> float:
+        return self._hud_hide_spring.x
+
+    @property
+    def hud_hidden(self) -> bool:
+        return self._hud_hidden
+
+    def toggle_hud_hidden(self) -> bool:
+        """TASK_hud_fix_1119 Fix 2: H key — session-only, never
+        persisted (no prefs write anywhere in this method). Returns the
+        new hidden state. A toast fires only when HIDING; nothing on
+        show, same as the task's own wording."""
+        self._hud_hidden = not self._hud_hidden
+        self._hud_hide_spring.to = 0.0 if self._hud_hidden else 1.0
+        if self._hud_hidden:
+            F.say(self.state, _HUD_HIDDEN_TOAST)
+        return self._hud_hidden
 
     # ---- TASK_accounts_1119: accounts — local store, no server -----------
     @property
@@ -868,6 +924,10 @@ class V3UI:
             state.pressed = self.mouse_down and state.hover is not None
             state.hover_fx = self._hover_fx
             state.camera_tex = self._camera_entry
+            #: TASK_hud_fix_1119 Fix 2: every HUD screen (incl. PVP_HIDE
+            #: — the hider's own cards fade too), read from the spring
+            #: ``_tick_hud_hidden`` (in ``tick()``) already stepped.
+            state.hud_hidden_alpha = self.hud_hidden_alpha
             if scene_draw is not None:
                 state.viewport_draw = lambda rect: self._scene(rect, scene_draw)
             if self._window is not None:
