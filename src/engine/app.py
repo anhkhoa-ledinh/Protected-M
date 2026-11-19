@@ -482,7 +482,7 @@ class HcpdApplication:
                 continue                     # đang trong trận: bấm = bắn
             self._album_action(album.click(), now)
         self._tick_auto_fire(now)
-        if input_state.album_centre:
+        if input_state.album_centre and not self._v3_field_focused():
             self._album_action("rest_eye", now)
         if input_state.screenshot:
             self._save_album_shot()
@@ -685,6 +685,23 @@ class HcpdApplication:
         painter.initialize()
         return painter
 
+    def _v3_field_focused(self) -> bool:
+        """TASK_hkey_profile_1119: a v3 text field (sign-in/up, the
+        forgot-password dialog's own four fields, the PvP join-code
+        field) has keyboard focus right now.
+
+        The char callback (``pop_typed``/``album.key``) and the single-
+        letter shortcut keys (H, C, 1-3 — see ``_on_key``'s ``V3_KEYS``)
+        fire from TWO INDEPENDENT GLFW callbacks for the SAME keypress:
+        typing "h" into a username both inserts the letter AND used to
+        toggle the HUD. ``False`` for the legacy album UI unconditionally
+        — it has no such focus concept at all, and its input handling
+        must not change (it is the thesis-defense fallback)."""
+        if not self._album_options.is_v3:
+            return False
+        state = self._album.state
+        return state.focus is not None or state.forgot_open
+
     def _tick_v3_input(self, input_state, now: float) -> None:
         """
         Phần nhập liệu CHỈ giao diện v3 có: Esc lùi, F11, ↑/↓, R, 1–3, U.
@@ -713,11 +730,13 @@ class HcpdApplication:
                 # TASK_shared_album_1111 P3: cung phim R, nghia khac theo man —
                 # y het Enter (album.submit()) da doi nghia theo man tu truoc.
                 self._album_action(album.activate("btn_Random from album"), now)
-        if input_state.item_slot:
+        if input_state.item_slot and not self._v3_field_focused():
             state.slot_selected = int(input_state.item_slot)
         if input_state.share_to_album and state.screen == album.flow.PHOTOS:
             self._album_action(album.activate("btn_Share to album"), now)
-        if input_state.hud_hide_toggle:
+        if (input_state.hud_hide_toggle and not self._v3_field_focused()
+                and state.screen in (album.flow.PLAY, album.flow.PVP_HUNT,
+                                     album.flow.PVP_HIDE)):
             album.toggle_hud_hidden()
         if album.pop_account_corrupt_toast():
             album.flow.say(state, "Your saved accounts file was unreadable — started a fresh one.")
