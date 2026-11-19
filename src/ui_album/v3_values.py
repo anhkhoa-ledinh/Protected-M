@@ -660,6 +660,7 @@ def _hud(state, flow, game, manifest, now) -> None:
     if game is not None:
         state.shots = [(x, y, now - fired, hit)
                        for x, y, fired, hit in getattr(game, "shots", ())]
+        state.hp_bars = game.hp_bars(now)
         if game.reloading(now):
             # Không có ô nào trên bản vẽ dành cho việc nạp đạn, nên nói bằng
             # dòng báo — nếu không, bấm chuột mà súng im là khó hiểu.

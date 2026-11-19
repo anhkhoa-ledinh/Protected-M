@@ -387,6 +387,15 @@ HIT_FLASH_S = 0.45
 HIT_FLASH_SIZE = 26.0
 HIT_FLASH_COL = "#3AA17A"
 
+#: TASK_weapons_1119: thanh máu nổi trên đầu một con vừa bị bắn mà chưa
+#: chết — 28×4 px thiết kế, xanh (``HIT_FLASH_COL``) → đỏ (``_DANGER_COL``,
+#: khai báo dưới) theo phần máu còn. Độ mờ do ``AlbumMatch.hp_bars`` tính
+#: sẵn (mờ dần hết ``HP_BAR_FADE_S`` giây không bị bắn tiếp) — vẽ ở đây chỉ
+#: đọc lại, không tính tuổi của riêng nó.
+HP_BAR_W_PX, HP_BAR_H_PX = 28.0, 4.0
+HP_BAR_GAP_PX = 16.0            # khoảng cách từ chỗ bắn lên đáy thanh
+HP_BAR_BG_COL = "#141C28"
+
 #: Dòng báo nổi ở giữa dưới (toast của giao diện).
 TOAST_RECT = (340.0, 626.0, 600.0, 44.0)
 TOAST_RADIUS = 22.0
@@ -1369,7 +1378,7 @@ class V3State:
                  "hover", "focus", "caret", "alpha", "shot", "message", "wrap",
                  "extra", "mirror", "aim", "shots", "aim_ready", "confirm",
                  "text_rect", "fx_on", "fx_draw", "selected", "pressed",
-                 "hover_fx", "aim_kick_scale", "hit_markers",
+                 "hover_fx", "aim_kick_scale", "hit_markers", "hp_bars",
                  "crit_impact_alpha", "scene_shake", "scope_zoom",
                  "card_alpha", "hud_hidden_alpha", "recovery_code", "forgot_open",
                  "forgot_focus")
@@ -1456,6 +1465,10 @@ class V3State:
         self.aim_kick_scale: float = 1.0
         #: ``[(x, y, age_s, crit), ...]``.
         self.hit_markers: list = []
+        #: TASK_weapons_1119: ``[(x, y, phần máu còn, độ mờ), ...]`` của mỗi
+        #: con vừa bị bắn mà chưa chết — ``v3_values._hud`` đổ từ
+        #: ``AlbumMatch.hp_bars``.
+        self.hp_bars: list = []
         self.crit_impact_alpha: float = 0.0
         #: Design-px ``(dx, dy)`` the 3D scene viewport and the fx layer
         #: are shifted by — HUD panels/text never move with it.
@@ -1620,6 +1633,7 @@ def draw_screen(painter: V3Painter, manifest: V3Manifest, screen: str,
     _draw_scope_mini_readout(painter, state)
     _draw_choose_photo_extra(painter, screen, state)
     _draw_shots(painter, state)
+    _draw_hp_bars(painter, state)
     _draw_aim(painter, state)
     _draw_scope_reticle(painter, state)
     _draw_hit_markers(painter, state)
@@ -1903,6 +1917,33 @@ def _draw_shots(painter, state) -> None:
             flash = 1.0 - age / HIT_FLASH_S
             _hole(painter, x, y, HIT_FLASH_SIZE * (1.0 - flash * 0.5),
                   rgba(HIT_FLASH_COL, 0.55 * flash))
+
+
+def _hp_bar_colour(frac: float, alpha: float) -> tuple[float, float, float, float]:
+    """Xanh (đầy) → đỏ (gần hết), nội suy tuyến tính theo ``frac`` (0–1)."""
+    full, empty = rgba(HIT_FLASH_COL), rgba(_DANGER_COL)
+    t = max(0.0, min(1.0, float(frac)))
+    rgb = tuple(e + (f - e) * t for f, e in zip(full[:3], empty[:3]))
+    return (*rgb, alpha)
+
+
+def _draw_hp_bars(painter, state) -> None:
+    """TASK_weapons_1119: thanh máu nổi trên đầu một con vừa bị bắn mà
+    chưa chết — cùng lối "điểm cố định" với vết đạn/hit marker
+    (``_scope_adjust``): gắn ở CHỖ PHÁT BẮN gần nhất găm vào nó, không
+    truy lại vị trí chiếu 3D hiện tại của con bọ."""
+    if state.shot:
+        return
+    for x, y, frac, alpha in state.hp_bars:
+        x, y, visible = _scope_adjust(x, y, state)
+        if not visible:
+            continue
+        left, top = x - HP_BAR_W_PX * 0.5, y - HP_BAR_GAP_PX
+        painter.rounded((left, top, HP_BAR_W_PX, HP_BAR_H_PX),
+                        HP_BAR_H_PX * 0.5, rgba(HP_BAR_BG_COL, 0.7 * alpha))
+        fill_w = max(HP_BAR_H_PX, HP_BAR_W_PX * max(0.0, min(1.0, frac)))
+        painter.rounded((left, top, fill_w, HP_BAR_H_PX), HP_BAR_H_PX * 0.5,
+                        _hp_bar_colour(frac, alpha))
 
 
 def _draw_toast(painter, state, screen=None) -> None:

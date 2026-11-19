@@ -1015,7 +1015,8 @@ class HcpdApplication:
         aim = self._aim_context()
         if aim is None:
             return True
-        shot = fire(match, self._album.mouse, aim)
+        shot = fire(match, self._album.mouse, aim,
+                   pvp=(self._album.state.screen == F.PVP_HUNT))
         if shot is None:
             return True          # hết băng hoặc đang nạp: nuốt cú bấm
         hit, crit = shot
@@ -1025,16 +1026,26 @@ class HcpdApplication:
             # it; only a hit gets a marker, only a crit gets the impact
             # frame too (``ShotFeel.on_shot`` itself decides which).
             self._album.register_shot(hit >= 0, crit)
-        if hit >= 0:
-            self._renderer.set_prop_found(hit)
+        # TASK_weapons_1119: a silhouette hit no longer always kills —
+        # ``fire()`` already ran damage per pellet (the shotgun fires
+        # several) and recorded which ones actually died in
+        # ``last_shot_hits``. Only a KILL removes the bug, counts, sends
+        # PvP's ``hit`` or plays ``hit_kill``/``hit_crit``; a non-lethal
+        # contact already got its marker above via ``register_shot``, and
+        # its HP bar comes straight back from ``match.bug_last_hit``
+        # (``v3_values._hud``) — nothing else to do for it here.
+        for index, pellet_crit, killed in match.last_shot_hits:
+            if not killed:
+                continue
+            self._renderer.set_prop_found(index)
             if self._bugs is not None:
                 self._bugs.mark_found(
-                    hit, [v / 1000.0 for v in self._game.props[hit]["pos_mm"]])
+                    index, [v / 1000.0 for v in self._game.props[index]["pos_mm"]])
             if self._album_options.is_v3:
                 # TASK_ui_sakuga_1117 Phase 6: LOCAL hit only — this path
                 # never runs for the opponent's kills, so no extra guard
                 # is needed to keep their shots silent here.
-                self._album.spawn_hit_fx(crit)
+                self._album.spawn_hit_fx(pellet_crit)
             if self._pvp_active and self._pvp is not None:
                 # TASK_pvp_lan_1116: xác nhận trúng do SERVER quyết — đánh
                 # dấu "found" cục bộ ở trên chỉ là phản hồi tức thì, điểm/
@@ -1042,11 +1053,12 @@ class HcpdApplication:
                 # ``_pvp_handle_killed``).
                 from src.net import protocol as proto
 
-                self._pvp.send({"t": proto.HIT, "bug": hit})
+                self._pvp.send({"t": proto.HIT, "bug": index})
             eye = aim.eye_mm
             logger.info("Prop BAN TRUNG #%d%s — eye (%.0f, %.0f, %.0f) mm",
-                        hit, " CHI MANG" if crit else "", eye[0], eye[1], eye[2])
-        elif self._album_options.is_v3:
+                        index, " CHI MANG" if pellet_crit else "",
+                        eye[0], eye[1], eye[2])
+        if hit < 0 and self._album_options.is_v3:
             self._album.spawn_miss_fx()
         return True
 
