@@ -14,6 +14,7 @@ import numpy.typing as npt
 from OpenGL import GL
 
 from src.config.schema import ContentSettings
+from src.engine.stage_profile import stage
 from src.content.bake import BakeWorker
 from src.content.depth_worker import DepthWorker
 from src.content.formats import detect_content_type
@@ -972,7 +973,8 @@ class ContentPlaneRenderer:
                 and self._mist is not None
                 and len(self._layers) >= 2
             ):
-                self._draw_mist(model_flat, view_flat, proj_flat)
+                with stage("mist"):
+                    self._draw_mist(model_flat, view_flat, proj_flat)
         GL.glDepthMask(GL.GL_TRUE)
         GL.glDisable(GL.GL_BLEND)
         GL.glEnable(GL.GL_CULL_FACE)

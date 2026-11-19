@@ -19,6 +19,7 @@ from OpenGL import GL
 from src.account import crypto as account_crypto
 from src.account import store as account_store
 from src.config import prefs as _prefs
+from src.engine.stage_profile import stage
 from src.fx.anim import Spring
 from src.fx.library import FxLibrary
 from src.fx.player import FxPlayer
@@ -975,9 +976,12 @@ class V3UI:
             else:
                 fx_transform = None
                 fx_hide_beyond = None
-            state.fx_draw = lambda: self._fx_library.draw(
-                self.painter, self._fx_player, offset=shake,
-                transform=fx_transform, hide_beyond=fx_hide_beyond)
+            def _fx_draw() -> None:
+                with stage("fx"):
+                    self._fx_library.draw(
+                        self.painter, self._fx_player, offset=shake,
+                        transform=fx_transform, hide_beyond=fx_hide_beyond)
+            state.fx_draw = _fx_draw
         if name != self._prefetch_last_screen:
             self._prefetch_last_screen = name
             for neighbour in v3_routes.NEXT_SCREENS.get(name, ()):

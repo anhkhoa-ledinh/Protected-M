@@ -39,6 +39,7 @@ from src.engine.adaptive_quality import AdaptiveQualityController
 from src.engine.camera_worker import CameraWorker
 from src.engine.pose_bus import PoseBus
 from src.engine.profiler import Profiler
+from src.engine import stage_profile
 from src.engine.tracking_worker import TrackingWorker
 from src.filters import PoseFilterPipeline
 from src.renderer import DebugMetrics, GlfwWindow, SceneRenderer, VirtualCamera
@@ -892,7 +893,8 @@ class HcpdApplication:
         else:
             scene()
         self._window.capture_last_frame()
-        self._window.swap_buffers()
+        with stage_profile.stage("swap_vsync"):
+            self._window.swap_buffers()
 
     def _should_freeze_on_screen_switch(self) -> bool:
         """TASK_perf_textures_1119 Fix 3: "swap only when ready" — up to
@@ -3257,6 +3259,7 @@ class HcpdApplication:
         try:
             while not self._window.should_close:
                 frame_start = self._profiler.begin_frame()
+                stage_profile.begin_frame()
                 now = time.perf_counter()
                 dt = now - last_input
                 last_input = now
@@ -3371,7 +3374,8 @@ class HcpdApplication:
                     dropped = self._window.pop_dropped_path()
 
                 if self._album is not None:
-                    self._tick_album(input_state, now)
+                    with stage_profile.stage("tick_album_logic"):
+                        self._tick_album(input_state, now)
                 # G đã bị bỏ khỏi giao diện v3 (xem V3_KEYS); chặn luôn ở đây
                 # để nhánh này không còn đường chạy nào trong luồng v3.
                 if input_state.game_toggle and not self._album_options.is_v3:
@@ -3392,18 +3396,20 @@ class HcpdApplication:
                 pose = snapshot.pose
                 pose_age_s = snapshot.age_ms(now) * 0.001
 
-                if self._render_extrapolation and self._filters.stage_info.prediction_enabled:
-                    pose = self._filters.extrapolate_for_display(pose, pose_age_s)
+                with stage_profile.stage("filters"):
+                    if self._render_extrapolation and self._filters.stage_info.prediction_enabled:
+                        pose = self._filters.extrapolate_for_display(pose, pose_age_s)
 
-                eye_offset_mm = np.asarray(
-                    self._screen_cal["eye_offset"],
-                    dtype=np.float64,
-                ) * 1000.0
-                self._virtual_camera.set_eye_mm(pose.translation_mm + eye_offset_mm)
-                control_eye = self._control_eye()
-                if control_eye is not None:
-                    # Điều kiện đối chứng: mắt đứng im ở tư thế nghỉ ĐO ĐƯỢC.
-                    self._virtual_camera.set_eye_mm(control_eye)
+                with stage_profile.stage("kooima_camera"):
+                    eye_offset_mm = np.asarray(
+                        self._screen_cal["eye_offset"],
+                        dtype=np.float64,
+                    ) * 1000.0
+                    self._virtual_camera.set_eye_mm(pose.translation_mm + eye_offset_mm)
+                    control_eye = self._control_eye()
+                    if control_eye is not None:
+                        # Điều kiện đối chứng: mắt đứng im ở tư thế nghỉ ĐO ĐƯỢC.
+                        self._virtual_camera.set_eye_mm(control_eye)
                 live_eye = self._virtual_camera.eye_position_mm
                 self._tick_rest_measure(now, live_eye, self._tracking.face_detected)
                 self._tick_prop_game(now, live_eye)
@@ -3424,7 +3430,8 @@ class HcpdApplication:
                 self._last_scene = scene
                 self._drawing = True
                 try:
-                    self._draw_frame_only(scene)
+                    with stage_profile.stage("draw_total"):
+                        self._draw_frame_only(scene)
                 finally:
                     self._drawing = False
                 if self._album is not None:
@@ -3442,6 +3449,31 @@ class HcpdApplication:
                 self._profiler.capture_latency_ms = self._camera.capture_latency_ms
                 self._profiler.tracking_latency_ms = self._tracking.tracking_latency_ms
                 self._profiler.pose_age_ms = snapshot.age_ms()
+                if stage_profile.ENABLED:
+                    # Sample the EXISTING stage logger's own webcam/tracking
+                    # numbers into the same history, instead of re-timing
+                    # them — they're already measured on their own worker
+                    # threads (src/camera/async_capture.py,
+                    # src/engine/tracking_worker.py), not the main thread.
+                    stage_profile.record_ms("webcam_capture",
+                                           self._profiler.capture_latency_ms)
+                    stage_profile.record_ms("pose_tracking",
+                                           self._profiler.tracking_latency_ms)
+                if stage_profile.ENABLED:
+                    # "ui_painter" is draw_total MINUS the sub-stages nested
+                    # inside it (bugs/layer_render/mist/fx/swap are all
+                    # timed INSIDE the same _draw_frame_only call) — the
+                    # remainder is the 2D HUD/screen painter itself plus
+                    # V3UI.draw()'s own per-frame state-building. Peek
+                    # THIS frame's totals before flushing so it lands in
+                    # the same frame's history, not the next one's.
+                    this_frame = stage_profile.current_frame()
+                    nested = sum(this_frame.get(name, 0.0) for name in
+                                ("bugs", "layer_render", "mist", "fx",
+                                 "swap_vsync"))
+                    stage_profile.record_ms(
+                        "ui_painter", max(0.0, this_frame.get("draw_total", 0.0) - nested))
+                stage_profile.end_frame()
 
                 profile = self._profiler.end_frame(frame_start)
                 quality = self._adaptive.update(profile.fps)
