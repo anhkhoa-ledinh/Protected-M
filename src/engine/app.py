@@ -73,6 +73,13 @@ HOOK_ENV_VARS = (
 )
 
 
+def hud_compact_hint_text(compact: bool) -> str:
+    """TASK_perf_textures_1119 Fix 7: the one-time first-match toast,
+    worded for whichever HUD mode is CURRENTLY active so the player
+    always knows how to reach the other one."""
+    return "Press H for the full HUD" if compact else "Press H for a compact HUD"
+
+
 def is_scripted_run(*, demo: bool, shots: bool, ui_shots: bool) -> bool:
     """TASK_perf_textures_1119 Fix 8: standalone so it's checkable BEFORE
     ``HcpdApplication`` exists (account storage redirect needs to happen
@@ -2379,10 +2386,16 @@ class HcpdApplication:
         # once per process, the first time a match actually starts.
         # Solo-only (the common first path to a gun screen); a player who
         # reaches PvP has, in practice, already been through here once.
-        if (self._album_options.is_v3 and not self._hud_compact_hint_shown
-                and not state.hud_compact):
+        #
+        # TASK_perf_textures_1119 Fix 7: this used to skip the toast
+        # entirely when hud_compact was ALREADY on (a player who'd set
+        # it in an earlier session never saw any hint at all) — now it
+        # always fires once, worded for whichever mode is CURRENTLY
+        # active, so the player always knows the other one is a press
+        # away.
+        if self._album_options.is_v3 and not self._hud_compact_hint_shown:
             self._hud_compact_hint_shown = True
-            F.say(state, "Press H for a compact HUD")
+            F.say(state, hud_compact_hint_text(state.hud_compact))
 
     def _album_shots_step(self) -> None:
         """

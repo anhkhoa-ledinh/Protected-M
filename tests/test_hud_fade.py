@@ -222,8 +222,11 @@ def test_compact_hud_pill_text_for_given_values():
     texts = [call[1] for call in painter.pills]
     assert "Lv 3 · Layer 2/4" in texts
     assert "02:20 · 1/4 · 84%" in texts
-    assert "♥ 100 · 50" in texts
+    # TASK_perf_textures_1119 Fix 7: "♥" isn't in the pack's Nunito cmap
+    # (FreeType substitutes its .notdef glyph) -- "HP" is plain ASCII.
+    assert "HP 100 · 50" in texts
     assert "Precision gun 9/12" in texts
+    assert "Pause" in texts
 
 
 def test_compact_hud_pvp_hunt_uses_kills_you_key():
@@ -240,15 +243,18 @@ def test_compact_hud_pvp_hunt_uses_kills_you_key():
 
 def test_compact_hud_skips_empty_pills():
     """No ammo/weapon and no hp text -> bottom-left/right pills just
-    don't get drawn, instead of drawing an empty/garbage pill."""
+    don't get drawn, instead of drawing an empty/garbage pill. The Pause
+    pill (TASK_perf_textures_1119 Fix 7) is unconditional -- it never
+    reads ``state.texts`` at all, so it's the one pill that always
+    appears alongside whatever else is non-empty."""
     state = V3State()
     state.texts = {"timer": "00:30"}
     painter = _FakeCompactPainter()
 
     _draw_compact_hud(painter, state)
 
-    assert len(painter.pills) == 1
-    assert painter.pills[0][1] == "00:30"
+    texts = [call[1] for call in painter.pills]
+    assert texts == ["00:30", "Pause"]
 
 
 # ---- Fix 10's own G12/G5-style guarantee: fire() is untouched -------------

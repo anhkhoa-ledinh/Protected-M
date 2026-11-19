@@ -761,6 +761,17 @@ def _hud_pvp_bug(state, flow, game) -> None:
     state.bars["exposure"] = exposure / 100.0
 
 
+#: TASK_perf_textures_1119 Fix 7: compact mode keeps every item slot
+#: (key number, icon, count) legible but smaller — 80% of its normal
+#: size, shrunk about its OWN centre so the group of slots stays
+#: anchored along the bottom centre instead of drifting toward one
+#: corner. Item-slot visuals bypass the card/compact-skip machinery
+#: entirely (``state.borrowed``/``state.extra``, not ``state.sprites``/
+#: ``record["texts"]``), which is why ``_COMPACT_SHRINK_PREFIXES`` in
+#: v3.py never actually reached them before this fix.
+_COMPACT_ITEM_SCALE = 0.80
+
+
 def _hud_items(state, flow, game, manifest, screen) -> None:
     """Ba ô vật phẩm của HUD, dựng từ ``item_slots`` + ``item_slot_layout``."""
     record = manifest.screens[screen]
@@ -772,8 +783,11 @@ def _hud_items(state, flow, game, manifest, screen) -> None:
                      "islot_name_used", "islot_count", "islot_count_used"}
     used = getattr(game, "used", {}) if game is not None else {}
     selected = int(flow.slot_selected)
+    compact = bool(getattr(flow, "hud_compact", False))
+    scale = _COMPACT_ITEM_SCALE if compact else 1.0
     for index, slot in enumerate(slots):
         number = index + 1
+        centre = (slot[0] + slot[2] * 0.5, slot[1] + slot[3] * 0.5)
         if index >= len(flow.items):
             state.hidden |= {f"islot:{k}" for k in ("normal", "selected")}
             continue
@@ -781,48 +795,71 @@ def _hud_items(state, flow, game, manifest, screen) -> None:
         left = max(0, 1 - int(used.get(item, 0)))
         mark = "selected" if number == selected else "normal"
         _place(state, manifest, screen, f"islot:{mark}", slot, (0.0, 0.0),
-               f"islot#{index}")
+               f"islot#{index}", scale=scale, centre=centre)
         key_off = layout.get("key") or (0, 0, 20, 20)
         _place(state, manifest, screen, f"ikey:{mark}", slot,
-               (key_off[0], key_off[1]), f"ikey#{index}")
+               (key_off[0], key_off[1]), f"ikey#{index}", scale=scale, centre=centre)
         icon = layout.get("icon")
         if icon:
             state.borrowed[f"islot_icon#{index}"] = (
                 F.LOADOUT, f"item_tile:{item}",
-                (slot[0] + icon[0], slot[1] + icon[1], icon[2], icon[3]))
+                _scale_rect((slot[0] + icon[0], slot[1] + icon[1],
+                            icon[2], icon[3]), scale, centre))
         if left == 0:
             badge = layout.get("used_badge")
             if badge:
                 _place(state, manifest, screen, "iused", slot,
-                       (badge[0], badge[1]), f"iused#{index}")
+                       (badge[0], badge[1]), f"iused#{index}", scale=scale, centre=centre)
         _slot_text(state, manifest, screen,
                    "islot_key_sel" if mark == "selected" else "islot_key",
-                   slot, layout.get("key"), str(number))
+                   slot, layout.get("key"), str(number), scale=scale, centre=centre)
         _slot_text(state, manifest, screen,
                    "islot_name_used" if left == 0 else "islot_name",
-                   slot, layout.get("name"), item)
+                   slot, layout.get("name"), item, scale=scale, centre=centre)
         count = layout.get("count_right")
         if count:
             _slot_text(state, manifest, screen,
                        "islot_count_used" if left == 0 else "islot_count",
                        slot, (count[0] - 40.0, count[1], 40.0, 17.0),
-                       f"×{left}", align="right")
+                       f"×{left}", align="right", scale=scale, centre=centre)
 
 
-def _place(state, manifest, screen, key, slot, offset, label) -> None:
+def _scale_rect(rect, scale: float, centre) -> tuple:
+    """``rect`` scaled by ``scale`` about ``centre`` (a design-space
+    point) -- identity when ``scale == 1.0``."""
+    if scale == 1.0:
+        return tuple(rect)
+    cx, cy = centre
+    x, y, w, h = rect
+    return (cx + (x - cx) * scale, cy + (y - cy) * scale, w * scale, h * scale)
+
+
+def _scaled_runs(runs, scale: float):
+    """``runs`` with every ``fs`` (font size) scaled -- the font-size
+    half of an item-slot TEXT's shrink; ``_scale_rect`` only handles the
+    rect (position/size of the bounding box painter.line aligns within,
+    which alone does not shrink the baked glyph bitmap)."""
+    if scale == 1.0:
+        return runs
+    return [dict(run, fs=float(run.get("fs", 16.0)) * scale) for run in runs]
+
+
+def _place(state, manifest, screen, key, slot, offset, label,
+          *, scale: float = 1.0, centre=None) -> None:
     """Đặt một sprite ô vật phẩm ở góc ``slot`` + ``offset``."""
     record = manifest.sprite(screen, key)
     if record is None:
         return
     anchor, rect = record["anchor"], record["rect"]
     shift = (slot[0] + offset[0] - anchor[0], slot[1] + offset[1] - anchor[1])
-    state.borrowed[label] = (screen, key,
-                             (rect[0] + shift[0], rect[1] + shift[1],
-                              rect[2], rect[3]))
+    final = (rect[0] + shift[0], rect[1] + shift[1], rect[2], rect[3])
+    if centre is not None:
+        final = _scale_rect(final, scale, centre)
+    state.borrowed[label] = (screen, key, final)
 
 
 def _slot_text(state, manifest, screen, key, slot, offset, text,
-               align=None) -> None:
+               align=None, *, scale: float = 1.0, centre=None) -> None:
     template = _spec(manifest, screen, key)
     if template is None or offset is None:
         return
@@ -831,7 +868,10 @@ def _slot_text(state, manifest, screen, key, slot, offset, text,
         rect = [slot[0] + offset[0], slot[1] + offset[1], offset[2], offset[3]]
     else:
         rect = [slot[0] + offset[0], slot[1] + offset[1], base[2], base[3]]
-    state.extra.append((rect, template["runs"], [str(text)],
+    if centre is not None:
+        rect = list(_scale_rect(rect, scale, centre))
+    runs = _scaled_runs(template["runs"], scale) if centre is not None else template["runs"]
+    state.extra.append((rect, runs, [str(text)],
                         align or template.get("al", "left")))
 
 

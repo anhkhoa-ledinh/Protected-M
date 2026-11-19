@@ -1682,6 +1682,9 @@ _COMPACT_PILL_FONT = {"ff": "Nunito", "fw": 800, "fs": 13.0, "ls": 0.4}
 _COMPACT_PILL_STYLE = {"bg": "#FFFFFFEB", "fg": INK}
 _COMPACT_PAD = 12.0
 _COMPACT_MARGIN = 16.0
+#: TASK_perf_textures_1119 Fix 7: compact mode's own small Pause hint —
+#: plain ASCII, same font/style as the other edge pills.
+_COMPACT_PAUSE_TEXT = "Pause"
 
 
 def _compact_pill_spec(x: float, y: float) -> dict:
@@ -1728,7 +1731,12 @@ def _draw_compact_hud(painter: "V3Painter", state: V3State) -> None:
     top_centre = " · ".join(p for p in centre_parts if p)
 
     hp = state.texts.get("hp_value")
-    bottom_left = f"♥ {hp}" if hp is not None else ""
+    # TASK_perf_textures_1119 Fix 7: "♥" (U+2665) is not in the pack's
+    # Nunito files' cmap — FreeType silently substitutes its .notdef
+    # glyph (a box/placeholder), which is what the user saw. "HP" is
+    # plain ASCII, in every weight already loaded (same font family/
+    # weight this pill already uses).
+    bottom_left = f"HP {hp}" if hp is not None else ""
     st = state.texts.get("st_value")
     if st is not None and "st" not in state.hidden:
         bottom_left = f"{bottom_left} · {st}" if bottom_left else str(st)
@@ -1749,6 +1757,16 @@ def _draw_compact_hud(painter: "V3Painter", state: V3State) -> None:
         width = _compact_pill_width(painter, top_centre)
         painter.pill(_compact_pill_spec((design_w - width) * 0.5, _COMPACT_MARGIN),
                     top_centre, _COMPACT_PILL_STYLE)
+    # TASK_perf_textures_1119 Fix 7: top.png's baked "Esc  Pause" card
+    # (a connected-component in the art with no manifest text/sprite key
+    # of its own — see cards_for_top_png) is skipped entirely in compact
+    # mode along with every other card; nothing replaced it, so the
+    # player saw the Pause hint vanish and thought the buttons were
+    # gone. One small pill, same corner.
+    pause_width = _compact_pill_width(painter, _COMPACT_PAUSE_TEXT)
+    painter.pill(_compact_pill_spec(design_w - _COMPACT_MARGIN - pause_width,
+                                    _COMPACT_MARGIN),
+                _COMPACT_PAUSE_TEXT, _COMPACT_PILL_STYLE)
     if bottom_left:
         y = DESIGN_SIZE[1] - _COMPACT_MARGIN - _COMPACT_PILL_H
         painter.pill(_compact_pill_spec(_COMPACT_MARGIN, y),
