@@ -193,6 +193,24 @@ def extra_files(manifest, screen: str, state: V3State) -> tuple:
     return tuple(sorted(out))
 
 
+# ---- TASK_accounts_1119 Phase 6: recovery code + forgot-password dialogs --
+def _dialogs(state, flow) -> None:
+    """Populates both overlay dialogs' state — called UNCONDITIONALLY
+    (regardless of ``flow.screen``), since either can be open on top of
+    whatever screen is underneath (the recovery dialog after sign-up
+    lands on MENU; the forgot dialog opens on SIGN_IN/SIGN_IN_ERR)."""
+    state.recovery_code = flow.recovery_code_shown
+    state.forgot_open = flow.forgot_open
+    state.forgot_focus = flow.forgot_focus
+    if not flow.forgot_open:
+        return
+    state.texts["forgot_user"] = flow.forgot_user
+    state.texts["forgot_code"] = flow.forgot_code
+    state.texts["forgot_pass"] = flow.forgot_new_pass
+    state.texts["forgot_pass2"] = flow.forgot_new_pass2
+    state.texts["forgot_error"] = flow.forgot_error
+
+
 # ---- màn đăng nhập / đăng ký -------------------------------------------
 def _signup_problem(flow, accounts: dict | None) -> str | None:
     """Vấn đề ĐẦU TIÊN (trên xuống: tên → mật khẩu → nhập lại) của một ô
@@ -1063,6 +1081,7 @@ def state_for(manifest, painter, flow, game=None, aim=None, accounts=None) -> V3
     screen = flow.screen
     state.message = (flow.message if now < flow.message_until_s else "")
     state.confirm = flow.shared_album_pending
+    _dialogs(state, flow)
     state.selected = _selected_hotspots(screen, flow)
     if screen in F.LOCKED:
         _sign_in(state, flow, accounts)

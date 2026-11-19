@@ -244,6 +244,10 @@ class V3UI:
     def hover(self) -> str | None:
         if self.state.shared_album_pending:
             return self._dialog_hover(*self.mouse)
+        if self.state.recovery_code_shown:
+            return self._recovery_hover(*self.mouse)
+        if self.state.forgot_open:
+            return self._forgot_hover(*self.mouse)
         return hit_test(self.manifest, self.state.screen, *self.mouse)
 
     def _dialog_hover(self, x: float, y: float) -> str | None:
@@ -252,6 +256,36 @@ class V3UI:
 
         for name, rect in (("btn_confirm_yes", CONFIRM_YES_RECT),
                           ("btn_confirm_no", CONFIRM_NO_RECT)):
+            rx, ry, rw, rh = rect
+            if rx <= x <= rx + rw and ry <= y <= ry + rh:
+                return name
+        return None
+
+    def _recovery_hover(self, x: float, y: float) -> str | None:
+        """TASK_accounts_1119 Phase 6: the recovery-code dialog's own two
+        buttons, same "covers the whole screen, nothing else" rule as
+        the share-confirm dialog."""
+        from src.ui_album.v3 import RECOVERY_COPY_RECT, RECOVERY_SAVED_RECT
+
+        for name, rect in (("btn_recovery_copy", RECOVERY_COPY_RECT),
+                          ("btn_recovery_saved", RECOVERY_SAVED_RECT)):
+            rx, ry, rw, rh = rect
+            if rx <= x <= rx + rw and ry <= y <= ry + rh:
+                return name
+        return None
+
+    def _forgot_hover(self, x: float, y: float) -> str | None:
+        """The forgot-password dialog's four fields + Reset/Cancel."""
+        from src.ui_album.v3 import (FORGOT_CANCEL_RECT, FORGOT_FIELD_H,
+                                     FORGOT_FIELD_W, FORGOT_FIELD_X,
+                                     FORGOT_FIELDS, FORGOT_SUBMIT_RECT)
+
+        for name, _label, field_y, _masked in FORGOT_FIELDS:
+            if (FORGOT_FIELD_X <= x <= FORGOT_FIELD_X + FORGOT_FIELD_W
+                    and field_y <= y <= field_y + FORGOT_FIELD_H):
+                return name
+        for name, rect in (("btn_forgot_submit", FORGOT_SUBMIT_RECT),
+                          ("btn_forgot_cancel", FORGOT_CANCEL_RECT)):
             rx, ry, rw, rh = rect
             if rx <= x <= rx + rw and ry <= y <= ry + rh:
                 return name
@@ -274,7 +308,9 @@ class V3UI:
             self.pending = ""
             return ""
         screen = self.state.screen
-        in_dialog = bool(self.state.shared_album_pending)
+        in_dialog = bool(self.state.shared_album_pending
+                         or self.state.recovery_code_shown
+                         or self.state.forgot_open)
         rect = self._click_rect(screen, name, in_dialog)
         is_primary = (not in_dialog and
                      name == v3_routes.primary_button(self.manifest, self.state))
@@ -287,10 +323,20 @@ class V3UI:
 
     def _click_rect(self, screen: str, name: str, in_dialog: bool):
         if in_dialog:
-            from src.ui_album.v3 import CONFIRM_NO_RECT, CONFIRM_YES_RECT
+            from src.ui_album.v3 import (CONFIRM_NO_RECT, CONFIRM_YES_RECT,
+                                         FORGOT_CANCEL_RECT, FORGOT_FIELD_H,
+                                         FORGOT_FIELD_W, FORGOT_FIELD_X,
+                                         FORGOT_FIELDS, FORGOT_SUBMIT_RECT,
+                                         RECOVERY_COPY_RECT, RECOVERY_SAVED_RECT)
 
-            return {"btn_confirm_yes": CONFIRM_YES_RECT,
-                   "btn_confirm_no": CONFIRM_NO_RECT}.get(name)
+            rects = {"btn_confirm_yes": CONFIRM_YES_RECT, "btn_confirm_no": CONFIRM_NO_RECT,
+                    "btn_recovery_copy": RECOVERY_COPY_RECT,
+                    "btn_recovery_saved": RECOVERY_SAVED_RECT,
+                    "btn_forgot_submit": FORGOT_SUBMIT_RECT,
+                    "btn_forgot_cancel": FORGOT_CANCEL_RECT}
+            for field_name, _label, field_y, _masked in FORGOT_FIELDS:
+                rects[field_name] = (FORGOT_FIELD_X, field_y, FORGOT_FIELD_W, FORGOT_FIELD_H)
+            return rects.get(name)
         from src.ui_album.v3 import hotspot_rect
 
         for hotspot in self.manifest.screens[screen].get("hotspots", ()):
@@ -337,25 +383,51 @@ class V3UI:
                     self.spawn_fx("star_pop", sx, sy, words=False)
 
     def key(self, char: str) -> None:
+        # TASK_accounts_1119 Phase 6: the forgot dialog has its OWN four
+        # fields/focus, separate from whatever screen it overlays.
+        if self.state.forgot_open:
+            F.forgot_type_char(self.state, char)
+            return
         F.type_char(self.state, char)
 
     def backspace(self) -> None:
+        if self.state.forgot_open:
+            F.forgot_backspace(self.state)
+            return
         F.backspace(self.state)
 
     def focus_next(self) -> None:
+        if self.state.forgot_open:
+            F.forgot_focus_next(self.state)
+            return
         fields = {h["n"] for h in
                   self.manifest.screens[self.state.screen].get("hotspots", ())}
         F.focus_next(self.state, fields)
 
     def submit(self) -> str:
-        """Enter = nút chính của màn đang mở (U2: "Enter = the primary button")."""
+        """Enter = nút chính của màn đang mở (U2: "Enter = the primary
+        button") — or of whichever dialog is open, if one is."""
+        if self.state.recovery_code_shown:
+            return self._click("btn_recovery_saved")
+        if self.state.forgot_open:
+            return self._click("btn_forgot_submit")
         name = v3_routes.primary_button(self.manifest, self.state)
         if not name:
             return ""
         return self._click(name)
 
     def back(self) -> str:
-        """Esc = lùi một bước."""
+        """Esc = lùi một bước — hoặc đóng hộp thoại đang mở, nếu có
+        (TASK_accounts_1119 Phase 6: không khoá người dùng lại trong một
+        hộp thoại không có đường thoát bằng bàn phím)."""
+        if self.state.recovery_code_shown:
+            self.state.recovery_code_shown = ""
+            return ""
+        if self.state.forgot_open:
+            self.state.forgot_open = False
+            self.state.forgot_focus = None
+            self.state.forgot_error = ""
+            return ""
         return v3_routes.on_back(self.state, time.perf_counter())
 
     def move_focus(self, delta: int) -> None:
@@ -480,6 +552,7 @@ class V3UI:
         {
             "sign_in": self._apply_sign_in_result,
             "sign_up": self._apply_sign_up_result,
+            "forgot": self._apply_forgot_result,
         }[kind](holder["result"])
 
     def sign_in_submit(self) -> None:
@@ -572,10 +645,69 @@ class V3UI:
         self.state.player = self._account_data["accounts"][key]["display"]
         self.state.password = self.state.password2 = ""
         self.state.focus = None
-        # TASK_accounts_1119 Phase 6 shows the one-time recovery code
-        # dialog here; for now (Phase 2) go straight to the menu.
         self.state.go(F.MENU)
-        _ = code
+        # TASK_accounts_1119 Phase 6: shown exactly once, right now — the
+        # recovery dialog overlays whatever screen is current (MENU,
+        # just set above), same as the share-album confirm dialog does.
+        self.state.recovery_code_shown = code
+
+    def forgot_submit(self) -> None:
+        """``ACT_FORGOT_SUBMIT`` (``app.py``): same cooldown-before-thread
+        pattern as ``sign_in_submit`` — a wrong recovery code burns the
+        SAME per-username throttle as a wrong password (task: "wrong
+        codes use the same 5-try/30s cooldown")."""
+        username = self.state.forgot_user
+        key_guess = account_crypto.username_key(account_crypto.normalize_username(username))
+        now = time.perf_counter()
+        remaining = self._account_throttle.cooldown_remaining(key_guess, now)
+        if remaining > 0.0:
+            self.state.forgot_error = f"Too many tries. Wait {int(round(remaining))} s."
+            return
+        self._start_account_job("forgot", self._verify_recovery_job, username,
+                                self.state.forgot_code, self.state.forgot_new_pass)
+
+    def _verify_recovery_job(self, username: str, code: str, new_password: str):
+        outcome, key = account_store.verify_recovery(self._account_data, username, code)
+        if outcome != account_store.RESULT_OK:
+            return outcome, key, None
+        new_code = account_store.reset_with_recovery(self._account_data, key, new_password)
+        account_store.save(self._account_root, self._account_data)
+        return outcome, key, new_code
+
+    def _apply_forgot_result(self, result) -> None:
+        outcome, key, new_code = result
+        now = time.perf_counter()
+        if outcome == account_store.RESULT_OK:
+            self._account_throttle.reset(key)
+            self.state.forgot_open = False
+            self.state.forgot_focus = None
+            self.state.forgot_user = self.state.forgot_code = ""
+            self.state.forgot_new_pass = self.state.forgot_new_pass2 = ""
+            self.state.forgot_error = ""
+            # TASK_accounts_1119 Phase 6: the old code is used up the
+            # moment it verifies — show the SAME recovery-code dialog
+            # again with the new one, once.
+            self.state.recovery_code_shown = new_code
+            return
+        # Same "throttle on the typed name" fallback as
+        # ``_apply_sign_in_result`` — an unknown name still burns a
+        # cooldown attempt.
+        throttle_key = key or account_crypto.username_key(
+            account_crypto.normalize_username(self.state.forgot_user))
+        self._account_throttle.record_failure(throttle_key, now)
+        remaining = self._account_throttle.cooldown_remaining(throttle_key, now)
+        if remaining > 0.0:
+            self.state.forgot_error = f"Too many tries. Wait {int(round(remaining))} s."
+        elif outcome == account_store.RESULT_UNKNOWN:
+            self.state.forgot_error = f"No album named {self.state.forgot_user}. Create one below."
+        else:
+            self.state.forgot_error = "Wrong code. Try again."
+
+    def copy_recovery_code(self) -> None:
+        """``ACT_COPY_RECOVERY_CODE`` — clipboard copy, same mechanism as
+        the PvP room-code "Copy" button (``app.py``)."""
+        if self._window is not None:
+            self._window.set_clipboard(self.state.recovery_code_shown)
 
     def save_progress(self) -> None:
         """TASK_accounts_1119 Phase 5: ``history``/``recent``/the best

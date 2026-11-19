@@ -340,6 +340,46 @@ def focus_next(flow: V3Flow, fields) -> None:
         flow.focus = order[0]
 
 
+# ---- TASK_accounts_1119 Phase 6: the forgot-password dialog's own ----------
+#: fields — a SEPARATE focus (``flow.forgot_focus``) from the screen
+#: UNDERNEATH it (normally SIGN_IN, which keeps its own ``flow.focus``
+#: untouched while the dialog is open, same as the share-album confirm
+#: dialog leaves the screen under it alone).
+FORGOT_FIELD_ATTR = {"field_forgot_user": "forgot_user",
+                     "field_forgot_code": "forgot_code",
+                     "field_forgot_pass": "forgot_new_pass",
+                     "field_forgot_pass2": "forgot_new_pass2"}
+#: The code field gets slack for the dashes/spaces a user might type —
+#: normalised (stripped + upper-cased) only at submit time.
+FORGOT_FIELD_MAXLEN = {"field_forgot_user": 32, "field_forgot_code": 20,
+                       "field_forgot_pass": 64, "field_forgot_pass2": 64}
+FORGOT_FIELD_ORDER = ("field_forgot_user", "field_forgot_code",
+                      "field_forgot_pass", "field_forgot_pass2")
+
+
+def forgot_type_char(flow: V3Flow, char: str) -> None:
+    attr = FORGOT_FIELD_ATTR.get(flow.forgot_focus or "")
+    if attr:
+        maxlen = FORGOT_FIELD_MAXLEN.get(flow.forgot_focus, 24)
+        setattr(flow, attr, (getattr(flow, attr) + char)[:maxlen])
+        flow.forgot_touched.add(flow.forgot_focus)
+
+
+def forgot_backspace(flow: V3Flow) -> None:
+    attr = FORGOT_FIELD_ATTR.get(flow.forgot_focus or "")
+    if attr:
+        setattr(flow, attr, getattr(flow, attr)[:-1])
+        flow.forgot_touched.add(flow.forgot_focus)
+
+
+def forgot_focus_next(flow: V3Flow) -> None:
+    order = FORGOT_FIELD_ORDER
+    if flow.forgot_focus in order:
+        flow.forgot_focus = order[(order.index(flow.forgot_focus) + 1) % len(order)]
+    else:
+        flow.forgot_focus = order[0]
+
+
 def move_menu_focus(flow: V3Flow, delta: int) -> None:
     """↑/↓ trên màn chính: vòng focus chạy qua bốn nút."""
     if flow.screen != MENU:

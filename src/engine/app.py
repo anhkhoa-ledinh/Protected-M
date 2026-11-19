@@ -1363,6 +1363,11 @@ class HcpdApplication:
             self._album.sign_in_submit()
         elif action == "account_sign_up":
             self._album.sign_up_submit()
+        elif action == "account_forgot_submit":
+            self._album.forgot_submit()
+        elif action == "account_copy_recovery_code":
+            self._album.copy_recovery_code()
+            F.say(state, "Code copied")
 
     def _tick_album_automatch(self, now: float) -> None:
         """

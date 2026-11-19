@@ -215,6 +215,10 @@ def test_switching_to_guest_after_sign_out_clears_history(monkeypatch, isolated_
 
     ui_instance = _make_ui(monkeypatch)
     _sign_up(ui_instance, "LeakUser1")
+    # TASK_accounts_1119 Phase 6: sign-up now opens the one-time recovery
+    # -code dialog, which is modal — dismiss it before anything else can
+    # be clicked, same as a real player would.
+    v3_routes.on_click(ui_instance.state, "btn_recovery_saved", 0.0)
     ui_instance.state.history = {"leak.jpg": {"score": 999}}
     ui_instance.save_progress()
     ui_instance.sign_out()

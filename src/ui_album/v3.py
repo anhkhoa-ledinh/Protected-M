@@ -413,6 +413,49 @@ CONFIRM_TEXT_FONT = {"ff": "Nunito", "fw": 700, "fs": 15.0, "ls": 0.0,
                      "col": INK}
 CONFIRM_BTN_FONT = {"ff": "Nunito", "fw": 800, "fs": 15.0, "ls": 0.0}
 
+# ---- TASK_accounts_1119 Phase 6: recovery code + forgot-password dialogs --
+#: Same style as the share-album confirm dialog above — a dimmed
+#: full-screen backdrop, a white rounded card, Nunito buttons. Field
+#: input-box fill sampled from the real sign-in design (base.png);
+#: field-label colour reuses the "muted" secondary-text tone used
+#: everywhere else in this pack.
+_DIALOG_DIM_COL = "#0B1520"
+_DIALOG_DIM_ALPHA = 0.45
+_FIELD_BG_COL = "#F1F6FC"
+_FIELD_LABEL_COL = "#8DA3BA"
+_FIELD_VALUE_FONT = {"ff": "Nunito", "fw": 800, "fs": 16.0, "ls": 0.0, "col": INK}
+_FIELD_LABEL_FONT = {"ff": "Nunito", "fw": 700, "fs": 11.0, "ls": 0.0,
+                     "col": _FIELD_LABEL_COL}
+_DANGER_COL = "#E8676B"
+
+RECOVERY_CARD_RECT = (380.0, 170.0, 520.0, 380.0)
+RECOVERY_TITLE_FONT = {"ff": "Baloo 2", "fw": 800, "fs": 22.0, "ls": 0.0, "col": INK}
+RECOVERY_BODY_FONT = {"ff": "Nunito", "fw": 700, "fs": 14.0, "ls": 0.0, "col": INK}
+RECOVERY_CODE_FONT = {"ff": "Nunito", "fw": 900, "fs": 26.0, "ls": 2.0,
+                      "col": BUTTON_PRIMARY_COL}
+RECOVERY_COPY_RECT = (420.0, 460.0, 200.0, 48.0)
+RECOVERY_SAVED_RECT = (660.0, 460.0, 200.0, 48.0)
+
+FORGOT_CARD_RECT = (330.0, 90.0, 620.0, 540.0)
+FORGOT_TITLE_FONT = {"ff": "Baloo 2", "fw": 800, "fs": 22.0, "ls": 0.0, "col": INK}
+FORGOT_FIELD_H = 56.0
+FORGOT_FIELD_X = 378.0
+FORGOT_FIELD_W = 524.0
+#: ``(hotspot name, label, y, is_password)``, top to bottom.
+FORGOT_FIELDS = (
+    ("field_forgot_user", "Username", 198.0, False),
+    ("field_forgot_code", "Recovery code", 262.0, False),
+    ("field_forgot_pass", "New password", 326.0, True),
+    ("field_forgot_pass2", "Confirm new password", 390.0, True),
+)
+FORGOT_ERROR_RECT = (378.0, 458.0, 524.0, 20.0)
+FORGOT_SUBMIT_RECT = (378.0, 540.0, 524.0, 48.0)
+FORGOT_CANCEL_RECT = (378.0, 596.0, 524.0, 20.0)
+FORGOT_ERROR_FONT = {"ff": "Nunito", "fw": 700, "fs": 13.0, "ls": 0.0,
+                     "col": _DANGER_COL}
+FORGOT_CANCEL_FONT = {"ff": "Nunito", "fw": 700, "fs": 13.0, "ls": 0.0,
+                      "col": BUTTON_PRIMARY_COL}
+
 #: Con trỏ nhập của ô đang chọn (ghi trong ``screens[].notes``).
 CARET_SIZE = (2.0, 20.0)
 CARET_GAP = 2.0
@@ -1218,7 +1261,8 @@ class V3State:
                  "text_rect", "fx_on", "fx_draw", "selected", "pressed",
                  "hover_fx", "aim_kick_scale", "hit_markers",
                  "crit_impact_alpha", "scene_shake", "scope_zoom",
-                 "card_alpha", "hud_compact")
+                 "card_alpha", "hud_compact", "recovery_code", "forgot_open",
+                 "forgot_focus")
 
     def __init__(self) -> None:
         #: ``key`` → chuỗi (thay run đầu) hoặc danh sách chuỗi (thay từng run).
@@ -1317,6 +1361,21 @@ class V3State:
         #: Fix 10.4: H toggles this, persisted in prefs as "hud_compact".
         #: Cards hide; small edge pills replace them.
         self.hud_compact: bool = False
+        #: TASK_accounts_1119 Phase 6: the one-time recovery code dialog
+        #: (``recovery_code`` non-empty = open, same ``""``-means-closed
+        #: convention as ``confirm`` above) and the forgot-password
+        #: dialog (``forgot_open`` + which of its OWN four fields has
+        #: focus — separate from ``focus`` above, which stays the
+        #: underlying screen's, same as the share-album confirm dialog
+        #: leaves the screen under it alone). Both dialogs' field VALUES
+        #: and any error message live in ``texts`` (keys "forgot_user"/
+        #: "forgot_code"/"forgot_pass"/"forgot_pass2"/"forgot_error") —
+        #: no new slot needed, nothing in the manifest ever uses those
+        #: key names so the generic manifest-driven text draw never
+        #: touches them; only the dialog's own draw function reads them.
+        self.recovery_code: str = ""
+        self.forgot_open: bool = False
+        self.forgot_focus: str | None = None
 
 
 def shot_state(manifest: V3Manifest, screen: str) -> V3State:
@@ -1461,6 +1520,8 @@ def draw_screen(painter: V3Painter, manifest: V3Manifest, screen: str,
     if state.fx_draw is not None:
         state.fx_draw()
     _draw_confirm_dialog(painter, state)
+    _draw_recovery_dialog(painter, state)
+    _draw_forgot_dialog(painter, state)
 
 
 def _draw_photos(painter, manifest, record, state) -> None:
@@ -1876,6 +1937,94 @@ def _draw_confirm_dialog(painter, state) -> None:
         painter.line(rect, [{**CONFIRM_BTN_FONT, "col": fg}], [label], "center")
         if state.hover == name:
             painter.rounded_frame(rect, rgba(CARET_COL), HOVER_PX, 10.0)
+
+
+def _draw_dialog_backdrop(painter) -> None:
+    painter.fill((0.0, 0.0, DESIGN_SIZE[0], DESIGN_SIZE[1]),
+                rgba(_DIALOG_DIM_COL, _DIALOG_DIM_ALPHA))
+
+
+def _draw_dialog_button(painter, state, name: str, rect, label: str,
+                        primary: bool) -> None:
+    bg = BUTTON_PRIMARY_COL if primary else "#DCE9F7"
+    fg = "#FFFFFF" if primary else INK
+    painter.rounded(rect, 10.0, rgba(bg))
+    painter.line(rect, [{**CONFIRM_BTN_FONT, "col": fg}], [label], "center")
+    if state.hover == name:
+        painter.rounded_frame(rect, rgba(CARET_COL), HOVER_PX, 10.0)
+
+
+def _draw_recovery_dialog(painter, state) -> None:
+    """TASK_accounts_1119 Phase 6: shown exactly once — right after
+    sign-up, and again after a successful forgot-password reset (the old
+    code is used up, so a fresh one is issued and shown the same way).
+    Same style as the share-album confirm dialog: dimmed backdrop, white
+    rounded card, Nunito buttons."""
+    if not state.recovery_code or state.shot:
+        return
+    _draw_dialog_backdrop(painter)
+    x, y, w, h = RECOVERY_CARD_RECT
+    painter.rounded((x, y, w, h), 18.0, rgba("#FFFFFF"))
+    pad = 28.0
+    painter.line((x + pad, y + pad, w - 2 * pad, 30.0),
+                 [RECOVERY_TITLE_FONT], ["Save your recovery code"], "left")
+    body = ("This code is the ONLY way back into your album if you forget "
+           "your password. It is shown once — write it down or copy it "
+           "now.")
+    line_h = 20.0
+    lines = _wrap_lines(painter, [RECOVERY_BODY_FONT], [body], w - 2 * pad)
+    body_y = y + pad + 44.0
+    for index, parts in enumerate(lines):
+        painter.line((x + pad, body_y + index * line_h, w - 2 * pad, line_h),
+                     [RECOVERY_BODY_FONT], parts, "left")
+    code_y = body_y + len(lines) * line_h + 20.0
+    painter.rounded((x + pad, code_y, w - 2 * pad, 56.0), 10.0, rgba(_FIELD_BG_COL))
+    painter.line((x + pad, code_y, w - 2 * pad, 56.0),
+                 [RECOVERY_CODE_FONT], [state.recovery_code], "center")
+    _draw_dialog_button(painter, state, "btn_recovery_copy", RECOVERY_COPY_RECT,
+                        "Copy", False)
+    _draw_dialog_button(painter, state, "btn_recovery_saved", RECOVERY_SAVED_RECT,
+                        "I saved it", True)
+
+
+def _forgot_field_value(state, key: str, masked: bool) -> str:
+    raw = str(state.texts.get(key) or "")
+    return "•" * len(raw) if masked else raw
+
+
+def _draw_forgot_dialog(painter, state) -> None:
+    """TASK_accounts_1119 Phase 6: "Forgot password?" — four fields
+    (username, recovery code, new password, confirm), an inline error
+    line, Reset/Cancel. Its OWN focus (``state.forgot_focus``) and field
+    values (``state.texts["forgot_*"]``) are separate from whatever
+    screen it overlays (normally sign-in)."""
+    if not state.forgot_open or state.shot:
+        return
+    _draw_dialog_backdrop(painter)
+    x, y, w, h = FORGOT_CARD_RECT
+    painter.rounded((x, y, w, h), 18.0, rgba("#FFFFFF"))
+    painter.line((x + 28.0, y + 28.0, w - 56.0, 30.0),
+                 [FORGOT_TITLE_FONT], ["Reset your password"], "left")
+    for name, label, field_y, masked in FORGOT_FIELDS:
+        rect = (FORGOT_FIELD_X, field_y, FORGOT_FIELD_W, FORGOT_FIELD_H)
+        painter.rounded(rect, 10.0, rgba(_FIELD_BG_COL))
+        painter.line((FORGOT_FIELD_X + 16.0, field_y + 6.0, FORGOT_FIELD_W - 32.0, 16.0),
+                     [_FIELD_LABEL_FONT], [label], "left")
+        value = _forgot_field_value(state, name.replace("field_", ""), masked)
+        value_rect = (FORGOT_FIELD_X + 16.0, field_y + 22.0, FORGOT_FIELD_W - 32.0, 24.0)
+        right = painter.line(value_rect, [_FIELD_VALUE_FONT], [value], "left")
+        if state.forgot_focus == name:
+            painter.rounded_frame(rect, rgba(CARET_COL), HOVER_PX, 10.0)
+            painter.fill((right + CARET_GAP, field_y + 22.0 + (24.0 - CARET_SIZE[1]) * 0.5,
+                         CARET_SIZE[0], CARET_SIZE[1]), rgba(CARET_COL))
+    error = str(state.texts.get("forgot_error") or "")
+    if error:
+        painter.line(FORGOT_ERROR_RECT, [FORGOT_ERROR_FONT], [error], "left")
+    _draw_dialog_button(painter, state, "btn_forgot_submit", FORGOT_SUBMIT_RECT,
+                        "Reset password", True)
+    painter.line(FORGOT_CANCEL_RECT, [FORGOT_CANCEL_FONT], ["Cancel"], "center")
+    if state.hover == "btn_forgot_cancel":
+        painter.rounded_frame(FORGOT_CANCEL_RECT, rgba(CARET_COL), HOVER_PX, 6.0)
 
 
 def _draw_aim(painter, state) -> None:

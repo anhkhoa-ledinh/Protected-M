@@ -151,16 +151,19 @@ def _sign_in(state, name: str) -> str:
         state.history, state.recent = {}, []
         state.go(F.MENU)
     elif name == "link_forgot":
-        # TASK_accounts_1119 Phase 6 làm hộp thoại thật; ở đây giữ nguyên
-        # thông báo cũ cho tới lúc đó.
-        F.say(state, "Password reset isn't available yet.")
+        state.forgot_open = True
+        state.forgot_user = state.player
+        state.forgot_code = ""
+        state.forgot_new_pass = state.forgot_new_pass2 = ""
+        state.forgot_error = ""
+        state.forgot_touched = set()
+        state.forgot_focus = "field_forgot_user"
     elif name == "switch_remember":
         state.remember = not state.remember
     elif name == "icon_show_password":
         state.show_password = not state.show_password
     elif name.startswith("field_"):
         state.focus = name
-    return ""
     return ""
 
 
@@ -210,6 +213,53 @@ def _confirm_share(state, name: str) -> str:
     state.shared_album_confirmed.add(path)
     state.shared_album_upload_path = path
     return ACT_SHARE_CONFIRMED
+
+
+def _recovery_dialog(state, name: str) -> str:
+    """TASK_accounts_1119 Phase 6: the one-time recovery-code dialog —
+    "Copy" (clipboard, app.py's job) and "I saved it" (closes it)."""
+    if name == "btn_recovery_copy":
+        return ACT_COPY_RECOVERY_CODE
+    elif name == "btn_recovery_saved":
+        state.recovery_code_shown = ""
+        return ACT_RECOVERY_SAVED
+    return ""
+
+
+def _forgot_dialog(state, name: str) -> str:
+    """The forgot-password dialog's own four fields + Reset/Cancel.
+
+    Same split as sign-up: only FORMAT-level checks happen here
+    (synchronous, no store access) — the code itself can only be
+    verified against the store, off-thread, via ``ACT_FORGOT_SUBMIT``.
+    """
+    if name.startswith("field_forgot_"):
+        state.forgot_focus = name
+    elif name == "btn_forgot_cancel":
+        state.forgot_open = False
+        state.forgot_focus = None
+        state.forgot_error = ""
+    elif name == "btn_forgot_submit":
+        state.forgot_touched |= {"field_forgot_user", "field_forgot_code",
+                                 "field_forgot_pass", "field_forgot_pass2"}
+        display, reason = _account_crypto.validate_username(state.forgot_user)
+        if display is None:
+            state.forgot_error = reason
+            return ""
+        code = _account_crypto.normalize_recovery_code(state.forgot_code)
+        if len(code) != _account_crypto.RECOVERY_CODE_CHARS:
+            state.forgot_error = "Enter the 12-character code."
+            return ""
+        pass_ok, reason2 = _account_crypto.validate_password(state.forgot_new_pass)
+        if not pass_ok:
+            state.forgot_error = reason2
+            return ""
+        if state.forgot_new_pass != state.forgot_new_pass2:
+            state.forgot_error = "Passwords don't match"
+            return ""
+        state.forgot_error = ""
+        return ACT_FORGOT_SUBMIT
+    return ""
 
 
 def _solo(state, name: str) -> str:
@@ -329,6 +379,10 @@ def on_click(state, name: str | None, now: float, point=None) -> str:
     logger.info("UI v3 click: %s (man %s)", name, state.screen)
     if state.shared_album_pending and name in ("btn_confirm_yes", "btn_confirm_no"):
         return _confirm_share(state, name)
+    if state.recovery_code_shown:
+        return _recovery_dialog(state, name)
+    if state.forgot_open:
+        return _forgot_dialog(state, name)
     if state.screen in F.LOCKED:
         return _sign_in(state, name)
     if name in F.TABS:
