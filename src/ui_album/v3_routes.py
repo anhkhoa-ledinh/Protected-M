@@ -411,3 +411,56 @@ def on_click(state, name: str | None, now: float, point=None) -> str:
                         F.PVP_HUNT, F.PVP_HIDE, F.PVP_RESULT, F.OFFLINE):
         return _pvp(state, name, now)
     return _solo(state, name)
+
+
+# ---- TASK_perf_textures_1119 Fix 3: prefetch graph ------------------------
+#
+# For every v3 screen, the screens reachable by exactly one click — hand-
+# built from ``on_click``/``BACK``/``TABS`` above (plus app.py's own
+# ``state.go`` calls for the off-thread actions this module only REQUESTS:
+# sign-in/up success, the split-layers pipeline, match start/end, PvP
+# matchmaking). tests/test_screen_prefetch.py cross-checks every
+# ``state.go(...)`` target actually found in THIS file against it.
+#
+# Tabs (``F.TABS``) work from every unlocked screen, so they're added to
+# every entry below except the three ``F.LOCKED`` ones, instead of repeated
+# by hand on each row.
+_TAB_NEIGHBOURS = (F.LEVELS, F.PVP_MODE, F.BOARD, F.SETTINGS)
+
+_NEXT_SCREENS_BASE: dict[str, tuple[str, ...]] = {
+    F.SIGN_IN: (F.SIGN_UP, F.SIGN_IN_ERR, F.MENU),
+    F.SIGN_UP: (F.SIGN_IN, F.MENU),
+    F.SIGN_IN_ERR: (F.SIGN_IN, F.SIGN_UP, F.MENU),
+    F.MENU: (F.LEVELS, F.PVP_MODE, F.BOARD, F.SETTINGS),
+    F.SETTINGS: (F.MENU, F.SIGN_IN),
+    F.OFFLINE: (F.PVP_MODE,),
+    F.LEVELS: (F.MENU, F.PHOTOS),
+    F.PHOTOS: (F.LEVELS, F.LOADING),
+    F.LOADING: (F.PHOTOS, F.LOADING_READY),
+    F.LOADING_READY: (F.PHOTOS, F.LOADOUT),
+    F.LOADOUT: (F.PHOTOS, F.TILT),
+    F.TILT: (F.LOADOUT, F.PLAY),
+    F.PLAY: (F.WIN, F.LOSE),
+    F.WIN: (F.MENU, F.TILT, F.PHOTOS, F.LEVELS),
+    F.LOSE: (F.MENU, F.TILT, F.PHOTOS, F.LEVELS),
+    F.PVP_MODE: (F.MENU, F.PVP_SEARCH, F.PVP_INVITE),
+    F.PVP_SEARCH: (F.PVP_MODE, F.PVP_FOUND, F.OFFLINE),
+    F.PVP_INVITE: (F.PVP_MODE, F.PVP_FOUND),
+    F.PVP_FOUND: (F.PVP_HUNT, F.PVP_HIDE, F.PVP_MODE),
+    F.PVP_HUNT: (F.PVP_RESULT, F.PVP_MODE),
+    F.PVP_HIDE: (F.PVP_RESULT, F.PVP_MODE),
+    F.PVP_RESULT: (F.MENU, F.PVP_MODE, F.BOARD),
+    F.BOARD: (F.MENU,),
+}
+
+
+def _build_next_screens() -> dict[str, tuple[str, ...]]:
+    out: dict[str, tuple[str, ...]] = {}
+    for screen, neighbours in _NEXT_SCREENS_BASE.items():
+        extra = () if screen in F.LOCKED else (s for s in _TAB_NEIGHBOURS if s != screen)
+        out[screen] = tuple(dict.fromkeys((*neighbours, *extra)))
+    return out
+
+
+#: ``screen -> (screens one click away)``. See ``V3UI._prefetch_neighbours``.
+NEXT_SCREENS: dict[str, tuple[str, ...]] = _build_next_screens()

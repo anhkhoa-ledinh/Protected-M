@@ -843,6 +843,11 @@ class HcpdApplication:
         khi swap) để đường blit đó có cái mà dùng.
         """
         if self._album is not None:
+            if self._should_freeze_on_screen_switch():
+                if self._window.draw_last_frame_letterboxed():
+                    return
+                # Nothing captured yet (very first frame ever) — fall
+                # through to a real draw instead of a black window.
             if not self._album.has_viewport():
                 # Màn không có ô viewport: vẫn chạy đúng đường vẽ demo
                 # (render đầy đủ) nhưng cắt xuống 1 pixel — xem chú thích
@@ -853,6 +858,29 @@ class HcpdApplication:
             scene()
         self._window.capture_last_frame()
         self._window.swap_buffers()
+
+    def _should_freeze_on_screen_switch(self) -> bool:
+        """TASK_perf_textures_1119 Fix 3: "swap only when ready" — up to
+        500 ms, keep the window showing the LAST drawn frame while the
+        screen just switched TO is still decoding its textures in the
+        background, instead of a broken partial draw (missing base/top
+        layer). ``V3UI.prepare_screen`` runs regardless of the verdict —
+        including on frames we end up freezing — so loading keeps
+        progressing even while frozen; skipping it there would mean a
+        screen that's still loading at the 500 ms mark NEVER finishes.
+
+        v3-only: the old album UI never got this cache/loader rework."""
+        if not self._album_options.is_v3:
+            return False
+        ready = self._album.prepare_screen()
+        screen = self._album.state.screen
+        now = time.perf_counter()
+        if screen != getattr(self, "_screen_switch_screen", None):
+            self._screen_switch_screen = screen
+            self._screen_switch_t = now
+        if ready:
+            return False
+        return (now - self._screen_switch_t) < 0.5
 
     def _on_refresh(self) -> None:
         """
@@ -2335,11 +2363,19 @@ class HcpdApplication:
         Ba điều đã làm hỏng lượt chụp đầu (18/50 ảnh đen, 6 nhóm trùng md5):
         đọc ngay khung đầu sau khi đổi màn, đọc theo cỡ cửa sổ đã rơi về
         1280×720 lúc cửa sổ bị thu nhỏ, và đồng hồ mô phỏng tự nhảy màn.
+
+        TASK_perf_textures_1119 Fix 3: texture của màn giờ nạp NGOÀI
+        LUỒNG — "đủ 3 khung" không còn chắc nghĩa là "đã xong" (trước
+        đây ``bind_screen`` chặn luồng tới khi xong nên 3 khung luôn
+        thừa). Phải tự hỏi ``current_screen_ready()``; đếm 3 khung chỉ
+        bắt đầu SAU khi nó thật đã xong.
         """
         from OpenGL import GL
 
         if self._window.is_iconified():
             logger.warning("Album shots: cua so dang thu nho — cho")
+            return
+        if self._album_options.is_v3 and not self._album.current_screen_ready():
             return
         self._shot_hold = getattr(self, "_shot_hold", 0) + 1
         if self._shot_hold < 3:

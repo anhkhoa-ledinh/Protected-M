@@ -20,6 +20,7 @@ import json
 import logging
 import math
 import re
+import time
 from collections import OrderedDict
 from pathlib import Path
 
@@ -42,12 +43,19 @@ from src.ui_album.shot_feel import (CRIT_IMPACT_COL,
                                     HITMARK_INNER_PX, HITMARK_LIFE_S,
                                     HITMARK_OUTER_PX, HITMARK_OUTLINE_COL,
                                     HITMARK_OUTLINE_PX, HITMARK_WIDTH_PX)
-from src.ui_album.textures import TextureCache, load_rgba, upload_rgba
+from src.ui_album.texture_loader import PRIORITY_CURRENT, PRIORITY_PREFETCH, AsyncTextureLoader
+from src.ui_album.textures import TextureCache, upload_rgba
 
 logger = logging.getLogger(__name__)
 
 #: Thư mục bộ asset v3, tính từ gốc project.
 ASSET_DIR = Path("assets") / "ui_v3"
+
+#: TASK_perf_textures_1119 Fix 3: số texture tối đa giữ trong
+#: ``V3Painter._screen_tex`` (màn đang mở + các màn prefetch) trước khi
+#: LRU bắt đầu xoá — đủ rộng cho màn nặng sprite nhất (LOADOUT, ~25) cộng
+#: vài màn hàng xóm, không rộng tới mức giữ cả app trong RAM GPU.
+SCREEN_CACHE_MAX_TEXTURES = 120
 
 #: Không gian thiết kế của bộ v3. Mọi ``rect`` trong manifest nằm trong hệ này.
 DESIGN_SIZE = (1280.0, 720.0)
@@ -628,9 +636,22 @@ class V3Painter:
         self._vao = self._vbo = 0
         self._fb = (1280, 720)
         self._box = letterbox(DESIGN_SIZE, self._fb)
-        #: Texture của màn đang mở: ``(path, max_width)`` → ``(tex, w, h)``.
-        self._screen_tex: dict[tuple, tuple[int, int, int]] = {}
+        #: Texture của màn đang mở VÀ các màn đã prefetch: ``(path,
+        #: max_width)`` → ``(tex, w, h)``. ``OrderedDict`` cho LRU —
+        #: TASK_perf_textures_1119 Fix 3: không xoá sạch mỗi lần đổi màn
+        #: nữa (đó mới là nguồn đơ thật, nặng hơn cả README's
+        #: ``IMAGE_CACHE_MAX=6`` của ``TextureCache``), chỉ xoá khi vượt
+        #: ``SCREEN_CACHE_MAX_TEXTURES``.
+        self._screen_tex: OrderedDict[tuple, tuple[int, int, int]] = OrderedDict()
         self._screen_key: tuple | None = None
+        #: TASK_perf_textures_1119 Fix 3: giải mã (decode/bleed/resize)
+        #: chạy trên luồng riêng — luồng vẽ chỉ queue (``request``) và
+        #: rút kết quả đã xong (``poll``) trong ``pump_uploads``.
+        self._loader = AsyncTextureLoader()
+        #: Kết quả đã giải mã (CPU), chờ tới lượt lên GPU trong ngân sách
+        #: ``pump_uploads`` — khung này chưa hết ngân sách thì phần còn lại
+        #: đợi khung sau, KHÔNG rơi mất (``poll()`` không gọi lại được).
+        self._upload_backlog: list[tuple[tuple, object]] = []
 
     # ---- hạ tầng ---------------------------------------------------------
     def initialize(self) -> None:
@@ -798,14 +819,10 @@ class V3Painter:
             self.quad(rect, entry[0], colour)
 
     # ---- texture của một màn --------------------------------------------
-    def bind_screen(self, screen: str, extra_files=()) -> None:
-        """
-        Nạp ``base``, ``top`` và sprite của màn — **một lần cho mỗi màn**.
-
-        ``base``/``top`` thu về đúng bề rộng framebuffer: ảnh xuất ở 1920 px
-        mà cửa sổ 1280 thì giữ nguyên cỡ chỉ tốn RAM GPU và fillrate. Sprite
-        giữ cỡ gốc (``item_tile``/``weapon_tile`` xuất ở 4× để còn nét).
-        """
+    def _wanted_textures(self, screen: str, extra_files=()) -> dict[tuple, int | None]:
+        """``{(path, max_width): max_width}`` của ``base``/``top``/sprite
+        một màn cần — tách khỏi ``bind_screen`` để ``screen_ready`` dùng
+        lại đúng tập này, không tính hai lần hai cách khác nhau."""
         manifest = self.manifest
         record = manifest.screens[screen]
         big = max(1, int(self._fb[0]))
@@ -822,23 +839,79 @@ class V3Painter:
             path = manifest.path(relative)
             if path is not None:
                 wanted[(str(path), 0)] = None
-        key = (screen, big, tuple(sorted(extra_files)))
-        if key == self._screen_key:
-            return
-        for old_key, entry in list(self._screen_tex.items()):
-            if old_key not in wanted:
-                GL.glDeleteTextures(1, [entry[0]])
-                del self._screen_tex[old_key]
+        return wanted
+
+    def bind_screen(self, screen: str, extra_files=(),
+                    *, priority: int = PRIORITY_CURRENT) -> None:
+        """
+        Queue ``base``/``top``/sprite của màn lên loader nền — **không
+        decode gì trên luồng này** (TASK_perf_textures_1119 Fix 3).
+
+        ``base``/``top`` thu về đúng bề rộng framebuffer: ảnh xuất ở 1920 px
+        mà cửa sổ 1280 thì giữ nguyên cỡ chỉ tốn RAM GPU và fillrate. Sprite
+        giữ cỡ gốc (``item_tile``/``weapon_tile`` xuất ở 4× để còn nét).
+
+        ``priority=PRIORITY_PREFETCH`` (màn hàng xóm, chưa phải màn đang
+        mở) không động tới ``_screen_key`` — đó chỉ theo dõi màn đang mở
+        THẬT để tránh queue lại mỗi khung.
+        """
+        wanted = self._wanted_textures(screen, extra_files)
+        if priority == PRIORITY_CURRENT:
+            big = max(1, int(self._fb[0]))
+            key = (screen, big, tuple(sorted(extra_files)))
+            if key == self._screen_key:
+                return
+            self._screen_key = key
         for tex_key, max_width in wanted.items():
             if tex_key in self._screen_tex:
+                self._screen_tex.move_to_end(tex_key)
                 continue
-            array = load_rgba(tex_key[0], max_width=max_width)
+            if self._loader.is_pending(tex_key):
+                continue
+            self._loader.request(tex_key, tex_key[0], max_width, priority)
+
+    def screen_ready(self, screen: str, extra_files=()) -> bool:
+        """True nếu MỌI texture màn ``screen`` cần đã có trên GPU — dùng
+        để quyết "đổi màn hay giữ khung cũ" (Fix 3) và để lượt chụp
+        (``_album_shots_step``) không đọc pixel trước khi màn thật xong."""
+        wanted = self._wanted_textures(screen, extra_files)
+        return all(tex_key in self._screen_tex for tex_key in wanted)
+
+    def pump_uploads(self, budget_s: float = 0.004) -> None:
+        """Rút kết quả CPU đã giải mã xong (``AsyncTextureLoader.poll``)
+        và lên GPU (``upload_rgba`` — ``glTexImage2D`` + mipmap) trong
+        ngân sách ``budget_s`` mỗi khung; phần chưa tới lượt đợi khung
+        sau (``_upload_backlog``, không rơi mất). Gọi mỗi khung từ
+        ``V3UI.draw``/``prepare_screen``."""
+        self._upload_backlog.extend(self._loader.poll())
+        t0 = time.perf_counter()
+        while self._upload_backlog:
+            if time.perf_counter() - t0 >= budget_s:
+                break
+            tex_key, array = self._upload_backlog.pop(0)
             if array is None:
                 continue
             self._screen_tex[tex_key] = (upload_rgba(array), array.shape[1],
                                          array.shape[0])
-        self._screen_key = key
-        logger.debug("UI v3: man %s — %d texture", screen, len(self._screen_tex))
+            self._screen_tex.move_to_end(tex_key)
+        self._evict_screen_cache()
+
+    def _evict_screen_cache(self) -> None:
+        while len(self._screen_tex) > SCREEN_CACHE_MAX_TEXTURES:
+            _old_key, entry = self._screen_tex.popitem(last=False)
+            GL.glDeleteTextures(1, [entry[0]])
+
+    def pause_loading(self) -> None:
+        self._loader.pause()
+
+    def resume_loading(self) -> None:
+        self._loader.resume()
+
+    def screen_cache_resident_mib(self) -> float:
+        """TASK_perf_textures_1119 G7: RAM GPU hiện đang giữ cho
+        ``_screen_tex`` (RGBA 8-bit, không tính mipmap)."""
+        total_bytes = sum(w * h * 4 for _tex, w, h in self._screen_tex.values())
+        return total_bytes / (1024.0 * 1024.0)
 
     def screen_image(self, relative: str | None, *, big: bool = False):
         """``(tex, w, h)`` của một file đã nạp cho màn đang mở."""
@@ -1225,11 +1298,13 @@ class V3Painter:
         return True
 
     def release(self) -> None:
+        self._loader.stop()
         self.cache.release()
         self.pil.release()
         for entry in self._screen_tex.values():
             GL.glDeleteTextures(1, [entry[0]])
         self._screen_tex.clear()
+        self._upload_backlog.clear()
         if self._vao:
             GL.glDeleteVertexArrays(1, [self._vao])
         if self._vbo:

@@ -26,6 +26,7 @@ from src.fx.spec import load_spec
 from src.ui_album import v3_routes, v3_values
 from src.ui_album import v3_flow as F
 from src.ui_album.hud_cards import card_index_for_point, cards_for_screen
+from src.ui_album.texture_loader import PRIORITY_PREFETCH
 from src.ui_album.scope import ScopeState
 from src.ui_album.shot_feel import ShotFeel
 from src.ui_album.v3 import V3Manifest, V3Painter, draw_screen, hit_test, shot_state
@@ -228,6 +229,13 @@ class V3UI:
             # starting now, not lazily per-screen — see
             # ``FxLibrary.start_preload``'s docstring for why.
             self._fx_library.start_preload()
+        # TASK_perf_textures_1119 Fix 3: queue the screens most launches
+        # land on FIRST, at prefetch priority, so by the time the player
+        # reaches MENU its textures are already decoding/decoded instead
+        # of starting cold.
+        for name in (F.SIGN_IN, F.SIGN_UP, F.SIGN_IN_ERR, F.MENU):
+            self._prefetch_screen(name)
+        self._prefetch_last_screen: str | None = None
 
     #: Xem ``ui.AlbumUI.flow``: ``app.py`` dùng chung một bộ hàm cho hai bộ
     #: giao diện, phân biệt nhau đúng ở module này.
@@ -440,6 +448,15 @@ class V3UI:
         # có — rẻ (không có việc nào đang chạy thì chỉ là một so sánh
         # ``is None``), nên chạy TRƯỚC cả cổng ``ui_shots`` dưới đây.
         self._poll_account_job()
+        # TASK_perf_textures_1119 Fix 3: scrypt hashing (account_busy)
+        # measurably competes with the texture loader's own background
+        # thread for the GIL on this machine (G3's own frame budget is
+        # tighter than either alone) — idle the loader for the ~100-300ms
+        # a hash job runs instead of racing it.
+        if self.account_busy:
+            self.painter.pause_loading()
+        else:
+            self.painter.resume_loading()
         # Khi chụp, KHÔNG chạy đồng hồ mô phỏng: nó đẩy "đang tìm trận" sang
         # "đã tìm thấy" ngay, nên hai ảnh ra y hệt nhau (bẫy của lượt album).
         if self.options.ui_shots:
@@ -858,11 +875,44 @@ class V3UI:
             state.fx_draw = lambda: self._fx_library.draw(
                 self.painter, self._fx_player, offset=shake,
                 transform=fx_transform, hide_beyond=fx_hide_beyond)
+        if name != self._prefetch_last_screen:
+            self._prefetch_last_screen = name
+            for neighbour in v3_routes.NEXT_SCREENS.get(name, ()):
+                self._prefetch_screen(neighbour)
         self.painter.bind_screen(name, v3_values.extra_files(self.manifest,
                                                              name, state))
+        self.painter.pump_uploads()
         self.painter.begin()
         draw_screen(self.painter, self.manifest, name, state)
         self.painter.end()
+
+    def _prefetch_screen(self, screen: str) -> None:
+        """TASK_perf_textures_1119 Fix 3: queue ``screen``'s textures at
+        background priority — never blocks, never pre-empts the CURRENT
+        screen's own (higher-priority) requests in the loader queue."""
+        self.painter.bind_screen(screen, (), priority=PRIORITY_PREFETCH)
+
+    def prepare_screen(self) -> bool:
+        """TASK_perf_textures_1119 Fix 3: queues the current screen's
+        textures and drains finished GL uploads — called every frame by
+        ``app.py`` BEFORE it decides whether to draw this screen or keep
+        showing the last one (``current_screen_ready``). Doing this
+        outside ``draw()`` means loading keeps progressing even while
+        ``app.py`` is choosing to freeze on the old frame.
+
+        ``extra_files`` (borrowed-sprite files, e.g. a HUD slot icon
+        borrowed from LOADOUT's sprite set) needs the full draw ``state``
+        ``v3_values.state_for`` builds, which this pre-draw check doesn't
+        have — those few sprites get requested from ``draw()`` itself
+        instead, same as before Fix 3; this only tracks base/top/screen's
+        OWN sprites, the ones actually responsible for the freeze."""
+        name = self.state.screen
+        self.painter.bind_screen(name, ())
+        self.painter.pump_uploads()
+        return self.painter.screen_ready(name, ())
+
+    def current_screen_ready(self) -> bool:
+        return self.painter.screen_ready(self.state.screen, ())
 
     # ---- Sakuga VFX (TASK_ui_sakuga_1117) ---------------------------------
     def spawn_fx(self, name: str, x: float, y: float, **kwargs) -> bool:
