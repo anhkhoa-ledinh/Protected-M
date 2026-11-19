@@ -242,6 +242,7 @@ def _sign_in(state, flow, accounts: dict | None = None) -> None:
     state.texts["user"] = flow.player
     state.texts["pass"] = dots
     state.texts["pass2"] = dots2
+    state.remember = flow.remember
     state.caret = {"field_user": "user", "field_pass": "pass",
                    "field_pass2": "pass2"}.get(flow.focus or "")
     state.focus = flow.focus

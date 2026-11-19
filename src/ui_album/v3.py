@@ -1381,7 +1381,7 @@ class V3State:
                  "hover_fx", "aim_kick_scale", "hit_markers", "hp_bars",
                  "crit_impact_alpha", "scene_shake", "scope_zoom",
                  "card_alpha", "hud_hidden_alpha", "recovery_code", "forgot_open",
-                 "forgot_focus")
+                 "forgot_focus", "remember")
 
     def __init__(self) -> None:
         #: ``key`` → chuỗi (thay run đầu) hoặc danh sách chuỗi (thay từng run).
@@ -1504,6 +1504,11 @@ class V3State:
         self.recovery_code: str = ""
         self.forgot_open: bool = False
         self.forgot_focus: str | None = None
+        #: TASK_signin_toggles_1120: ``switch_remember``'s current value —
+        #: ``base.png`` only ever drew the ON look, so this is read by
+        #: ``_draw_remember_switch`` to paint the OFF look over it; ON
+        #: itself needs no extra draw.
+        self.remember: bool = False
 
 
 def shot_state(manifest: V3Manifest, screen: str) -> V3State:
@@ -1521,6 +1526,13 @@ def shot_state(manifest: V3Manifest, screen: str) -> V3State:
     state.shot = True
     state.wrap = False
     state.photo = manifest.sample_photo()
+    # TASK_signin_toggles_1120: ``switch_remember`` has no "sample"/
+    # "default" field of its own (it isn't a sprite/pill) — ON is the
+    # baked look in ``base.png``, so pin it ON here the same way every
+    # other control's sample value is pinned, instead of falling through
+    # to ``V3State``'s real-gameplay default (OFF) and drawing an overlay
+    # ``expected/`` was never captured with.
+    state.remember = True
     state.sprites = {s["key"]: True for s in record.get("sprites", ())
                      if s.get("default")}
     state.bars = {b["key"]: float(b.get("sample_frac", 0.0))
@@ -1626,6 +1638,7 @@ def draw_screen(painter: V3Painter, manifest: V3Manifest, screen: str,
     _draw_pips(painter, record, state, card_map)
     _draw_pills(painter, record, state, card_map)
     _draw_sprites(painter, manifest, screen, record, state, card_map)
+    _draw_remember_switch(painter, screen, record, state)
     _draw_texts(painter, record, state, card_map)
     # Fix 10.3: drawn LAST of the HUD layer, on top of the (now-fading)
     # cards — ammo/timer/kills must stay legible for the whole fade, not
@@ -1833,6 +1846,31 @@ def _draw_sprites(painter, manifest, screen, record, state, card_map) -> None:
                            * float(state.hud_hidden_alpha),
                            label in state.mirror)
     _ = screen
+
+
+#: TASK_signin_toggles_1120: ``switch_remember`` has no OFF art — the
+#: design mock (``base.png``) only ever drew it ON (green track, knob
+#: right). Painting ON needs nothing extra; OFF is painted procedurally
+#: over the baked ON look, grey track + knob pushed left, same colour as
+#: the field placeholder text so it reads as "disabled" without a new
+#: asset.
+_SWITCH_OFF_TRACK_COL = _FIELD_LABEL_COL
+_SWITCH_KNOB_COL = "#FFFFFF"
+_SWITCH_KNOB_PAD = 2.0
+
+
+def _draw_remember_switch(painter, screen, record, state) -> None:
+    if state.remember:
+        return
+    hotspot = next((h for h in record.get("hotspots", ())
+                    if h["n"] == "switch_remember"), None)
+    if hotspot is None:
+        return
+    x, y, w, h = (float(v) for v in hotspot_rect(screen, hotspot))
+    painter.rounded((x, y, w, h), h * 0.5, rgba(_SWITCH_OFF_TRACK_COL))
+    knob_d = h - 2.0 * _SWITCH_KNOB_PAD
+    painter.disc((x + _SWITCH_KNOB_PAD, y + _SWITCH_KNOB_PAD, knob_d, knob_d),
+                rgba(_SWITCH_KNOB_COL))
 
 
 def _draw_texts(painter, record, state, card_map) -> None:
