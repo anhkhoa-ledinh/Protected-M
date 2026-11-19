@@ -215,15 +215,25 @@ def test_forgot_focus_next_with_no_prior_focus_lands_on_first_field():
 
 @pytest.fixture
 def ui(gl_context, monkeypatch, tmp_path):
+    """TASK_perf_textures_1119 Fix 8: redirect account_store's path
+    functions BEFORE constructing V3UI, not override ``_account_root``/
+    ``_account_data`` after -- by then ``__init__`` has already read the
+    REAL ``accounts.json``/``session.json`` (last_account pre-fills
+    ``state.player``, a "remember me" session auto-signs in) and a
+    developer's real signed-in machine made
+    ``test_key_routes_into_the_forgot_dialog_when_open`` fail
+    (``state.player`` wasn't "" to begin with). Same pattern as
+    ``tests/test_account_session.py``'s ``isolated_accounts`` fixture."""
     monkeypatch.setenv("HCPD_NO_FX", "1")
     from src.ui_album.options import AlbumOptions
     from src.ui_album.v3_ui import V3UI
 
+    monkeypatch.setattr(account_store, "accounts_path",
+                        lambda root: tmp_path / "assets" / "config" / "accounts.json")
+    monkeypatch.setattr(account_store, "session_path",
+                        lambda root: tmp_path / "assets" / "config" / "session.json")
     options = AlbumOptions(enabled=True, ui="v3")
     instance = V3UI(ROOT, ROOT / "assets" / "shaders", options)
-    instance._account_root = tmp_path
-    instance._account_data = account_store.load(tmp_path).data
-    instance._account_corrupt = False
     yield instance
     instance.release()
 

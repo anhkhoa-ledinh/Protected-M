@@ -58,6 +58,31 @@ WATCH_S = 5.0
 LAYER_WAIT_TOAST_S = 2.0
 LAYER_WAIT_MAX_S = 120.0
 
+#: TASK_perf_textures_1119 Fix 8: every bench/evidence/shot env-var hook
+#: this codebase has — checked by ``HcpdApplication._is_scripted_run``
+#: so NONE of them can ever write the user's real config files, even one
+#: run without ``--demo`` (``--demo`` already guards this for everything
+#: ELSE; this specific list closes the gap for anything that doesn't
+#: pass it). Keep this in sync when a new hook is added.
+HOOK_ENV_VARS = (
+    "HCPD_FX_BENCH", "HCPD_SCOPE_BENCH", "HCPD_ALBUM_AUTOMATCH",
+    "HCPD_EVIDENCE_1118", "HCPD_ACCOUNTS_SHOTS", "HCPD_NAV_BENCH",
+    "HCPD_UI_SHOTS_1117", "HCPD_AA_BASELINE_1118", "HCPD_V3_LIVE",
+    "HCPD_PERF_PROFILE", "HCPD_PVP_AUTO", "HCPD_PVP_SHOTS",
+    "HCPD_PROP_PROBE", "HCPD_VIDEO_STATS",
+)
+
+
+def is_scripted_run(*, demo: bool, shots: bool, ui_shots: bool) -> bool:
+    """TASK_perf_textures_1119 Fix 8: standalone so it's checkable BEFORE
+    ``HcpdApplication`` exists (account storage redirect needs to happen
+    before ``V3UI.__init__`` ever reads ``accounts.json``/``session.json`` —
+    see the account-store redirect in ``run()``), not just from
+    ``HcpdApplication._is_scripted_run``."""
+    if demo or shots or ui_shots:
+        return True
+    return any(os.environ.get(var) for var in HOOK_ENV_VARS)
+
 
 class HcpdApplication:
     """
@@ -728,7 +753,8 @@ class HcpdApplication:
 
         if self._album is not None:
             self._album.state.display = mode
-        P.save(self._root, mode, self._window.remembered_rect())
+        if not self._is_scripted_run():
+            P.save(self._root, mode, self._window.remembered_rect())
         self._refresh_window_plane()
 
     def _apply_hud_compact(self, enabled: bool) -> None:
@@ -738,6 +764,8 @@ class HcpdApplication:
         display/window_rect đang có."""
         from src.config import prefs as P
 
+        if self._is_scripted_run():
+            return
         P.save(self._root, self._window.display_mode,
                self._window.remembered_rect(), hud_compact=enabled)
 
@@ -3006,6 +3034,25 @@ class HcpdApplication:
             if self._album_options.is_v3:
                 from src.ui_album.v3_ui import V3UI
 
+                if self._is_scripted_run():
+                    # TASK_perf_textures_1119 Fix 8: V3UI.__init__ itself
+                    # reads accounts.json/session.json (and, with a valid
+                    # "remember me" session, WRITES session_expires_at
+                    # back) the moment it's constructed — too early for
+                    # _shutdown's guard above to help. Redirect BEFORE
+                    # that constructor call, every scripted run, so it
+                    # can never touch the real files regardless of what
+                    # this machine's account/session state happens to be.
+                    import tempfile
+
+                    from src.account import store as account_store
+
+                    tmp_dir = Path(tempfile.mkdtemp(prefix="hcpd_scripted_run_"))
+                    self._scripted_run_tmp_dir = tmp_dir
+                    account_store.accounts_path = (
+                        lambda root: tmp_dir / "assets" / "config" / "accounts.json")
+                    account_store.session_path = (
+                        lambda root: tmp_dir / "assets" / "config" / "session.json")
                 self._album = V3UI(self._root, self._shader_dir,
                                    self._album_options, window=self._window)
             else:
@@ -3300,8 +3347,19 @@ class HcpdApplication:
             ),
         )
 
+    def _is_scripted_run(self) -> bool:
+        """TASK_perf_textures_1119 Fix 8: true for ``--demo``, ``--album-shots``/
+        ``--ui-shots``, or any bench/evidence hook env var (``HOOK_ENV_VARS``) —
+        none of those may ever write the user's real ``assets/config/*.json``.
+        Found via a real violation: ``_shutdown`` used to save
+        ``user_prefs.json`` on EVERY exit regardless of mode, clobbering the
+        real window_rect/display with whatever a `--ui-shots` run's hidden
+        window happened to be."""
+        return is_scripted_run(demo=self._demo, shots=self._album_options.shots,
+                               ui_shots=self._album_options.ui_shots)
+
     def _shutdown(self) -> None:
-        if self._album_options.is_v3:
+        if self._album_options.is_v3 and not self._is_scripted_run():
             # D1: nhớ chế độ và khung cửa sổ cho lần chạy sau.
             from src.config import prefs as _prefs
 
@@ -3315,3 +3373,8 @@ class HcpdApplication:
         if self._renderer is not None:
             self._renderer.release()
         self._window.destroy()
+        tmp_dir = getattr(self, "_scripted_run_tmp_dir", None)
+        if tmp_dir is not None:
+            import shutil
+
+            shutil.rmtree(tmp_dir, ignore_errors=True)

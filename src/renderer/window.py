@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass
 
 import glfw
@@ -201,6 +202,13 @@ V3_KEYS = frozenset({
 })
 
 
+#: TASK_perf_textures_1119 Fix 8: a second PRESS callback invocation
+#: within this many seconds of the first is treated as the SAME physical
+#: click, not a second one — see ``GlfwWindow._on_mouse_button``'s
+#: docstring for why this exists.
+DUPLICATE_PRESS_GUARD_S = 0.05
+
+
 class GlfwWindow:
     """Application window with modern OpenGL context."""
 
@@ -295,6 +303,9 @@ class GlfwWindow:
         #: TASK_album_ui_1106: chuột và chữ, chỉ giao diện album đọc tới.
         self._clicks: list[tuple[float, float]] = []
         self._typed = ""
+        #: TASK_perf_textures_1119 Fix 8: mốc PRESS gần nhất, cho
+        #: ``_on_mouse_button``'s duplicate-press guard.
+        self._last_press_t: float | None = None
 
     @property
     def width(self) -> int:
@@ -798,9 +809,28 @@ class GlfwWindow:
         return typed
 
     def _on_mouse_button(self, window, button, action, mods) -> None:
+        """GLFW's left-button PRESS callback → one queued click.
+
+        TASK_perf_textures_1119 Fix 8: the user's log showed every shot
+        ("Ban hut tai ...") followed AT ONCE by a second, rejected
+        ``fire()`` call ("Bam co dan: chua toi nhip") for 7 of 8 shots —
+        one physical click producing two queued entries in ``_clicks``
+        (this is the ONLY place anything appends to it, and
+        ``_album_shoot`` is called exactly once per popped click, so a
+        double queue IS a double fire). No human can release and press
+        again within ``DUPLICATE_PRESS_GUARD_S`` (50 ms); a PRESS that
+        close behind the last one is the same physical click delivered
+        twice, not a second one.
+        """
         _ = (window, mods)
-        if button == glfw.MOUSE_BUTTON_LEFT and action == glfw.PRESS:
-            self._clicks.append(self.cursor_pos())
+        if button != glfw.MOUSE_BUTTON_LEFT or action != glfw.PRESS:
+            return
+        now = time.perf_counter()
+        if (self._last_press_t is not None
+                and now - self._last_press_t < DUPLICATE_PRESS_GUARD_S):
+            return
+        self._last_press_t = now
+        self._clicks.append(self.cursor_pos())
 
     def _on_char(self, window, codepoint) -> None:
         _ = window
