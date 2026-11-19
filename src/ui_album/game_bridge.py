@@ -53,6 +53,18 @@ WEAPON_MAG = {name: spec.mag for name, spec in WEAPONS_SPEC.items()}
 DEFAULT_MAG = DEFAULT_SPEC.mag
 RELOAD_S = DEFAULT_SPEC.reload_s
 
+#: TASK_weapons_1119: tên hiển thị cho người chơi. ID nội bộ ("Precision
+#: gun", "Spread gun", "Heavy-mag gun") giữ nguyên ở MỌI nơi khác — lịch sử
+#: trận, accounts, thông điệp PvP, khoá sprite đều tra theo ID — mapping
+#: này là CHỖ DUY NHẤT đổi chữ hiển thị, nên mọi dòng chữ người chơi thấy
+#: (HUD ``weapon_name``, toast, màn kết quả) phải tra qua đây, không ghép
+#: chuỗi hiển thị ở nơi khác.
+WEAPON_LABEL = {
+    "Precision gun": "Sniper rifle",
+    "Spread gun": "Shotgun",
+    "Heavy-mag gun": "Heavy-mag gun",
+}
+
 
 @dataclass
 class AlbumMatch:

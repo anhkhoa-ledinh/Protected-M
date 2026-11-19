@@ -20,6 +20,7 @@ import time
 from src.account import crypto as account_crypto
 from src.content import shared_album
 from src.ui_album import v3_flow as F
+from src.ui_album.game_bridge import WEAPON_LABEL
 from src.ui_album.v3 import V3State
 
 #: Bảng xếp hạng mẫu (U2: "The data stays the sample").
@@ -711,7 +712,7 @@ def _hud_shot(state, flow, game, now, level) -> None:
 
 def _hud_weapon(state, flow, game, manifest, screen) -> None:
     name = flow.weapon_name() or (game.weapon_name if game else F.WEAPONS[0])
-    state.texts["weapon_name"] = name.upper()
+    state.texts["weapon_name"] = WEAPON_LABEL.get(name, name).upper()
     rounds, total = (10, 10) if game is None else game.rounds
     state.texts["ammo"] = [str(rounds), f"/{total}"]
     # Bản vẽ chỉ xuất 10 ô pip; băng 16 viên thì dãy pip kịch trần còn con số
