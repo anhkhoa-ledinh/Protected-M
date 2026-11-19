@@ -47,6 +47,10 @@ docs/HCPD_FOR_CLAUDE.md
 # luật `*.png` xoá sạch 41 file atlas/chữ của bộ này.
 !assets/fx/**/*.png
 
+# TASK_perf_textures_1119 Fix 4: cùng bộ Sakuga, nướng lại ở image_scale=2
+# (framebuffer rộng hơn 1920px) — ngoại lệ giống đúng assets/fx/ ở trên.
+!assets/fx@2x/**/*.png
+
 # ─── Cấu hình riêng từng máy / từng người ─────────────────────────────────
 # user.json chứa face_scale đo riêng cho khuôn mặt của một người. Commit lên
 # thì người khác clone về sẽ chạy với hiệu chỉnh của người kia, và Z sai mà

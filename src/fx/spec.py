@@ -31,6 +31,11 @@ class FxSpec:
     effects: dict
     words: dict
     sheet_sizes: dict
+    #: TASK_perf_textures_1119 Fix 4: true when ``tools/sakuga_bake/pack.py``
+    #: already ran every sheet/word through ``bleed()`` at bake time — the
+    #: PNG FILES themselves carry no per-file marker (``pack.py`` doesn't
+    #: stamp one), only this ``fx.json``-level flag does.
+    rgb_bled: bool = False
 
     def sheet_path(self, relpath: str) -> Path:
         return self.root / relpath
@@ -42,9 +47,11 @@ class FxSpec:
         return f"words/{word}_{style}.png"
 
 
-def load_spec(project_root) -> FxSpec:
+def load_spec(project_root, fx_dir: str = "fx") -> FxSpec:
     """
-    Read and validate ``<project_root>/assets/fx/fx.json``.
+    Read and validate ``<project_root>/assets/<fx_dir>/fx.json``
+    (``fx_dir`` defaults to ``"fx"``; TASK_perf_textures_1119 Fix 4 passes
+    ``"fx@2x"`` for framebuffers wider than 1920 px).
 
     Raises ``FileNotFoundError`` if a sheet or word PNG the spec refers to
     is missing, and ``ValueError`` if a frame's ``rect`` falls outside its
@@ -52,18 +59,20 @@ def load_spec(project_root) -> FxSpec:
     off the variant's own declared ``size`` field — catches a stale
     ``size`` too).
     """
-    root = Path(project_root) / FX_DIR
+    root = Path(project_root) / "assets" / fx_dir
     data = json.loads((root / "fx.json").read_text(encoding="utf-8"))
     image_scale = float(data["image_scale"])
     fps = int(data["fps"])
     effects = data["effects"]
     words = data["words"]
+    rgb_bled = bool(data.get("rgb_bled", False))
 
     _validate_words(root, words)
     sheet_sizes = _validate_effects(root, effects)
 
     return FxSpec(root=root, image_scale=image_scale, fps=fps,
-                  effects=effects, words=words, sheet_sizes=sheet_sizes)
+                  effects=effects, words=words, sheet_sizes=sheet_sizes,
+                  rgb_bled=rgb_bled)
 
 
 def _validate_words(root: Path, words: dict) -> None:

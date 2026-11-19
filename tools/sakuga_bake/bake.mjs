@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT = resolve(process.argv[2] || 'out');
 const RAW = join(OUT, 'raw');
-const SCALE = 1.5;               // design px (1280 basis) -> image px (1920 basis), same as assets/ui_v3 image_scale
+const SCALE = Number(process.env.FX_SCALE || 1.5);  // design px (1280 basis) -> image px. 1.5 = 1920 basis (assets/fx), 2 = 2560 basis (assets/fx@2x)
 const FPS = 30;
 const VW = 640, VH = 560;        // design px around the anchor
 const AX = 320, AY = 320;        // anchor in design px

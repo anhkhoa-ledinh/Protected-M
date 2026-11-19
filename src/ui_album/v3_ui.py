@@ -34,6 +34,12 @@ from src.ui_album.v3_hover import HoverFx, cursor_for
 
 logger = logging.getLogger(__name__)
 
+#: TASK_perf_textures_1119 Fix 4: framebuffer width above which the fx@2x
+#: pack (baked at ``image_scale=2``, 2560 basis) looks better than the
+#: 1.5x default — below it, fx@2x is wasted decode/upload/GPU-RAM for no
+#: visible gain.
+FX_WIDE_THRESHOLD_PX = 1920
+
 #: TASK_ui_sakuga_1117 Phase 6 — hotspot names/prefixes that get a plain
 #: ``ui_tap`` on click (the PRIMARY button of the screen gets
 #: ``ui_confirm`` instead; anything not listed here gets nothing —
@@ -194,15 +200,22 @@ class V3UI:
         self._fx_library = None
         self._fx_screen: str | None = None
         self._fx_last_t: float | None = None
+        #: TASK_perf_textures_1119 Fix 4: which pack is currently active
+        #: ("fx" or "fx@2x"), and the ``(dir, player, library)`` of a pack
+        #: switch in progress (``None`` once there isn't one) — see
+        #: ``_ensure_fx_pack``/``_poll_fx_pack_switch``.
+        self._fx_dir: str | None = None
+        self._fx_pending: tuple[str, object, object] | None = None
         if self._fx_enabled:
             try:
-                spec = load_spec(root)
+                spec = load_spec(root, fx_dir="fx")
             except (OSError, ValueError) as err:
                 logger.warning("V3UI: khong nap duoc fx.json (%s) — tat hieu ung", err)
                 self._fx_enabled = False
             else:
                 self._fx_player = FxPlayer(spec)
                 self._fx_library = FxLibrary(spec)
+                self._fx_dir = "fx"
 
         # TASK_ui_sakuga_1117 Phase 6: bookkeeping for the per-tick/
         # per-screen fx triggers (loading bar, tilt checklist, toast,
@@ -807,11 +820,57 @@ class V3UI:
         return any(p.get("kind") == "viewport" for p in
                    self.manifest.screens[self.state.screen].get("photos", ()))
 
+    # ---- fx: 1.5x vs 2x pack (TASK_perf_textures_1119 Fix 4) --------------
+    def _ensure_fx_pack(self, width: int) -> None:
+        """Starts loading the pack ``width`` wants, in the BACKGROUND, if
+        it isn't already the active or in-progress one. Never touches
+        the currently-drawing pack — ``_poll_fx_pack_switch`` swaps over
+        only once the new one has finished preloading."""
+        if not self._fx_enabled:
+            return
+        wanted = "fx@2x" if width > FX_WIDE_THRESHOLD_PX else "fx"
+        if wanted == self._fx_dir:
+            return
+        if self._fx_pending is not None and self._fx_pending[0] == wanted:
+            return
+        try:
+            spec = load_spec(self._account_root, fx_dir=wanted)
+        except (OSError, ValueError) as err:
+            logger.warning("V3UI: khong doi duoc sang goi fx %s (%s)", wanted, err)
+            return
+        library = FxLibrary(spec)
+        if not library.check_capability():
+            return
+        player = FxPlayer(spec)
+        library.start_preload()
+        self._fx_pending = (wanted, player, library)
+
+    def _poll_fx_pack_switch(self) -> None:
+        if self._fx_pending is None:
+            return
+        wanted, player, library = self._fx_pending
+        # The pending library's own decode results only turn into resident
+        # textures (and ``preload_remaining`` drop) when something calls
+        # ITS ``pump()`` -- the active pack's ``pump()`` call in ``draw()``
+        # only ever drains ITSELF.
+        library.pump()
+        if library.preload_remaining > 0:
+            return
+        old_library = self._fx_library
+        self._fx_player, self._fx_library, self._fx_dir = player, library, wanted
+        self._fx_pending = None
+        if old_library is not None:
+            old_library.release()
+        logger.info("V3UI: doi sang goi fx %s (framebuffer rong hon %dpx)",
+                   wanted, FX_WIDE_THRESHOLD_PX)
+
     # ---- vẽ --------------------------------------------------------------
     def draw(self, framebuffer, scene_draw=None) -> None:
         """Vẽ màn đang mở. ``scene_draw()`` vẽ cảnh 3D vào ô viewport."""
         name = self.state.screen
         self.painter.set_frame(framebuffer)
+        self._ensure_fx_pack(framebuffer[0])
+        self._poll_fx_pack_switch()
         if self.options.ui_shots:
             state = shot_state(self.manifest, name)
         else:
@@ -1186,6 +1245,9 @@ class V3UI:
             self._camera_entry = None
         if self._fx_library is not None:
             self._fx_library.release()
+        if self._fx_pending is not None:
+            self._fx_pending[2].release()
+            self._fx_pending = None
         self.painter.release()
 
 

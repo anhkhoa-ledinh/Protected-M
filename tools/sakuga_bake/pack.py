@@ -4,16 +4,48 @@ python3 pack.py out/raw DEST     -> DEST/sheets/*.png, DEST/words/*.png, DEST/fx
 Frame rects are in image px (1920 basis). Offsets are from the effect's anchor (the point the game passes in).
 """
 import json, os, shutil, sys
+import numpy as np
 from PIL import Image
+
+
+def bleed(im):
+    """Fill RGB under transparent pixels within 4 px of opaque ones with the nearby colour.
+
+    The rest of the transparent area gets one flat colour, which keeps the PNG small.
+
+    Alpha is untouched, so the image looks identical when blended. It only matters for
+    mipmaps: GL averages straight-alpha RGB, and black under alpha 0 would darken edges.
+    """
+    import cv2
+    a = np.asarray(im, dtype=np.float32)
+    rgb, al = a[..., :3], a[..., 3:4] / 255.0
+    empty = al[..., 0] == 0
+    if not empty.any() or empty.all():
+        return im
+    out = rgb.copy(); todo = empty.copy()
+    num, den = rgb * al, al[..., 0]
+    for r in (1, 2, 4):          # mip levels 0-1 only ever read 1-2 px past an edge
+        k = (2 * r + 1, 2 * r + 1)
+        nb, db = cv2.blur(num, k), cv2.blur(den, k)
+        hit = todo & (db > 1e-4)
+        out[hit] = nb[hit] / db[hit][:, None]
+        todo &= ~hit
+        if not todo.any():
+            break
+    if todo.any():
+        out[todo] = (num.sum((0, 1)) / max(den.sum(), 1e-6))
+    res = np.concatenate([np.clip(out, 0, 255), a[..., 3:4]], axis=2).round().astype(np.uint8)
+    return Image.fromarray(res, 'RGBA')
+
 
 RAW, DEST = sys.argv[1], sys.argv[2]
 meta = json.load(open(os.path.join(RAW, 'meta.json')))
 S = meta['scale']; AXp, AYp = meta['anchor'][0] * S, meta['anchor'][1] * S
 os.makedirs(os.path.join(DEST, 'sheets'), exist_ok=True)
 os.makedirs(os.path.join(DEST, 'words'), exist_ok=True)
-MAXW = 2048
+MAXW = int(os.environ.get('FX_MAXW', 2048))
 out = {'version': 1, 'source': 'sakuga-vfx core.js (MIT, Justin Finkelman), recoloured to the ui_v3 palette',
-       'image_scale': S, 'fps': meta['fps'], 'effects': {}, 'words': {}}
+       'image_scale': S, 'fps': meta['fps'], 'rgb_bled': True, 'effects': {}, 'words': {}}
 total_px = 0
 for name, r in meta['recipes'].items():
     eff = {'duration': r['duration'], 'words': r.get('words', []), 'variants': []}
@@ -44,12 +76,13 @@ for name, r in meta['recipes'].items():
             recs.append({'rect': [pos[i][0], pos[i][1], im.width, im.height],
                          'offset': [round(bb[0] - AXp), round(bb[1] - AYp)]})
         fn = f"{v['dir']}.png"
+        atlas = bleed(atlas)
         atlas.save(os.path.join(DEST, 'sheets', fn), optimize=True)
         total_px += atlas.width * atlas.height
         eff['variants'].append({'sheet': f'sheets/{fn}', 'size': [atlas.width, atlas.height], 'frames': recs})
     out['effects'][name] = eff
 for fn in sorted(os.listdir(os.path.join(RAW, 'words'))):
-    shutil.copy(os.path.join(RAW, 'words', fn), os.path.join(DEST, 'words', fn))
+    bleed(Image.open(os.path.join(RAW, 'words', fn)).convert('RGBA')).save(os.path.join(DEST, 'words', fn), optimize=True)
 for w, m in meta['words'].items():
     out['words'][w] = {'traced_w': m['traced_w'], 'traced_h': m['traced_h'], 'pad': m['pad'],
                        'styles': ['ink', 'hollow', 'dotted', 'crit']}

@@ -3,6 +3,7 @@
  "source": "sakuga-vfx core.js (MIT, Justin Finkelman), recoloured to the ui_v3 palette",
  "image_scale": 1.5,
  "fps": 30,
+ "rgb_bled": true,
  "effects": {
   "hit_kill": {
    "duration": 1,

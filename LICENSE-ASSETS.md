@@ -23,8 +23,9 @@ Protected M uses two licenses:
 
 - **Fonts** in `assets/ui_v3/fonts/` and `assets/ui_album/fonts/` are under the
   SIL Open Font License 1.1. See the `OFL_*.txt` file next to each font.
-- **`assets/fx/`** (baked Sakuga VFX atlases and sound-effect-word PNGs) is
-  excluded from CC BY-NC 4.0. It is third-party MIT material — see
+- **`assets/fx/`** and **`assets/fx@2x/`** (baked Sakuga VFX atlases and
+  sound-effect-word PNGs, at image_scale 1.5 and 2 respectively) are
+  excluded from CC BY-NC 4.0. They are third-party MIT material — see
   [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 - **Third-party files** listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
   keep their own licenses.

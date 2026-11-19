@@ -25,7 +25,7 @@ def render(name, var, f, bg, ax, ay, mirror=False):
         im = im.resize((max(1, int(im.width * sc * S)), max(1, int(im.height * sc * S))), Image.LANCZOS).rotate(-ang * 57.2958, expand=True, resample=Image.BICUBIC)
         out.alpha_composite(im, (int(cx * S - im.width / 2), int(cy * S - im.height / 2)))
     return out
-sky = Image.new('RGBA', (900, 720), (215, 232, 248, 255))
+sky = Image.new('RGBA', (int(600 * S), int(480 * S)), (215, 232, 248, 255))  # 900x720 at image_scale 1.5
 cells = [('ui_confirm', 0, 4), ('ui_confirm', 0, 14), ('star_five', 0, 6), ('star_pop', 0, 8), ('toast_in', 0, 5), ('load_done', 0, 5), ('hit_block', 0, 3), ('hit_kill', 1, 5)]
 tiles = [render(n, v, f, sky, 300, 260, mirror=(n == 'hit_kill')).resize((450, 360)) for n, v, f in cells]
 sheet = Image.new('RGBA', (450 * 4, 360 * 2))

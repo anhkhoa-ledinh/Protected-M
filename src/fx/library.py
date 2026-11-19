@@ -323,9 +323,18 @@ class FxLibrary:
         """Queue a background decode for ``key`` if not already resident
         or in flight. Never blocks. A fallback path for a key preload
         somehow missed — in normal operation ``start_preload()`` already
-        covers everything."""
+        covers everything.
+
+        TASK_perf_textures_1119 Fix 4: a decoded-but-still-uploading key
+        is in NEITHER ``_pending`` (cleared the moment ``pump()`` drains
+        it off the decode queue) NOR ``_textures`` (only set once ALL its
+        bands + mipmap are done) — missing that window here meant ``get``
+        could re-request (and eventually re-decode+re-upload) a key
+        that's mid-upload, previously masked by decode (with the old
+        full-image bleed) almost always outlasting the upload entirely."""
         if (self.disabled_reason or key in self._textures or key in self._pending
-                or key in self._failed):
+                or key in self._failed
+                or any(item.key == key for item in self._in_progress)):
             return
         self._pending.add(key)
         _ensure_decode_workers()
@@ -340,8 +349,13 @@ class FxLibrary:
                 array = np.asarray(image.convert("RGBA"), dtype=np.uint8)
             t1 = time.perf_counter()
             # Loang màu ở LUỒNG NỀN này (CPU, có thể chậm), không phải ở
-            # ``pump()`` (luồng GL chính).
-            array = bleed_transparent(array)
+            # ``pump()`` (luồng GL chính). TASK_perf_textures_1119 Fix 4:
+            # ``tools/sakuga_bake/pack.py`` đã loang màu OFFLINE cho MỌI
+            # file của bộ fx đã chuẩn bị (``fx.json``'s ``rgb_bled: true``
+            # — PNG riêng lẻ không mang chunk, pack.py không stamp) — làm
+            # lại ở đây vừa tốn vừa vô ích.
+            if not self._spec.rgb_bled and np.any(array[..., 3] == 0):
+                array = bleed_transparent(array)
             t2 = time.perf_counter()
             decode_s, bleed_s = t1 - t0, t2 - t1
         except (OSError, ValueError) as err:

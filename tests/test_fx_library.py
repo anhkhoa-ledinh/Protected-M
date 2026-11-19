@@ -48,6 +48,74 @@ def test_lazy_decode_then_resident(gl_context, spec):
     library.release()
 
 
+# ---- TASK_perf_textures_1119 Fix 4: pre-bled pack, fx@2x ------------------
+
+def test_real_pack_is_marked_rgb_bled(spec):
+    assert spec.root.name == "fx"
+    data = __import__("json").loads((spec.root / "fx.json").read_text(encoding="utf-8"))
+    assert data.get("rgb_bled") is True
+
+
+def test_decode_skips_bleed_for_an_already_bled_file(gl_context, spec, monkeypatch):
+    """The real pack's files all carry ``rgb_bled=1`` -- ``_decode`` must
+    not call ``bleed_transparent`` for them."""
+    import src.fx.library as lib_mod
+
+    calls = []
+    monkeypatch.setattr(lib_mod, "bleed_transparent",
+                        lambda a: (calls.append(1), a)[1])
+    library = FxLibrary(spec)
+    library.check_capability()
+    key = "sheets/ui_tap_1.png"
+    assert _wait(lambda: library.get(key) is not None, library)
+    assert calls == []
+    library.release()
+
+
+def test_decode_still_bleeds_a_pack_without_the_rgb_bled_flag(gl_context, spec, tmp_path, monkeypatch):
+    """Robustness: a pack whose ``fx.json`` doesn't say ``rgb_bled: true``
+    (hand-authored, not yet run through ``tools/sakuga_bake/pack.py``)
+    still gets bled at runtime -- Fix 4 only skips it for packs that
+    earned the skip."""
+    import numpy as np
+    from PIL import Image
+
+    import src.fx.library as lib_mod
+
+    array = np.zeros((9, 9, 4), dtype=np.uint8)
+    array[4, 4] = [255, 0, 0, 255]
+    Image.fromarray(array, "RGBA").save(tmp_path / "unmarked.png")
+
+    calls = []
+    monkeypatch.setattr(lib_mod, "bleed_transparent",
+                        lambda a: (calls.append(1), a)[1])
+    library = FxLibrary(spec)
+    library._spec = spec.__class__(root=tmp_path, image_scale=spec.image_scale,
+                                   fps=spec.fps, effects={}, words={},
+                                   sheet_sizes={}, rgb_bled=False)
+    library._decode("unmarked.png")
+    assert calls == [1]
+
+
+def test_fx2x_pack_loads_and_is_marked_rgb_bled():
+    spec2x = load_spec(".", fx_dir="fx@2x")
+    assert spec2x.image_scale == 2.0
+    data = __import__("json").loads((spec2x.root / "fx.json").read_text(encoding="utf-8"))
+    assert data.get("rgb_bled") is True
+
+
+def test_fx2x_rects_are_the_fx_rects_scaled_by_the_same_ratio_as_image_scale(spec):
+    spec2x = load_spec(".", fx_dir="fx@2x")
+    name = next(iter(spec.effects))
+    v1 = spec.effects[name]["variants"][0]
+    v2 = spec2x.effects[name]["variants"][0]
+    f1 = next(f for f in v1["frames"] if f)
+    f2 = next(f for f in v2["frames"] if f)
+    ratio = spec2x.image_scale / spec.image_scale
+    assert f2["rect"][2] == pytest.approx(f1["rect"][2] * ratio)
+    assert f2["rect"][3] == pytest.approx(f1["rect"][3] * ratio)
+
+
 def test_try_spawn_gates_on_residency(gl_context, spec):
     library = FxLibrary(spec)
     library.check_capability()

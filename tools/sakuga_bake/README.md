@@ -21,3 +21,12 @@ python tools/sakuga_bake/preview.py assets/fx build/fx_preview.jpg
 ```
 
 Randomness is seeded (`?seed=N`), so a re-bake gives the same frames.
+
+`assets/fx@2x` (for screens wider than 1920 px) is the same bake at scale 2; atlases may be up to 4096 px wide:
+
+```
+FX_SCALE=2 node tools/sakuga_bake/bake.mjs build/fxbake2x
+FX_MAXW=4096 python tools/sakuga_bake/pack.py build/fxbake2x/raw assets/fx@2x
+```
+
+`pack.py` fills RGB under fully transparent pixels with the nearby colour (`bleed()`, alpha untouched) and writes `rgb_bled: true`, so the game needs no colour bleed at load time.

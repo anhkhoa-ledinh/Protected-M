@@ -6,6 +6,7 @@ These files are third-party art under MIT (see `THIRD_PARTY_NOTICES.md`), not un
 ## fx.json
 
 - `image_scale` 1.5: sheet px = design px x 1.5 (1920x1080 basis, same as `assets/ui_v3`).
+- `rgb_bled` true: RGB under fully transparent pixels is already filled with the nearby colour (4 px band, flat colour beyond), so mipmaps get no dark fringe. Alpha and every visible pixel are unchanged. A loader must **skip** its own colour bleed for this pack.
 - `fps` 30. Frame `f` is shown for `t` in `[f/30, (f+1)/30)` after the effect is spawned.
 - `effects.<name>.variants[i]`:
   - `sheet`: the atlas PNG.
@@ -32,7 +33,11 @@ These files are third-party art under MIT (see `THIRD_PARTY_NOTICES.md`), not un
 | `toast_in` | a toast has just landed | the toast centre (made for ~320x56) |
 | `load_edge` | the layer-split bar is filling, every ~0.25 s | the bar's leading edge |
 | `load_done` | the layer-split bar reached 100 % | the bar's right end |
-| `star_pop`, `star_five` | not wired yet (for star ratings) | the star centre |
+| `star_pop`, `star_five` | step/tilt/slot pops; WIN | see `src/fx/` hooks |
 
 Words: `don` (impact), `pon` (pop), `zuza` (skid), `gogo` (rumble), `kachi` (click), `shu` (swish).
 Styles: `ink` (navy fill, white edge), `hollow` (white fill, navy edge), `dotted` (screentone), `crit` (red fill, white edge).
+
+## assets/fx@2x
+
+The same effects baked at `image_scale` 2 (2560x1440 basis), same seeds, same frames and words; only the sheets are bigger. Use it only when the framebuffer is wider than 1920 px: at 1920 or below this 1.5x pack is already at or above screen resolution, and the 2x pack costs about 1.8x the memory.
