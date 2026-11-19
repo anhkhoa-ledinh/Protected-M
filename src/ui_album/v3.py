@@ -1706,10 +1706,22 @@ def _draw_hud_top_cards(painter, manifest, screen, record, state) -> None:
     """TASK_game_feel_fix_1118 Fix 10.1: draw ``top.png`` per CARD, each
     at its own current alpha, instead of one single full-canvas quad —
     this is what lets one card fade out while the rest of the HUD stays
-    put."""
+    put.
+
+    TASK_hud_fix_1119 Fix 2: this is the card BACKGROUND art itself, a
+    separate draw from the dynamic bars/pips/pills/sprites/texts drawn
+    over it (those go through ``_card_fade`` below) — missing this one
+    left every card's opaque panel on screen while H had faded its
+    CONTENTS to nothing (confirmed from a real ``hud_hidden.png``: Esc/
+    Pause and every card panel still fully opaque). ``hud_hidden_alpha``
+    applies to every card here, fadeable or not — unlike proximity/scope
+    (which only ever targets ``card.fades`` cards), H hides the WHOLE
+    HUD, Esc/Pause included.
+    """
     top = record.get("top")
     for index, card in enumerate(cards_for_screen(manifest, screen)):
-        alpha = float(state.card_alpha.get(index, 1.0)) if card.fades else 1.0
+        base = float(state.card_alpha.get(index, 1.0)) if card.fades else 1.0
+        alpha = base * float(state.hud_hidden_alpha)
         painter.layer_region(card.rect, top, alpha)
 
 

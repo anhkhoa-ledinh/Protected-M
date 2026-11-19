@@ -69,7 +69,7 @@ HOOK_ENV_VARS = (
     "HCPD_EVIDENCE_1118", "HCPD_ACCOUNTS_SHOTS", "HCPD_NAV_BENCH",
     "HCPD_UI_SHOTS_1117", "HCPD_AA_BASELINE_1118", "HCPD_V3_LIVE",
     "HCPD_PERF_PROFILE", "HCPD_PVP_AUTO", "HCPD_PVP_SHOTS",
-    "HCPD_PROP_PROBE", "HCPD_VIDEO_STATS",
+    "HCPD_PROP_PROBE", "HCPD_VIDEO_STATS", "HCPD_HUD_FIX_1119_SHOTS",
 )
 
 
@@ -437,7 +437,11 @@ class HcpdApplication:
         sakuga_shots = os.environ.get("HCPD_UI_SHOTS_1117") == "1"
         scope_bench = os.environ.get("HCPD_SCOPE_BENCH") == "1"
         evidence_1118 = os.environ.get("HCPD_EVIDENCE_1118") == "1"
-        if not sakuga_shots and not scope_bench and not evidence_1118:
+        # TASK_hud_fix_1119 Fix 4 evidence: same reasoning as
+        # ``evidence_1118`` right below — ``_build_hud_fix_1119_steps``
+        # also drives its own fixed ``album.mouse`` per step.
+        hud_fix_1119_shots = os.environ.get("HCPD_HUD_FIX_1119_SHOTS") == "1"
+        if not sakuga_shots and not scope_bench and not evidence_1118 and not hud_fix_1119_shots:
             # TASK_ui_sakuga_1117: lượt chụp 20 ảnh tự đặt ``album.mouse``
             # cho từng bước (hover_*/press_*) — con trỏ OS thật ghi đè lên
             # đúng mỗi khung thì KHÔNG BAO GIỜ thấy hover, bất kể bước nào
@@ -496,6 +500,7 @@ class HcpdApplication:
         self._tick_fx_bench(now)
         self._tick_scope_bench(now)
         self._tick_evidence_1118(now)
+        self._tick_hud_fix_1119_shots(now)
         self._tick_album_match(now)
         self._tick_pvp(now)
         self._tick_pvp_auto(now)
@@ -1333,6 +1338,97 @@ class HcpdApplication:
             ("fx_win", go_win(), 0.5),
         ]
 
+    def _tick_hud_fix_1119_shots(self, now: float) -> None:
+        """``HCPD_HUD_FIX_1119_SHOTS=1`` (with ``HCPD_ALBUM_AUTOMATCH=1``):
+        one-off screenshot sequence into ``results/hud_fix_1119/`` for Fix
+        1/2's own evidence (the designed HUD with every card, proximity
+        fade, H-hidden, scoped) — same spirit as ``HCPD_EVIDENCE_1118``,
+        not meant to ship."""
+        if (os.environ.get("HCPD_HUD_FIX_1119_SHOTS") != "1"
+                or not self._album_options.is_v3):
+            return
+        F = self._album.flow
+        if self._album.state.screen != F.PLAY:
+            return
+        if not hasattr(self, "_hud1119_step"):
+            if not self._measurement_ready():
+                return
+            self._hud1119_step = 0
+            self._hud1119_step_t = now
+            self._hud1119_out = self._root / "results" / "hud_fix_1119"
+            self._hud1119_steps = self._build_hud_fix_1119_steps()
+            return
+        if self._hud1119_step >= len(self._hud1119_steps):
+            self._window.request_close()
+            return
+        name, setup, hold_s = self._hud1119_steps[self._hud1119_step]
+        setup(self)
+        if now - self._hud1119_step_t >= hold_s:
+            if name is not None:
+                from OpenGL import GL
+
+                from src.ui_album.shots import save_framebuffer
+
+                self._window.restore_and_focus()
+                self._window.pump_events()
+                scene = self._last_scene or (lambda: None)
+                if not self._album.has_viewport():
+                    self._album.draw_hidden_scene(scene)
+                self._album_draw_guarded(scene)
+                width, height = self._window.framebuffer_size()
+                if width >= 2 and height >= 2:
+                    GL.glFinish()
+                    save_framebuffer(self._hud1119_out / f"{name}.png", width, height)
+                    logger.info("HUD_FIX_1119: %s.png", name)
+                self._window.swap_buffers()
+            self._hud1119_step += 1
+            self._hud1119_step_t = now
+
+    def _build_hud_fix_1119_steps(self) -> list:
+        def crosshair(xy):
+            def setup(app):
+                app._album.mouse = xy
+            return setup
+
+        def scoped(xy):
+            def setup(app):
+                import os as _os
+
+                _os.environ["HCPD_SCOPE_BENCH"] = "1"
+                app._album.mouse = app._tick_scope(time.perf_counter(), xy)
+            return setup
+
+        def hidden(want: bool):
+            def setup(app):
+                if app._album.hud_hidden != want:
+                    app._album.toggle_hud_hidden()
+            return setup
+
+        def weapon(name):
+            def setup(app):
+                app._apply_bench_weapon(name)
+            return setup
+
+        def clear_toast():
+            def setup(app):
+                app._album.state.message = ""
+            return setup
+
+        centre, weapon_card = (640.0, 360.0), (1130.0, 650.0)
+        return [
+            ("hud_full", crosshair(centre), 1.0),
+            ("hud_proximity", crosshair(weapon_card), 1.0),
+            (None, hidden(True), 0.05),
+            ("hud_hidden", crosshair(centre), 0.3),
+            (None, hidden(False), 0.05),
+            (None, weapon("Precision gun"), 0.1),
+            # the H-hidden toast above is a timed (6s) message, not
+            # cleared by un-hiding (Fix 2: "nothing on show") -- clear it
+            # by hand so it doesn't linger into the scope screenshot.
+            (None, clear_toast(), 0.1),
+            ("hud_scope", scoped(centre), 1.5),
+        ]
+
     def _album_action(self, action: str, now: float) -> None:
         """Thực hiện một hành động mà giao diện album yêu cầu."""
         F = self._album.flow
@@ -1413,6 +1509,12 @@ class HcpdApplication:
         if self._album.game is not None or self._renderer.waiting_for_depth:
             return
         if self._album.state.screen != F.PLAY:
+            # TASK_hud_fix_1119 Fix 4: accounts added a sign-in screen
+            # ahead of MENU since this hook was written -- a cold
+            # ``--album-guest`` launch now lands on MENU, not PLAY, so
+            # "no clicking through the whole flow" needs to jump there
+            # itself instead of just waiting for it.
+            self._album.state.go(F.PLAY)
             return
         self._album.state.weapon = 0
         if os.environ.get("HCPD_ALBUM_AUTOMATCH") == "2":
