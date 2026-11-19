@@ -1034,6 +1034,14 @@ class GlfwWindow:
         GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, 0)
         self._last_frame_valid_size = (width, height)
 
+    #: TASK_perf_textures_1119 Fix 9: GL enable-bits ``draw_last_frame_letterboxed``
+    #: must own, save, disable and restore — none of these are reset
+    #: between a normal frame and a resize mid-drag, and this path draws
+    #: with NONE of the state the normal frame path set up for itself.
+    _RESIZE_REDRAW_GL_STATES = (GL.GL_DEPTH_TEST, GL.GL_CULL_FACE,
+                                GL.GL_SCISSOR_TEST, GL.GL_STENCIL_TEST,
+                                GL.GL_BLEND)
+
     def draw_last_frame_letterboxed(self, bg_colour: tuple = (0.05, 0.06, 0.08)) -> bool:
         """The entire resize-drag redraw: clear to ``bg_colour``, draw the
         cached last frame letterboxed (16:9) into the CURRENT framebuffer
@@ -1045,18 +1053,38 @@ class GlfwWindow:
         ``msaa_samples > 0`` (the project default), and
         ``glBlitFramebuffer`` into a multisampled draw framebuffer is
         illegal regardless of rect sizes — see ``_draw_textured_rect``'s
-        docstring."""
+        docstring.
+
+        TASK_perf_textures_1119 Fix 9: the window showed only the flat
+        clear colour during a drag — ``window.py`` enables
+        ``GL_DEPTH_TEST``/``GL_CULL_FACE`` globally (normal-frame setup),
+        and this quad draws at z=0 against a depth buffer GLFW just
+        reallocated at the NEW size for the resize (undefined/uncleared
+        contents) — the clear ran, but the quad silently failed the
+        depth test (or got scissored/blended/stencilled out by whatever
+        the interrupted normal frame had set). Saves, disables, draws,
+        restores — every GL enable this function doesn't own itself is
+        now exactly as the caller left it, same as before this call."""
         if self._last_frame_fbo is None or self._last_frame_valid_size is None:
             return False
         width, height = self._fb_size
         if width <= 0 or height <= 0:
             return False
-        GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, 0)
-        GL.glViewport(0, 0, width, height)
-        GL.glClearColor(bg_colour[0], bg_colour[1], bg_colour[2], 1.0)
-        GL.glClear(GL.GL_COLOR_BUFFER_BIT)
-        dst_x, dst_y, dst_w, dst_h = letterbox_rect((width, height))
-        self._draw_textured_rect(dst_x, dst_y, dst_w, dst_h, width, height)
+        was_enabled = {state: GL.glIsEnabled(state)
+                      for state in self._RESIZE_REDRAW_GL_STATES}
+        for state in self._RESIZE_REDRAW_GL_STATES:
+            GL.glDisable(state)
+        try:
+            GL.glColorMask(True, True, True, True)
+            GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, 0)
+            GL.glViewport(0, 0, width, height)
+            GL.glClearColor(bg_colour[0], bg_colour[1], bg_colour[2], 1.0)
+            GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
+            dst_x, dst_y, dst_w, dst_h = letterbox_rect((width, height))
+            self._draw_textured_rect(dst_x, dst_y, dst_w, dst_h, width, height)
+        finally:
+            for state, enabled in was_enabled.items():
+                (GL.glEnable if enabled else GL.glDisable)(state)
         self.swap_buffers()
         return True
 

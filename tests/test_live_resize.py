@@ -21,6 +21,8 @@ whatever the CURRENT framebuffer size is — see
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock
+
 import pytest
 
 from src.engine.app import HcpdApplication
@@ -411,3 +413,120 @@ def test_draw_last_frame_letterboxed_does_not_blit_into_multisampled_fbo0(msaa_g
 
     window._release_blit_shader()
     window._release_last_frame_storage()
+
+
+# ---- GL state save/disable/restore, mocked GL (TASK_perf_textures_1119 Fix 9) --
+
+def _mocked_gl_window(enabled_states: set):
+    """A ``GlfwWindow`` whose every GL call is a ``MagicMock`` call
+    recorded for inspection, with ``glIsEnabled`` answering from
+    ``enabled_states`` (mutated by the mocked ``glEnable``/``glDisable``
+    so the restore really has to put back what was really on)."""
+    import src.renderer.window as window_mod
+
+    window = GlfwWindow.__new__(GlfwWindow)
+    window._window = object()
+    window._fb_size = (800, 600)
+    window._last_frame_fbo = 1
+    window._last_frame_valid_size = (800, 600)
+
+    gl = MagicMock()
+    for name in ("GL_DEPTH_TEST", "GL_CULL_FACE", "GL_SCISSOR_TEST",
+                "GL_STENCIL_TEST", "GL_BLEND", "GL_FRAMEBUFFER"):
+        setattr(gl, name, name)
+    gl.GL_COLOR_BUFFER_BIT = 0x4000       # real bit-flag values -- the
+    gl.GL_DEPTH_BUFFER_BIT = 0x0100       # test below ORs them together
+    gl.glIsEnabled.side_effect = lambda state: state in enabled_states
+    gl.glEnable.side_effect = enabled_states.add
+    gl.glDisable.side_effect = enabled_states.discard
+    window_mod.GL = gl
+    window._draw_textured_rect = MagicMock()
+    window.swap_buffers = MagicMock()
+    return window, gl
+
+
+def test_draw_last_frame_letterboxed_disables_all_five_states_before_drawing(monkeypatch):
+    import src.renderer.window as window_mod
+
+    real_gl = window_mod.GL
+    try:
+        enabled = {real_gl.GL_DEPTH_TEST, real_gl.GL_CULL_FACE,
+                  real_gl.GL_SCISSOR_TEST, real_gl.GL_STENCIL_TEST,
+                  real_gl.GL_BLEND}
+        window, gl = _mocked_gl_window(enabled)
+        draw_order = []
+        window._draw_textured_rect.side_effect = lambda *a: draw_order.append(set(enabled))
+
+        assert window.draw_last_frame_letterboxed() is True
+
+        assert draw_order == [set()], (
+            "every one of the five states must be OFF at draw time, "
+            f"got {draw_order}")
+    finally:
+        window_mod.GL = real_gl
+
+
+def test_draw_last_frame_letterboxed_restores_states_that_were_on(monkeypatch):
+    import src.renderer.window as window_mod
+
+    real_gl = window_mod.GL
+    try:
+        enabled = {real_gl.GL_DEPTH_TEST, real_gl.GL_CULL_FACE,
+                  real_gl.GL_SCISSOR_TEST, real_gl.GL_STENCIL_TEST,
+                  real_gl.GL_BLEND}
+        before = set(enabled)
+        window, gl = _mocked_gl_window(enabled)
+
+        assert window.draw_last_frame_letterboxed() is True
+
+        assert enabled == before
+    finally:
+        window_mod.GL = real_gl
+
+
+def test_draw_last_frame_letterboxed_restores_states_that_were_off(monkeypatch):
+    import src.renderer.window as window_mod
+
+    real_gl = window_mod.GL
+    try:
+        enabled: set = set()               # nothing was on to begin with
+        window, gl = _mocked_gl_window(enabled)
+
+        assert window.draw_last_frame_letterboxed() is True
+
+        assert enabled == set()
+    finally:
+        window_mod.GL = real_gl
+
+
+def test_draw_last_frame_letterboxed_restores_even_if_the_draw_raises(monkeypatch):
+    import src.renderer.window as window_mod
+
+    real_gl = window_mod.GL
+    try:
+        enabled = {real_gl.GL_DEPTH_TEST}
+        before = set(enabled)
+        window, gl = _mocked_gl_window(enabled)
+        window._draw_textured_rect.side_effect = RuntimeError("boom")
+
+        with pytest.raises(RuntimeError):
+            window.draw_last_frame_letterboxed()
+
+        assert enabled == before
+    finally:
+        window_mod.GL = real_gl
+
+
+def test_draw_last_frame_letterboxed_sets_a_full_colour_mask_and_clears_depth():
+    import src.renderer.window as window_mod
+
+    real_gl = window_mod.GL
+    try:
+        window, gl = _mocked_gl_window(set())
+        window.draw_last_frame_letterboxed()
+        gl.glColorMask.assert_called_once_with(True, True, True, True)
+        clear_calls = [c.args[0] for c in gl.glClear.call_args_list]
+        assert any(mask == (gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
+                  for mask in clear_calls)
+    finally:
+        window_mod.GL = real_gl
