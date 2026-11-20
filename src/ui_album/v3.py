@@ -1096,6 +1096,29 @@ class V3Painter:
         entry = self._text_entry(runs, texts)
         return 0.0 if not entry else entry[3][0]
 
+    def caret_offsets(self, run: dict, text: str) -> list:
+        """TASK_small_fixes_1120: cumulative x advance (design px) BEFORE
+        each character of ``text`` under ``run``'s font/size/scale/
+        letter-spacing — ``offsets[0] == 0.0``, ``offsets[len(text)]`` ==
+        this run's total width (matches ``text_width``/``line``'s own
+        ``total``, since no two glyphs kern — see ``_text_entry``'s own
+        comment). ``offsets[i]`` is where a caret sitting BEFORE
+        character ``i`` belongs; this is the one measurement both the
+        field's drawing AND its click-to-caret hit test use, so they can
+        never land on different pixels for the same ``(text, i)``."""
+        k = self.k
+        size = float(run.get("fs", 16))
+        metric = self.fonts.get(run.get("ff"), run.get("fw"), round(size * k))
+        spacing = float(run.get("ls") or 0.0)
+        text = text.upper() if run.get("upper") else text
+        offsets = [0.0]
+        for index, char in enumerate(text):
+            extra = metric.getlength(char) / k
+            if index >= 1:
+                extra += spacing
+            offsets.append(offsets[-1] + extra)
+        return offsets
+
     # ---- hình khối bo góc ------------------------------------------------
     def rounded(self, rect, radius: float, colour) -> None:
         """
@@ -1381,7 +1404,7 @@ class V3State:
                  "hover_fx", "aim_kick_scale", "hit_markers", "hp_bars",
                  "crit_impact_alpha", "scene_shake", "scope_zoom",
                  "card_alpha", "hud_hidden_alpha", "recovery_code", "forgot_open",
-                 "forgot_focus", "remember")
+                 "forgot_focus", "remember", "caret_index")
 
     def __init__(self) -> None:
         #: ``key`` → chuỗi (thay run đầu) hoặc danh sách chuỗi (thay từng run).
@@ -1409,6 +1432,10 @@ class V3State:
         self.focus: str | None = None
         #: ``key`` của ô chữ đang nhận chữ gõ — vẽ con trỏ sau nó.
         self.caret: str | None = None
+        #: TASK_small_fixes_1120: character index of the caret INSIDE
+        #: ``self.caret``'s field (0 = before the first character) —
+        #: unused while ``self.caret`` is ``None``.
+        self.caret_index: int = 0
         #: ``key`` → độ mờ 0–1 (ô vật phẩm cấp 1 vẽ 45 %).
         self.alpha: dict = {}
         self.shot = False
@@ -1639,7 +1666,7 @@ def draw_screen(painter: V3Painter, manifest: V3Manifest, screen: str,
     _draw_pills(painter, record, state, card_map)
     _draw_sprites(painter, manifest, screen, record, state, card_map)
     _draw_remember_switch(painter, screen, record, state)
-    _draw_texts(painter, record, state, card_map)
+    _draw_texts(painter, manifest, screen, record, state, card_map)
     # Fix 10.3: drawn LAST of the HUD layer, on top of the (now-fading)
     # cards — ammo/timer/kills must stay legible for the whole fade, not
     # just once alpha hits exactly 0.
@@ -1873,7 +1900,65 @@ def _draw_remember_switch(painter, screen, record, state) -> None:
                 rgba(_SWITCH_KNOB_COL))
 
 
-def _draw_texts(painter, record, state, card_map) -> None:
+#: TASK_small_fixes_1120: text-key -> its field's own hotspot, for the
+#: three sign-in/up fields whose caret must scroll within the FULL field
+#: BOX, not the narrow rect Penpot exported around the box's SAMPLE value
+#: (``user``'s sample "anhkhoa" measures 65px; the box itself is 356px).
+_CARET_FIELD_HOTSPOT = {"user": "field_user", "pass": "field_pass",
+                       "pass2": "field_pass2"}
+
+
+def _field_box_rect(manifest, screen: str, key: str, text_rect):
+    """Widens ``text_rect`` (a ``texts`` entry's own rect, sized to its
+    SAMPLE value) out to its field's real hotspot box, keeping the
+    text's own left inset and y/height — the box is symmetric (left
+    inset == right margin), matching the forgot dialog's own hand-placed
+    16px margin and confirmed against the manifest's own numbers (both
+    ``field_user`` and ``field_pass`` measure exactly 48px/260px)."""
+    hotspot_name = _CARET_FIELD_HOTSPOT.get(key)
+    if hotspot_name is None:
+        return text_rect
+    hotspot = next((h for h in manifest.screens[screen].get("hotspots", ())
+                    if h["n"] == hotspot_name), None)
+    if hotspot is None:
+        return text_rect
+    hx, hy, hw, hh = (float(v) for v in hotspot_rect(screen, hotspot))
+    _ = hy, hh
+    inset = float(text_rect[0]) - hx
+    if inset <= 0.0:
+        return text_rect
+    width = (hx + hw) - inset - float(text_rect[0])
+    return (text_rect[0], text_rect[1], max(1.0, width), text_rect[3])
+
+
+def _draw_field_text(painter, rect, run: dict, text: str, caret_index,
+                     alpha: float = 1.0) -> None:
+    """Draws one field's text CLIPPED to ``rect`` and, if ``text`` is
+    wider than ``rect``, scrolled so the caret stays inside the box —
+    then draws the caret itself at ``caret_index`` (a character index;
+    ``None`` draws plain, unfocused text, no scroll/cursor, clipped from
+    the start — TASK_small_fixes_1120)."""
+    offsets = painter.caret_offsets(run, text)
+    total = offsets[-1] if offsets else 0.0
+    box_w = float(rect[2])
+    if caret_index is None:
+        scroll = 0.0
+    else:
+        caret_index = max(0, min(len(text), int(caret_index)))
+        scroll = max(0.0, offsets[caret_index] - box_w)
+        scroll = min(scroll, max(0.0, total - box_w))
+    GL.glEnable(GL.GL_SCISSOR_TEST)
+    GL.glScissor(*painter.viewport_px(rect))
+    shifted = (rect[0] - scroll, rect[1], rect[2] + scroll, rect[3])
+    painter.line(shifted, [run], [text], "left", alpha)
+    GL.glDisable(GL.GL_SCISSOR_TEST)
+    if caret_index is not None:
+        caret_x = rect[0] + offsets[caret_index] - scroll
+        painter.fill((caret_x, rect[1] + (rect[3] - CARET_SIZE[1]) * 0.5,
+                     CARET_SIZE[0], CARET_SIZE[1]), rgba(CARET_COL))
+
+
+def _draw_texts(painter, manifest, screen, record, state, card_map) -> None:
     for spec in record.get("texts", ()):
         key = spec["key"]
         if key in state.hidden:
@@ -1890,11 +1975,13 @@ def _draw_texts(painter, record, state, card_map) -> None:
                 painter.line((rect[0], rect[1] + index * line_h, rect[2], line_h),
                              runs, parts, spec.get("al", "left"), alpha)
             continue
-        right = painter.line(rect, runs, texts, spec.get("al", "left"), alpha)
-        if state.caret == key:
-            painter.fill((right + CARET_GAP,
-                          rect[1] + (rect[3] - CARET_SIZE[1]) * 0.5,
-                          CARET_SIZE[0], CARET_SIZE[1]), rgba(CARET_COL))
+        if (state.caret == key and len(runs) == 1
+                and spec.get("al", "left") == "left"):
+            box = _field_box_rect(manifest, screen, key, rect)
+            _draw_field_text(painter, box, runs[0], texts[0],
+                             state.caret_index, alpha)
+        else:
+            painter.line(rect, runs, texts, spec.get("al", "left"), alpha)
     # TASK_hud_fix_1119 Fix 2: item-slot key/name/count text (no card of
     # its own, same reasoning as the borrowed-sprite loop above).
     for rect, runs, texts, align in state.extra:
@@ -2105,6 +2192,13 @@ def _forgot_field_value(state, key: str, masked: bool) -> str:
     return "•" * len(raw) if masked else raw
 
 
+def forgot_field_value_rect(field_y: float):
+    """The value text's own rect inside a forgot-dialog field box at
+    ``field_y`` — shared by drawing and by ``V3UI``'s click-to-caret math
+    (TASK_small_fixes_1120), so both measure from the exact same box."""
+    return (FORGOT_FIELD_X + 16.0, field_y + 22.0, FORGOT_FIELD_W - 32.0, 24.0)
+
+
 def _draw_forgot_dialog(painter, state) -> None:
     """TASK_accounts_1119 Phase 6: "Forgot password?" — four fields
     (username, recovery code, new password, confirm), an inline error
@@ -2124,12 +2218,13 @@ def _draw_forgot_dialog(painter, state) -> None:
         painter.line((FORGOT_FIELD_X + 16.0, field_y + 6.0, FORGOT_FIELD_W - 32.0, 16.0),
                      [_FIELD_LABEL_FONT], [label], "left")
         value = _forgot_field_value(state, name.replace("field_", ""), masked)
-        value_rect = (FORGOT_FIELD_X + 16.0, field_y + 22.0, FORGOT_FIELD_W - 32.0, 24.0)
-        right = painter.line(value_rect, [_FIELD_VALUE_FONT], [value], "left")
+        value_rect = forgot_field_value_rect(field_y)
         if state.forgot_focus == name:
             painter.rounded_frame(rect, rgba(CARET_COL), HOVER_PX, 10.0)
-            painter.fill((right + CARET_GAP, field_y + 22.0 + (24.0 - CARET_SIZE[1]) * 0.5,
-                         CARET_SIZE[0], CARET_SIZE[1]), rgba(CARET_COL))
+            _draw_field_text(painter, value_rect, _FIELD_VALUE_FONT, value,
+                             state.caret_index)
+        else:
+            painter.line(value_rect, [_FIELD_VALUE_FONT], [value], "left")
     error = str(state.texts.get("forgot_error") or "")
     if error:
         painter.line(FORGOT_ERROR_RECT, [FORGOT_ERROR_FONT], [error], "left")

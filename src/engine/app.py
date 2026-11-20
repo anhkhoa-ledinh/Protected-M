@@ -741,6 +741,20 @@ class HcpdApplication:
             album.toggle_hud_hidden()
         if album.pop_account_corrupt_toast():
             album.flow.say(state, "Your saved accounts file was unreadable — started a fresh one.")
+        # TASK_small_fixes_1120: caret move/delete inside the focused
+        # text field — same guard pattern as every other key here, no
+        # ``_v3_field_focused()`` check needed (``move_caret``/``caret_home``/
+        # ``caret_end``/``delete_char`` already no-op with nothing focused).
+        if input_state.caret_left:
+            album.move_caret(-1)
+        if input_state.caret_right:
+            album.move_caret(1)
+        if input_state.caret_home:
+            album.caret_home()
+        if input_state.caret_end:
+            album.caret_end()
+        if input_state.delete_forward:
+            album.delete_char()
         if input_state.paste_requested:
             # TASK_accounts_1119: dán vào ô đang chọn, kể cả ô mật khẩu —
             # đi qua ĐÚNG đường ``album.key()`` mỗi ký tự gõ tay cũng đi,

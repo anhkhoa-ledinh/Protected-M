@@ -226,6 +226,11 @@ class V3Flow:
     forgot_new_pass2: str = ""
     forgot_error: str = ""
     forgot_touched: set = field(default_factory=set)
+    #: TASK_small_fixes_1120: character index of the caret inside WHICHEVER
+    #: field currently has it (``focus`` or, while the modal dialog is
+    #: open, ``forgot_focus``) — only one field can hold the caret at a
+    #: time app-wide, so one shared index is enough.
+    caret_index: int = 0
 
     # ---- bảng cấp --------------------------------------------------------
     def level_name(self) -> str:
@@ -299,48 +304,9 @@ FIELD_MAXLEN = {"field_user": 32, "field_pass": 64, "field_pass2": 64}
 #: Thứ tự ô nhập khi bấm Tab.
 FIELD_ORDER = ("field_user", "field_pass", "field_pass2")
 
-
-def type_char(flow: V3Flow, char: str) -> None:
-    """Gõ một ký tự vào **đúng** ô đang chọn."""
-    if flow.focus == "field_join":
-        if char.isdigit() and len(flow.join_typed) < 4:
-            flow.join_typed += char
-        return
-    attr = FIELD_ATTR.get(flow.focus or "")
-    if attr:
-        maxlen = FIELD_MAXLEN.get(flow.focus, 24)
-        setattr(flow, attr, (getattr(flow, attr) + char)[:maxlen])
-        # TASK_accounts_1119: gợi ý lỗi trên màn đăng ký chỉ hiện cho ô
-        # người dùng đã THẬT SỰ gõ vào — đánh dấu ngay lần gõ đầu tiên.
-        flow.touched.add(flow.focus)
-
-
-def backspace(flow: V3Flow) -> None:
-    if flow.focus == "field_join":
-        flow.join_typed = flow.join_typed[:-1]
-        return
-    attr = FIELD_ATTR.get(flow.focus or "")
-    if attr:
-        setattr(flow, attr, getattr(flow, attr)[:-1])
-        flow.touched.add(flow.focus)
-
-
-def focus_next(flow: V3Flow, fields) -> None:
-    """Tab: sang ô nhập kế tiếp của màn (vòng lại ô đầu)."""
-    order = [name for name in FIELD_ORDER if name in fields]
-    if not order:
-        return
-    if flow.focus in order:
-        flow.focus = order[(order.index(flow.focus) + 1) % len(order)]
-    else:
-        flow.focus = order[0]
-
-
-# ---- TASK_accounts_1119 Phase 6: the forgot-password dialog's own ----------
-#: fields — a SEPARATE focus (``flow.forgot_focus``) from the screen
-#: UNDERNEATH it (normally SIGN_IN, which keeps its own ``flow.focus``
-#: untouched while the dialog is open, same as the share-album confirm
-#: dialog leaves the screen under it alone).
+#: TASK_accounts_1119 Phase 6: the forgot-password dialog's own fields —
+#: declared here (next to ``FIELD_ATTR``) so ``field_value``/the caret
+#: helpers below can read both tables without a forward reference.
 FORGOT_FIELD_ATTR = {"field_forgot_user": "forgot_user",
                      "field_forgot_code": "forgot_code",
                      "field_forgot_pass": "forgot_new_pass",
@@ -353,18 +319,153 @@ FORGOT_FIELD_ORDER = ("field_forgot_user", "field_forgot_code",
                       "field_forgot_pass", "field_forgot_pass2")
 
 
+def field_value(flow: V3Flow, name: str | None) -> str:
+    """Current string content of editable field ``name`` — ``""`` for
+    anything that isn't one (callers don't need to special-case buttons).
+
+    TASK_small_fixes_1120: ``field_join`` (the PvP 4-digit room code) is
+    deliberately NOT covered — it keeps its own append/backspace-last
+    model, a PIN-style entry rather than a text field, and isn't one of
+    the fields this task's gates (or its own wording) names."""
+    attr = FIELD_ATTR.get(name or "") or FORGOT_FIELD_ATTR.get(name or "")
+    return getattr(flow, attr) if attr else ""
+
+
+def _is_caret_field(name: str | None) -> bool:
+    return name in FIELD_ATTR or name in FORGOT_FIELD_ATTR
+
+
+def _edit_insert(value: str, caret: int, char: str, maxlen: int) -> tuple[str, int]:
+    """Inserts ``char`` AT the caret; a full field drops the keystroke
+    instead of truncating from the front (TASK_small_fixes_1120: "max-
+    length limits ... stay as they are")."""
+    if len(value) >= maxlen:
+        return value, caret
+    caret = max(0, min(caret, len(value)))
+    return value[:caret] + char + value[caret:], caret + 1
+
+
+def _edit_backspace(value: str, caret: int) -> tuple[str, int]:
+    """Deletes the character LEFT of the caret."""
+    caret = max(0, min(caret, len(value)))
+    if caret == 0:
+        return value, caret
+    return value[:caret - 1] + value[caret:], caret - 1
+
+
+def _edit_delete(value: str, caret: int) -> tuple[str, int]:
+    """Delete key: removes the character RIGHT of the caret."""
+    caret = max(0, min(caret, len(value)))
+    if caret >= len(value):
+        return value, caret
+    return value[:caret] + value[caret + 1:], caret
+
+
+def type_char(flow: V3Flow, char: str) -> None:
+    """Gõ một ký tự vào **đúng vị trí con trỏ** của ô đang chọn."""
+    if flow.focus == "field_join":
+        if char.isdigit() and len(flow.join_typed) < 4:
+            flow.join_typed += char
+        return
+    attr = FIELD_ATTR.get(flow.focus or "")
+    if attr:
+        maxlen = FIELD_MAXLEN.get(flow.focus, 24)
+        value, flow.caret_index = _edit_insert(getattr(flow, attr),
+                                               flow.caret_index, char, maxlen)
+        setattr(flow, attr, value)
+        # TASK_accounts_1119: gợi ý lỗi trên màn đăng ký chỉ hiện cho ô
+        # người dùng đã THẬT SỰ gõ vào — đánh dấu ngay lần gõ đầu tiên.
+        flow.touched.add(flow.focus)
+
+
+def backspace(flow: V3Flow) -> None:
+    if flow.focus == "field_join":
+        flow.join_typed = flow.join_typed[:-1]
+        return
+    attr = FIELD_ATTR.get(flow.focus or "")
+    if attr:
+        value, flow.caret_index = _edit_backspace(getattr(flow, attr),
+                                                   flow.caret_index)
+        setattr(flow, attr, value)
+        flow.touched.add(flow.focus)
+
+
+def delete_char(flow: V3Flow) -> None:
+    """Delete key: removes the character to the RIGHT of the caret."""
+    attr = FIELD_ATTR.get(flow.focus or "")
+    if attr:
+        value, flow.caret_index = _edit_delete(getattr(flow, attr), flow.caret_index)
+        setattr(flow, attr, value)
+        flow.touched.add(flow.focus)
+
+
+def focus_next(flow: V3Flow, fields) -> None:
+    """Tab: sang ô nhập kế tiếp của màn (vòng lại ô đầu)."""
+    order = [name for name in FIELD_ORDER if name in fields]
+    if not order:
+        return
+    if flow.focus in order:
+        flow.focus = order[(order.index(flow.focus) + 1) % len(order)]
+    else:
+        flow.focus = order[0]
+    flow.caret_index = len(field_value(flow, flow.focus))
+
+
+def move_caret(flow: V3Flow, delta: int) -> None:
+    """Left/Right: shift the caret one character, inside whichever field
+    currently holds it (the screen's own, or the forgot dialog's)."""
+    name = flow.forgot_focus if flow.forgot_open else flow.focus
+    if not _is_caret_field(name):
+        return
+    flow.caret_index = max(0, min(len(field_value(flow, name)),
+                                  flow.caret_index + int(delta)))
+
+
+def caret_home(flow: V3Flow) -> None:
+    name = flow.forgot_focus if flow.forgot_open else flow.focus
+    if _is_caret_field(name):
+        flow.caret_index = 0
+
+
+def caret_end(flow: V3Flow) -> None:
+    name = flow.forgot_focus if flow.forgot_open else flow.focus
+    if _is_caret_field(name):
+        flow.caret_index = len(field_value(flow, name))
+
+
+# ---- TASK_accounts_1119 Phase 6: the forgot-password dialog's own ----------
+#: fields — a SEPARATE focus (``flow.forgot_focus``) from the screen
+#: UNDERNEATH it (normally SIGN_IN, which keeps its own ``flow.focus``
+#: untouched while the dialog is open, same as the share-album confirm
+#: dialog leaves the screen under it alone). The field tables themselves
+#: moved up next to ``FIELD_ATTR`` (TASK_small_fixes_1120) — this comment
+#: stays here as the focus split's own explanation.
+
+
 def forgot_type_char(flow: V3Flow, char: str) -> None:
     attr = FORGOT_FIELD_ATTR.get(flow.forgot_focus or "")
     if attr:
         maxlen = FORGOT_FIELD_MAXLEN.get(flow.forgot_focus, 24)
-        setattr(flow, attr, (getattr(flow, attr) + char)[:maxlen])
+        value, flow.caret_index = _edit_insert(getattr(flow, attr),
+                                               flow.caret_index, char, maxlen)
+        setattr(flow, attr, value)
         flow.forgot_touched.add(flow.forgot_focus)
 
 
 def forgot_backspace(flow: V3Flow) -> None:
     attr = FORGOT_FIELD_ATTR.get(flow.forgot_focus or "")
     if attr:
-        setattr(flow, attr, getattr(flow, attr)[:-1])
+        value, flow.caret_index = _edit_backspace(getattr(flow, attr),
+                                                   flow.caret_index)
+        setattr(flow, attr, value)
+        flow.forgot_touched.add(flow.forgot_focus)
+
+
+def forgot_delete_char(flow: V3Flow) -> None:
+    attr = FORGOT_FIELD_ATTR.get(flow.forgot_focus or "")
+    if attr:
+        value, flow.caret_index = _edit_delete(getattr(flow, attr), flow.caret_index)
+        setattr(flow, attr, value)
         flow.forgot_touched.add(flow.forgot_focus)
 
 
@@ -374,6 +475,7 @@ def forgot_focus_next(flow: V3Flow) -> None:
         flow.forgot_focus = order[(order.index(flow.forgot_focus) + 1) % len(order)]
     else:
         flow.forgot_focus = order[0]
+    flow.caret_index = len(field_value(flow, flow.forgot_focus))
 
 
 def move_menu_focus(flow: V3Flow, delta: int) -> None:

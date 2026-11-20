@@ -57,6 +57,12 @@ WANTED = {
     "U chia se anh": glfw.KEY_U,
     "H HUD gon": glfw.KEY_H,
     "Ctrl+V dan vao o nhap": glfw.KEY_V,
+    # TASK_small_fixes_1120: di chuyen/xoa con tro trong o nhap.
+    "Left dich con tro trai": glfw.KEY_LEFT,
+    "Right dich con tro phai": glfw.KEY_RIGHT,
+    "Home ve dau o": glfw.KEY_HOME,
+    "End ve cuoi o": glfw.KEY_END,
+    "Delete xoa phai con tro": glfw.KEY_DELETE,
 }
 
 
@@ -93,5 +99,8 @@ def test_old_album_pack_keeps_its_tools():
 
 
 def test_v3_set_is_small_enough_to_read():
-    """Danh sách cho phép phải ngắn; dài ra là dấu hiệu lại trượt về trừ dần."""
-    assert len(V3_KEYS) <= 17
+    """Danh sách cho phép phải ngắn; dài ra là dấu hiệu lại trượt về trừ dần.
+
+    TASK_small_fixes_1120: trần cũ 17 + 5 phím con trỏ (Left/Right/Home/
+    End/Delete) = 22 — nâng đúng bằng số phím thêm, không hơn."""
+    assert len(V3_KEYS) <= 22
