@@ -74,13 +74,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Them vai dong mau (danh dau 'mau') vao bang xep hang",
     )
-    # TASK_ui_v3_1107: chon bo giao dien. Mac dinh v3 (ban ve "v2 · Redesign");
-    # --ui album chay lai NGUYEN bo cu, khong xoa dong ma nao cua no.
+    # TASK_ui_v3_1107: bo giao dien v3 ("v2 · Redesign") la bo duy nhat
+    # con lai (TASK_arch_refactor_1120 R1 da xoa bo cu "album").
     parser.add_argument(
         "--ui",
-        choices=("v3", "album"),
+        choices=("v3",),
         default="v3",
-        help="Bo giao dien khi --album bat: v3 (mac dinh) hoac album (bo cu)",
+        help="Bo giao dien khi --album bat (chi co v3)",
     )
     parser.add_argument(
         "--ui-shots",

@@ -3248,11 +3248,6 @@ class HcpdApplication:
                         lambda root: tmp_dir / "assets" / "config" / "session.json")
                 self._album = V3UI(self._root, self._shader_dir,
                                    self._album_options, window=self._window)
-            else:
-                from src.ui_album.ui import AlbumUI
-
-                self._album = AlbumUI(self._root, self._shader_dir,
-                                      self._album_options)
             self._album.initialize()
             self._bugs = self._build_bug_painter()
             self._renderer.extra_scene_draw = self._draw_album_bugs
