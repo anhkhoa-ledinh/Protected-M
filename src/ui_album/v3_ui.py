@@ -901,9 +901,13 @@ class V3UI:
         scores = [float(record.get("score", 0.0)) for record in self.state.history.values()
                  if isinstance(record, dict)]
         best_score = max(scores) if scores else None
-        account_store.save_progress(self._account_data, key, self.state.history,
-                                    self.state.recent, best_score)
-        account_store.save(self._account_root, self._account_data)
+        try:
+            account_store.save_progress(self._account_data, key, self.state.history,
+                                        self.state.recent, best_score)
+            account_store.save(self._account_root, self._account_data)
+        except Exception:
+            logger.error("Khong luu duoc tien trinh tai khoan", exc_info=True)
+            F.say(self.state, "Couldn't save your progress.")
 
     def note_match_finished(self) -> None:
         """TASK_accounts_1119 Phase 5: call once right after a match
@@ -928,7 +932,7 @@ class V3UI:
         if progress is None:
             return
         self.state.history = progress["history"]
-        self.state.recent = progress["recent"]
+        self.state.recent = [Path(p) for p in progress["recent"]]
 
     def sign_out(self) -> None:
         """TASK_accounts_1119 Phase 4: a deliberate sign-out must not

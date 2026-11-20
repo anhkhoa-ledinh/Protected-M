@@ -71,6 +71,7 @@ HOOK_ENV_VARS = (
     "HCPD_UI_SHOTS_1117", "HCPD_AA_BASELINE_1118", "HCPD_V3_LIVE",
     "HCPD_PERF_PROFILE", "HCPD_PVP_AUTO", "HCPD_PVP_SHOTS",
     "HCPD_PROP_PROBE", "HCPD_VIDEO_STATS", "HCPD_HUD_FIX_1119_SHOTS",
+    "HCPD_ALBUM_AUTOWIN",
 )
 
 
@@ -498,6 +499,7 @@ class HcpdApplication:
             self._tick_v3_input(input_state, now)
         album.tick()
         self._tick_album_automatch(now)
+        self._tick_album_autowin(now)
         self._tick_fx_bench(now)
         self._tick_scope_bench(now)
         self._tick_evidence_1118(now)
@@ -1597,6 +1599,41 @@ class HcpdApplication:
 
             if weapon in WEAPONS_SPEC:
                 self._apply_bench_weapon(weapon)
+
+    def _tick_album_autowin(self, now: float) -> None:
+        """TASK_arch_refactor_1120 Part A: ``HCPD_ALBUM_AUTOWIN=1`` — once
+        ``_tick_album_automatch`` (or any other hook) has a real match
+        running on ``PLAY``, hạ từng con bọ một (mỗi 0.1 s) cho tới khi
+        ván thắng, để kiểm được đường thật từ đầu tới màn kết quả (lưu
+        tiến trình) mà không phải rà chuột khắp khung hình đoán chỗ bọ
+        ẩn. Dùng đúng ``AlbumMatch.apply_damage`` sản phẩm dùng mỗi phát
+        bắn — chỉ khác chỗ chọn mục tiêu (ở đây là tuần tự theo chỉ số,
+        không phải dò theo tâm ngắm)."""
+        if os.environ.get("HCPD_ALBUM_AUTOWIN") != "1":
+            return
+        match = self._album.game
+        F = self._album.flow
+        if match is None or self._album.state.screen != F.PLAY:
+            return
+        if self._game is None or not self._game.props:
+            return
+        if now < getattr(self, "_autowin_next_s", 0.0):
+            return
+        self._autowin_next_s = now + 0.1
+        for index, found in enumerate(match.state.found):
+            if found:
+                continue
+            killed = match.apply_damage(index, 1_000_000.0, (0.0, 0.0), now)
+            if killed:
+                match.state.found[index] = True
+                match.last_shot_hits = [(index, False, True)]
+                self._renderer.set_prop_found(index)
+                if self._bugs is not None:
+                    self._bugs.mark_found(
+                        index, [v / 1000.0 for v in self._game.props[index]["pos_mm"]])
+                logger.info("AUTOWIN: ha bo #%d (%d/%d)", index,
+                            match.bugs_found, match.bugs_total)
+            break
 
     def _measurement_ready(self) -> bool:
         """

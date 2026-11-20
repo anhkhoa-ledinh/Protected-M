@@ -340,3 +340,20 @@ def test_best_score_and_progress_survive_a_reload(tmp_path):
     assert loaded["best_score"] == 77.0
     assert loaded["history"] == {"p.jpg": {"damage": 1}}
     assert loaded["recent"] == ["p.jpg"]
+
+
+def test_save_progress_round_trips_path_entries_in_recent(tmp_path):
+    """Regression: app.py puts ``Path`` objects into ``recent``; before the
+    fix, ``save_progress`` stored them as-is and ``json.dumps`` (inside
+    ``save``) raised ``TypeError: Object of type WindowsPath is not JSON
+    serializable``."""
+    data = store.load(tmp_path).data
+    key, _ = store.create_account(data, "Jan", "password123")
+    recent_in = [Path("a.jpg"), Path("sub") / "b.jpg"]
+    store.save_progress(data, key, {}, recent_in, None)
+    store.save(tmp_path, data)   # must not raise
+
+    reloaded = store.load(tmp_path).data
+    loaded = store.load_progress(reloaded, key)
+    assert all(isinstance(p, str) for p in loaded["recent"])
+    assert [Path(p) for p in loaded["recent"]] == recent_in
