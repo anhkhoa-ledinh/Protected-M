@@ -631,7 +631,7 @@ class HcpdApplication:
         nhầm ô nhỏ thì bộ lọc vứt gần hết bọ: log 07/11 "xin 6 · đặt 1 · ngoài
         ô 7", người chơi vào trận cấp 1 chỉ có đúng một con.
         """
-        from src.ui_album.viewport_filter import VIEWPORT_RECT
+        from src.game.viewport_filter import VIEWPORT_RECT
 
         if not self._album_options.is_v3:
             return VIEWPORT_RECT
@@ -975,7 +975,7 @@ class HcpdApplication:
         ``video_rgba.frag`` (``content.layer_alpha_threshold``).
         """
         from src.ui_album.bugs import SIZE_FACTOR
-        from src.ui_album.game_bridge import AimContext
+        from src.game.match import AimContext
 
         mask = self._bugs.sprite_mask(self._album.state.level) \
             if self._bugs is not None else None
@@ -1014,7 +1014,7 @@ class HcpdApplication:
         kể cả khi một lớp gần hơn đang che chỗ đó.
         """
         F = self._album.flow
-        from src.ui_album.game_bridge import fire
+        from src.game.match import fire
 
         match = self._album.game
         if match is None or self._album.state.screen not in (F.PLAY, F.PVP_HUNT):
@@ -1642,7 +1642,7 @@ class HcpdApplication:
         ``assign_bug_sizes``/``assign_bug_camo``), rồi đổi sang dạng mạng
         (``pvp_sync``) và gửi ``bugs`` cho server. ``False`` nếu ảnh không
         giấu được con nào."""
-        from src.ui_album.viewport_filter import filter_props
+        from src.game.viewport_filter import filter_props
         from src.ui_album.bugs import assign_bug_camo, assign_bug_sizes
         from src.ui_album import pvp_sync
         from src.net import protocol as proto
@@ -1680,7 +1680,7 @@ class HcpdApplication:
 
     def _pvp_handle_start(self, msg: dict, now: float) -> None:
         from src.ui_album import pvp_sync
-        from src.ui_album.game_bridge import (
+        from src.game.match import (
             DEFAULT_SPEC, WEAPONS_SPEC, start_match,
         )
 
@@ -1817,10 +1817,10 @@ class HcpdApplication:
     def _start_album_match(self, now: float) -> None:
         """Mở một ván theo cấp đang chọn: số bọ lấy từ bảng cấp."""
         F = self._album.flow
-        from src.ui_album.game_bridge import start_match
+        from src.game.match import start_match
 
         from src.content.hidden_props_search import exposure_count
-        from src.ui_album.viewport_filter import filter_props
+        from src.game.viewport_filter import filter_props
 
         state = self._album.state
         count = F.LEVEL_TABLE[state.level][1]
@@ -1916,7 +1916,7 @@ class HcpdApplication:
             # Đếm đạn CHỈ ở giao diện v3; bộ album giữ nguyên lối bắn không
             # giới hạn của nó. Ba khẩu khác nhau cả băng đạn, nhịp bắn lẫn
             # thời gian nạp — xem ``WEAPONS_SPEC``.
-            from src.ui_album.game_bridge import DEFAULT_SPEC, WEAPONS_SPEC
+            from src.game.match import DEFAULT_SPEC, WEAPONS_SPEC
 
             spec = WEAPONS_SPEC.get(weapon, DEFAULT_SPEC)
             match.ammo_enabled = True

@@ -13,6 +13,8 @@ import random
 import time
 from dataclasses import dataclass, field
 
+from src.game.match import LEVEL_TABLE
+
 logger = logging.getLogger(__name__)
 
 LOGIN, SIGNUP, LOGIN_ERR = "moi_01_dang_nhap", "moi_01b_dang_ky", "moi_01c_loi_dang_nhap"
@@ -31,13 +33,6 @@ PVP_RESULT, BOARD = "moi_10_ket_qua_pvp", "moi_11_bang_xep_hang"
 
 TABS = {"tab_CHƠI ĐƠN": LEVELS, "tab_PVP": PVP_MODE,
         "tab_XẾP HẠNG": BOARD, "tab_CÀI ĐẶT": SETTINGS}
-
-#: Bảng cấp: (tên, số bọ, giây, ô vật phẩm, phản công)
-LEVEL_TABLE = {
-    1: ("Dễ", 6, 180, 2, False), 2: ("Cơ bản", 8, 150, 3, False),
-    3: ("Khó", 10, 150, 3, True), 4: ("Xâm thực", 12, 120, 4, True),
-    5: ("Châu Á", 12, 120, 4, True),
-}
 
 ITEM_WEIGHT = {"Pháo sáng": 3, "Thuốc giải": 5, "Khiên axit": 4,
                "Kính lọc": 4, "La bàn": 2, "Máy quét nhiệt": 8,

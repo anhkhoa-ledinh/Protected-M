@@ -18,7 +18,7 @@ import logging
 import time
 
 from src.ui_album import v3_flow as F
-from src.ui_album.game_bridge import AlbumMatch
+from src.game.match import AlbumMatch
 
 logger = logging.getLogger(__name__)
 

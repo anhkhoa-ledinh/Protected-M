@@ -85,7 +85,7 @@ def assign_bug_camo(props, rgb_image, rest_eye_mm, screen_mm=(344.0, 194.0),
     ``BUG_CAMO_STRENGTH`` > 0, nhưng ``draw()`` chỉ dùng giá trị này nếu nó
     tồn tại trên prop.
     """
-    from src.ui_album.viewport_filter import DESIGN_SIZE, project_to_design
+    from src.game.viewport_filter import DESIGN_SIZE, project_to_design
 
     height, width = rgb_image.shape[:2]
     half = max(1, int(patch_px) // 2)
@@ -156,7 +156,7 @@ class BugPainter:
         và thứ phép bắn ĐO không bao giờ là hai hình khác nhau. ``None`` khi
         thiếu bộ asset: lúc đó không có bọ để vẽ, cũng không có gì để bắn.
         """
-        from src.ui_album.hit import SpriteMask
+        from src.game.hit import SpriteMask
 
         relative = sprite_for(self.manifest, level)
         if not relative:

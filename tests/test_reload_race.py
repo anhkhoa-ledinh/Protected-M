@@ -8,7 +8,7 @@ involved — the bug and the fix both live entirely in ``game_bridge.py``.
 
 from __future__ import annotations
 
-from src.ui_album.game_bridge import AlbumMatch
+from src.game.match import AlbumMatch
 
 MAG, FIRE_S, RELOAD_S = 24, 0.18, 1.3
 

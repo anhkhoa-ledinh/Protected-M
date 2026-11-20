@@ -452,7 +452,7 @@ class DevTools:
             # khỏi phần tìm chỗ giấu (place_props có ảnh trả về 0 chỗ).
             from src.content.hidden_props import layer_planes
             from src.content.prop_game import GameState
-            from src.ui_album.game_bridge import start_match
+            from src.game.match import start_match
 
             radius = float(app._content.game_prop_radius_mm)
             props = [{"pos_mm": (x, 0.0, -180.0), "radius_mm": radius,
@@ -477,7 +477,7 @@ class DevTools:
         # alone, without the 20 s synthetic-fire loop, picks the weapon.
         weapon = self.env("HCPD_BENCH_WEAPON").strip()
         if weapon:
-            from src.ui_album.game_bridge import WEAPONS_SPEC
+            from src.game.match import WEAPONS_SPEC
 
             if weapon in WEAPONS_SPEC:
                 self._apply_bench_weapon(weapon)
@@ -585,7 +585,7 @@ class DevTools:
             self._fx_bench_fx_times: list = []
             self._fx_bench_cycle = 0
             requested = self.env("HCPD_BENCH_WEAPON").strip()
-            from src.ui_album.game_bridge import WEAPONS_SPEC
+            from src.game.match import WEAPONS_SPEC
 
             self._fx_bench_weapon = requested if requested in WEAPONS_SPEC else None
             self._fx_bench_weapon_applied = False
@@ -658,7 +658,7 @@ class DevTools:
         """TASK_game_feel_1118 P7: force the live match onto
         ``weapon_name`` (automatch always picks the Precision gun) with a
         fresh magazine, for ``HCPD_BENCH_WEAPON``."""
-        from src.ui_album.game_bridge import WEAPONS_SPEC
+        from src.game.match import WEAPONS_SPEC
 
         match = self._app._album.game
         if match is None:

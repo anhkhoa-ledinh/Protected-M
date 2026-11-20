@@ -18,9 +18,9 @@ from src.content.prop_game import GameState
 from src.devtools import DevTools
 from src.engine.app import HcpdApplication
 from src.net import protocol as proto
-from src.ui_album import hit as H
+from src.game import hit as H
 from src.ui_album import v3_flow as F
-from src.ui_album.game_bridge import AlbumMatch
+from src.game.match import AlbumMatch
 
 
 class _Renderer:
