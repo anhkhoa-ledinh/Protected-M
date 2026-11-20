@@ -16,6 +16,10 @@ jobs:
       # skips anything that needs them instead of fetching them here.
     steps:
       - uses: actions/checkout@v4
+        with:
+          # tests/test_account_art.py reads an older commit with `git show`;
+          # the default shallow clone (depth 1) does not contain it.
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:

@@ -6,8 +6,11 @@ Khác ``flow.py`` ở hai chỗ, và chỉ hai chỗ: tên màn là tên bảng 
 tên cấp/vật phẩm/vũ khí là **tiếng Anh** (bộ asset v3 in chữ Anh, nên khoá nội
 bộ phải cùng ngôn ngữ với sprite ``item_tile:<item>``).
 
-Phần PvP và tài khoản vẫn là **mô phỏng** (bot, trạng thái trong bộ nhớ) —
-báo cáo phải nói rõ.
+TASK_accounts_1119: tài khoản đã THẬT (``src/account``) — sống trên một
+máy, không có server. ``player`` vẫn là nội dung ô "Username"/tên hiển
+thị; ``account_key`` là khoá đã case-fold trong kho tài khoản (xem
+``src.account.crypto.GUEST_KEY`` cho khoá chơi khách), hoặc ``""`` khi
+chưa đăng nhập.
 """
 
 from __future__ import annotations
@@ -197,6 +200,32 @@ class V3Flow:
     #: Đường dẫn app phải tải lên NGAY (khác ``shared_album_pending``: ô này
     #: không vẽ hộp thoại nào, chỉ là tín hiệu bàn giao cho ``_album_action``).
     shared_album_upload_path: str = ""
+    # ---- TASK_accounts_1119: tài khoản cục bộ (không có server) -----------
+    #: Khoá tài khoản (``crypto.username_key``) đang đăng nhập; ``""`` =
+    #: chưa đăng nhập, ``"guest"`` = chơi khách. Khác ``player`` (tên hiển
+    #: thị, cũng là nội dung ô "Username" trên màn đăng nhập/đăng ký).
+    account_key: str = ""
+    #: Ô nào trên màn đăng ký người dùng đã GÕ VÀO rồi — gợi ý lỗi chỉ hiện
+    #: cho ô đã động tới (không doạ người mới vào màn với lỗi ngay lập tức).
+    touched: set = field(default_factory=set)
+    #: Dòng lỗi của màn ``v3_01c_sign_in_error`` (khoá text ``error``) và
+    #: màn ``v3_01b_sign_up`` (khoá text ``hint``, khi có vấn đề).
+    sign_in_error: str = ""
+    hint_text: str = ""
+    #: Có đang hiện icon "!" đỏ (``hint_bad``) thay vì dấu tích xanh
+    #: (``hint_ok``) trên màn đăng ký hay không.
+    hint_bad: bool = False
+    #: TASK_accounts_1119 Phase 6: hộp thoại mã khôi phục (hiện MỘT LẦN
+    #: ngay sau khi đăng ký) và hộp thoại quên mật khẩu.
+    recovery_code_shown: str = ""
+    forgot_open: bool = False
+    forgot_focus: str | None = None
+    forgot_user: str = ""
+    forgot_code: str = ""
+    forgot_new_pass: str = ""
+    forgot_new_pass2: str = ""
+    forgot_error: str = ""
+    forgot_touched: set = field(default_factory=set)
 
     # ---- bảng cấp --------------------------------------------------------
     def level_name(self) -> str:
@@ -226,9 +255,20 @@ class V3Flow:
     def go(self, screen: str) -> None:
         if screen != self.screen:
             logger.info("UI v3: %s -> %s", self.screen, screen)
+            if self.screen in (PLAY, PVP_HUNT, PVP_HIDE):
+                # TASK_game_feel_1118 P3: toast "trận" (vd "Reloading")
+                # không được rò sang màn SAU trận — review ảnh 1117 bắt
+                # được nó còn hiện nguyên trên WIN (``fx_win.png``).
+                self.message = ""
+                self.message_until_s = 0.0
             if screen == TILT:
                 self.tilt_entered_s = time.perf_counter()
                 self.tilt_left_done = self.tilt_right_done = False
+            if screen == SIGN_UP and self.screen != SIGN_UP:
+                # TASK_accounts_1119: hint/lỗi chỉ hiện cho ô đã gõ vào —
+                # vào màn đăng ký MỚI (không phải bật qua tắt lại chính
+                # màn này) thì chưa ô nào được coi là đã động tới.
+                self.touched = set()
         self.screen = screen
 
     # ---- dấu kiểm của màn thử nghiêng -----------------------------------
@@ -250,6 +290,12 @@ class V3Flow:
 FIELD_ATTR = {"field_user": "player", "field_pass": "password",
               "field_pass2": "password2"}
 
+#: TASK_accounts_1119: trần ký tự riêng từng ô — mật khẩu hợp lệ dài tới 64
+#: (``crypto.validate_password``), nên trần 24 cũ (dùng chung mọi ô) sẽ cắt
+#: mật khẩu dài mà người dùng không hề biết ("Raise the field cap so a
+#: password is never truncated silently").
+FIELD_MAXLEN = {"field_user": 32, "field_pass": 64, "field_pass2": 64}
+
 #: Thứ tự ô nhập khi bấm Tab.
 FIELD_ORDER = ("field_user", "field_pass", "field_pass2")
 
@@ -262,7 +308,11 @@ def type_char(flow: V3Flow, char: str) -> None:
         return
     attr = FIELD_ATTR.get(flow.focus or "")
     if attr:
-        setattr(flow, attr, (getattr(flow, attr) + char)[:24])
+        maxlen = FIELD_MAXLEN.get(flow.focus, 24)
+        setattr(flow, attr, (getattr(flow, attr) + char)[:maxlen])
+        # TASK_accounts_1119: gợi ý lỗi trên màn đăng ký chỉ hiện cho ô
+        # người dùng đã THẬT SỰ gõ vào — đánh dấu ngay lần gõ đầu tiên.
+        flow.touched.add(flow.focus)
 
 
 def backspace(flow: V3Flow) -> None:
@@ -272,6 +322,7 @@ def backspace(flow: V3Flow) -> None:
     attr = FIELD_ATTR.get(flow.focus or "")
     if attr:
         setattr(flow, attr, getattr(flow, attr)[:-1])
+        flow.touched.add(flow.focus)
 
 
 def focus_next(flow: V3Flow, fields) -> None:
@@ -283,6 +334,46 @@ def focus_next(flow: V3Flow, fields) -> None:
         flow.focus = order[(order.index(flow.focus) + 1) % len(order)]
     else:
         flow.focus = order[0]
+
+
+# ---- TASK_accounts_1119 Phase 6: the forgot-password dialog's own ----------
+#: fields — a SEPARATE focus (``flow.forgot_focus``) from the screen
+#: UNDERNEATH it (normally SIGN_IN, which keeps its own ``flow.focus``
+#: untouched while the dialog is open, same as the share-album confirm
+#: dialog leaves the screen under it alone).
+FORGOT_FIELD_ATTR = {"field_forgot_user": "forgot_user",
+                     "field_forgot_code": "forgot_code",
+                     "field_forgot_pass": "forgot_new_pass",
+                     "field_forgot_pass2": "forgot_new_pass2"}
+#: The code field gets slack for the dashes/spaces a user might type —
+#: normalised (stripped + upper-cased) only at submit time.
+FORGOT_FIELD_MAXLEN = {"field_forgot_user": 32, "field_forgot_code": 20,
+                       "field_forgot_pass": 64, "field_forgot_pass2": 64}
+FORGOT_FIELD_ORDER = ("field_forgot_user", "field_forgot_code",
+                      "field_forgot_pass", "field_forgot_pass2")
+
+
+def forgot_type_char(flow: V3Flow, char: str) -> None:
+    attr = FORGOT_FIELD_ATTR.get(flow.forgot_focus or "")
+    if attr:
+        maxlen = FORGOT_FIELD_MAXLEN.get(flow.forgot_focus, 24)
+        setattr(flow, attr, (getattr(flow, attr) + char)[:maxlen])
+        flow.forgot_touched.add(flow.forgot_focus)
+
+
+def forgot_backspace(flow: V3Flow) -> None:
+    attr = FORGOT_FIELD_ATTR.get(flow.forgot_focus or "")
+    if attr:
+        setattr(flow, attr, getattr(flow, attr)[:-1])
+        flow.forgot_touched.add(flow.forgot_focus)
+
+
+def forgot_focus_next(flow: V3Flow) -> None:
+    order = FORGOT_FIELD_ORDER
+    if flow.forgot_focus in order:
+        flow.forgot_focus = order[(order.index(flow.forgot_focus) + 1) % len(order)]
+    else:
+        flow.forgot_focus = order[0]
 
 
 def move_menu_focus(flow: V3Flow, delta: int) -> None:

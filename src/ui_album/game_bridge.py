@@ -9,6 +9,8 @@ chơi cũ không có: đồng hồ đếm ngược theo cấp, máu, stamina, đ
 from __future__ import annotations
 
 import logging
+import math
+import random
 import time
 from dataclasses import dataclass, field
 from typing import NamedTuple
@@ -41,10 +43,13 @@ class WeaponSpec(NamedTuple):
 #: gian chết — đo trên một phiên chơi thật: 59 phát ra, 45 cú bấm bị nuốt.
 #: Gần một nửa số lần bấm không ra đạn là hỏng, nhất là ở buổi bảo vệ. Bộ
 #: dưới đây giữ nguyên tính cách ba khẩu mà kéo tỉ lệ ấy về 15 % · 19 % · 23 %.
+#: TASK_weapons_1119: Heavy-mag gun's magazine goes 24 → 50 (reload 1.3 s
+#: → 2.5 s); fire interval (0.18 s) is unchanged — the user's own call,
+#: not re-derived from the downtime-ratio formula above.
 WEAPONS_SPEC = {
     "Precision gun": WeaponSpec(12, 0.50, 1.1),
     "Spread gun": WeaponSpec(8, 0.38, 0.9),
-    "Heavy-mag gun": WeaponSpec(24, 0.18, 1.3),
+    "Heavy-mag gun": WeaponSpec(50, 0.18, 2.5),
 }
 DEFAULT_SPEC = WeaponSpec(12, 0.45, 1.1)
 
@@ -52,6 +57,77 @@ DEFAULT_SPEC = WeaponSpec(12, 0.45, 1.1)
 WEAPON_MAG = {name: spec.mag for name, spec in WEAPONS_SPEC.items()}
 DEFAULT_MAG = DEFAULT_SPEC.mag
 RELOAD_S = DEFAULT_SPEC.reload_s
+
+#: TASK_weapons_1119: tên hiển thị cho người chơi. ID nội bộ ("Precision
+#: gun", "Spread gun", "Heavy-mag gun") giữ nguyên ở MỌI nơi khác — lịch sử
+#: trận, accounts, thông điệp PvP, khoá sprite đều tra theo ID — mapping
+#: này là CHỖ DUY NHẤT đổi chữ hiển thị, nên mọi dòng chữ người chơi thấy
+#: (HUD ``weapon_name``, toast, màn kết quả) phải tra qua đây, không ghép
+#: chuỗi hiển thị ở nơi khác.
+WEAPON_LABEL = {
+    "Precision gun": "Sniper rifle",
+    "Spread gun": "Shotgun",
+    "Heavy-mag gun": "Heavy-mag gun",
+}
+
+
+class DamageSpec(NamedTuple):
+    """Sát thương một viên/đạn ghém, và hệ số khi trúng đầu."""
+
+    damage: float
+    headshot_mult: float
+
+
+#: TASK_weapons_1119 — bảng sát thương theo id nội bộ. Shotgun không có
+#: thưởng trúng đầu (``headshot_mult=1.0``): 5 viên ghém, 25 sát thương
+#: mỗi viên, không viên nào ăn thêm dù rơi vào vùng đầu.
+WEAPON_DAMAGE = {
+    "Precision gun": DamageSpec(100.0, 2.0),
+    "Spread gun": DamageSpec(25.0, 1.0),
+    "Heavy-mag gun": DamageSpec(34.0, 1.5),
+}
+#: Khẩu không tra được (bộ album cũ dùng id "Sung"/"Sung N", hoặc
+#: ``AlbumMatch.weapon_name`` mặc định) — sát thương đủ lớn để vẫn hạ một
+#: phát, giữ ĐÚNG hành vi trước TASK_weapons_1119 cho đường lùi cũ.
+DEFAULT_DAMAGE = DamageSpec(9999.0, 1.0)
+
+
+def weapon_damage(weapon_name: str, crit: bool) -> float:
+    """Sát thương một viên của ``weapon_name`` đã găm trúng, ``crit`` hay không."""
+    spec = WEAPON_DAMAGE.get(weapon_name, DEFAULT_DAMAGE)
+    return spec.damage * (spec.headshot_mult if crit else 1.0)
+
+
+#: Máu một con bọ theo cấp (bảng cố định của TASK_weapons_1119).
+BUG_HP_BY_LEVEL = {1: 100.0, 2: 100.0, 3: 150.0, 4: 200.0, 5: 200.0}
+
+#: Shotgun: số viên ghém và bán kính rải quanh tâm ngắm, px thiết kế.
+PELLET_COUNT = 5
+PELLET_RADIUS_PX = 40.0
+
+#: Thanh máu nổi trên đầu bọ (sau một phát không hạ) mờ dần sau ngần này
+#: giây không bị bắn tiếp — xem ``AlbumMatch.hp_bars``.
+HP_BAR_FADE_S = 1.5
+
+
+def pellet_points(centre, *, radius: float = PELLET_RADIUS_PX,
+                  count: int = PELLET_COUNT, rng: random.Random | None = None
+                  ) -> list[tuple[float, float]]:
+    """``count`` điểm bên trong đĩa bán kính ``radius`` quanh ``centre``.
+
+    Điểm đầu LÀ ``centre`` (tâm ngắm) — người chơi ngắm đâu, viên giữa
+    luôn đi đúng đó; ``count - 1`` điểm còn lại rải ngẫu nhiên, ĐỀU trong
+    đĩa (lấy mẫu theo ``r = R·sqrt(u)``, không phải ``r = R·u`` — nếu
+    không viên sẽ dồn về tâm, không đều trên mặt đĩa).
+    """
+    rng = rng if rng is not None else random.Random()
+    cx, cy = float(centre[0]), float(centre[1])
+    points = [(cx, cy)]
+    for _ in range(int(count) - 1):
+        r = float(radius) * math.sqrt(rng.random())
+        theta = rng.random() * 2.0 * math.pi
+        points.append((cx + r * math.cos(theta), cy + r * math.sin(theta)))
+    return points
 
 
 @dataclass
@@ -107,10 +183,70 @@ class AlbumMatch:
     shot_at_s: float = 0.0
     shot_point: tuple = (640.0, 360.0)
     ended: str = ""                    # "", "win", "lose"
+    #: TASK_weapons_1119: máu còn lại của mỗi con, khởi tạo CHẬM (lần đầu
+    #: bị bắn — xem ``apply_damage``) theo ``BUG_HP_BY_LEVEL`` của ván
+    #: này, nên không cần một vòng khởi tạo riêng theo ``state.props``.
+    bug_hp: dict = field(default_factory=dict)
+    #: Chỗ và mốc giờ của phát KHÔNG hạ gần nhất trên mỗi con còn sống —
+    #: ``HUD`` đọc lại để vẽ thanh máu nổi (``hp_bars``), rồi tự rụng khỏi
+    #: đây khi con đó bị hạ hẳn.
+    bug_last_hit: dict = field(default_factory=dict)
+    #: ``(chỉ số, chí mạng, có hạ không)`` của MỖI viên/ghém đã găm trúng ở
+    #: phát bắn GẦN NHẤT — ``app.py`` đọc lại để biết viên nào thật sự hạ
+    #: (chỉ viên đó mới tính giết/gọi ``hit_kill``/``hit_crit``).
+    last_shot_hits: list = field(default_factory=list)
+    #: RNG riêng cho rải ghém shotgun — seed cố định nên cùng một ván chơi
+    #: lại ra đúng cùng độ rải (khác RNG của ``fx``/``shot_feel``, không
+    #: chung một nguồn với bất cứ gì khác).
+    pellet_rng: random.Random = field(default_factory=lambda: random.Random(0))
 
     def __post_init__(self) -> None:
         if self.rounds_left < 0:
             self.rounds_left = int(self.mag_size)
+
+    def apply_damage(self, index: int, amount: float, point, now: float) -> bool:
+        """Trừ máu bọ #``index``; trả ``True`` nếu phát này VỪA hạ nó.
+
+        Máu khởi tạo chậm ở đây (lần đầu con này bị bắn) từ
+        ``BUG_HP_BY_LEVEL`` của cấp ván — mọi con bắt đầu ván ở cùng mức
+        máu dù ``start_match`` không chạm tới ``bug_hp``. Bọ đã hạ rồi thì
+        phát này không làm gì (nhiều ghém của CÙNG một phát shotgun có thể
+        cùng găm vào một con vừa chết).
+        """
+        hp = self.bug_hp.get(index)
+        if hp is None:
+            hp = float(BUG_HP_BY_LEVEL.get(self.level, BUG_HP_BY_LEVEL[1]))
+        if hp <= 0.0:
+            return False
+        hp = max(0.0, hp - float(amount))
+        self.bug_hp[index] = hp
+        if hp <= 0.0:
+            self.bug_last_hit.pop(index, None)
+            return True
+        self.bug_last_hit[index] = (float(point[0]), float(point[1]), float(now))
+        return False
+
+    def hp_bars(self, now: float) -> list[tuple[float, float, float, float]]:
+        """``[(x, y, phần máu còn, độ mờ), ...]`` của mỗi con còn sống bị
+        bắn (không hạ) trong ``HP_BAR_FADE_S`` giây gần nhất.
+
+        Vị trí là CHỖ PHÁT BẮN gần nhất găm vào nó — cùng lối "điểm cố
+        định" với vết đạn/hit marker (``game_bridge.fire``, ``v3.py``'s
+        ``_scope_adjust``), không truy lại chiếu 3D hiện tại của con bọ.
+        """
+        max_hp = float(BUG_HP_BY_LEVEL.get(self.level, BUG_HP_BY_LEVEL[1]))
+        out = []
+        for index, (x, y, hit_s) in self.bug_last_hit.items():
+            age = now - hit_s
+            if age >= HP_BAR_FADE_S:
+                continue
+            hp = self.bug_hp.get(index)
+            if hp is None or hp <= 0.0:
+                continue
+            frac = max(0.0, min(1.0, hp / max_hp))
+            alpha = max(0.0, 1.0 - age / HP_BAR_FADE_S)
+            out.append((x, y, frac, alpha))
+        return out
 
     @property
     def rounds(self) -> tuple:
@@ -134,7 +270,18 @@ class AlbumMatch:
 
         Hết viên cuối thì tự nạp: không có đường nạp thì bắn hết băng là ván
         tắc, mà bản vẽ không có nút nạp đạn nào.
+
+        TASK_game_feel_fix_1118 Fix 3: ``tick_reload(now)`` first, right
+        here — not just in ``app.py``'s ``_tick_auto_fire`` (the 1118
+        patch). That only closed the race for full-auto; a REGULAR CLICK
+        landing on the exact frame the reload deadline passes hit the
+        same race (``reloading(now)`` already false, ``rounds_left``
+        still 0 because nothing had called ``tick_reload`` yet this
+        frame) — rare for a discrete click, but still a real bug, and the
+        fix belongs at the one place every firing path already goes
+        through, not duplicated in every caller.
         """
+        self.tick_reload(now)
         if self.reloading(now) or not self.ready_to_fire(now):
             return False
         if self.rounds_left <= 0:
@@ -256,15 +403,27 @@ class AimContext:
                            alpha_threshold=self.alpha_threshold)
 
 
-def fire(match: AlbumMatch, crosshair, aim: AimContext) -> tuple | None:
+def fire(match: AlbumMatch, crosshair, aim: AimContext, *,
+        pvp: bool = False) -> tuple | None:
     """
-    Một phát bắn. Trả ``(chỉ số con bọ, chí mạng)``; ``(-1, False)`` nếu hụt,
-    ``None`` nếu **không bắn được** (hết băng hoặc đang nạp).
+    Một phát bắn. Trả ``(chỉ số con bọ, chí mạng)`` của viên/ghém ĐẦU TIÊN
+    găm trúng; ``(-1, False)`` nếu không viên nào trúng, ``None`` nếu
+    **không bắn được** (hết băng hoặc đang nạp).
 
     F1: hộp trúng là hình bóng THẬT của sprite (alpha > 0,25, nới 4 px), và
     tia ngắm gặp lớp gần hơn thì phát đó găm vào lớp — hụt. Vòng tròn 40 px
     quanh tâm chiếu đã bỏ: sprite vẽ ở ``radius × 3`` nên phần lớn thân con bọ
     nằm ngoài vòng ấy, bắn vào chân luôn báo hụt.
+
+    TASK_weapons_1119: "trúng" (``best >= 0``) không còn luôn nghĩa là
+    "chết" — mỗi viên/ghém trúng trừ máu qua ``match.apply_damage``, ghi
+    vào ``match.last_shot_hits`` (``app.py`` đọc lại để biết viên nào THẬT
+    SỰ hạ, chỉ viên đó mới gọi ``hit_kill``/``hit_crit`` và tính giết).
+    Shotgun (``"Spread gun"``) bắn ``PELLET_COUNT`` điểm rải trong đĩa
+    ``PELLET_RADIUS_PX`` quanh ``crosshair`` — khẩu khác bắn đúng một
+    điểm, y hệt trước đây. ``pvp=True``: giữ NGUYÊN lối một phát hạ cũ —
+    PvP bug HP không thuộc phạm vi việc này, kết quả giết chốt ở server
+    (xem ``app.py``'s ``_pvp_handle_killed``).
     """
     now = time.perf_counter()
     if match.ammo_enabled and not match.take_round(now):
@@ -280,10 +439,39 @@ def fire(match: AlbumMatch, crosshair, aim: AimContext) -> tuple | None:
         aim.bugs, crosshair, aim.eye_mm, aim.planes, aim.glass_mm,
         aim.centre_mm, alpha_threshold=aim.alpha_threshold,
         is_exposed=aim.is_exposed))
-    best, crit = aim.resolve(crosshair)
+    points = (pellet_points(crosshair, rng=match.pellet_rng)
+             if match.weapon_name == "Spread gun" else [tuple(crosshair)])
+    match.last_shot_hits = []
+    primary = (-1, False)
+    for point in points:
+        index, crit = aim.resolve(point)
+        if index < 0:
+            continue
+        if primary[0] < 0:
+            primary = (index, crit)
+        if pvp:
+            killed = True
+        else:
+            damage = weapon_damage(match.weapon_name, crit)
+            killed = match.apply_damage(index, damage, point, now)
+        if killed:
+            match.state.found[index] = True
+        match.last_shot_hits.append((index, crit, bool(killed)))
+    best, crit = primary
     match.shot_at_s = now
     match.shot_point = tuple(crosshair)
     # Vết đạn: giữ vài phát gần nhất, cũ nhất rụng trước.
+    #
+    # TASK_game_feel_1118 P6: this is the ONE scene-anchored overlay
+    # (besides the Sakuga hit/miss fx, spawned the same way — see
+    # ``v3_ui.py``'s ``spawn_hit_fx``/``spawn_miss_fx``) — and it needs NO
+    # ``s = c + z(g - c)`` transform while scoped. It's always stored at
+    # ``crosshair`` itself (the design-px point the scope's own Kooima
+    # sub-window is centred on), and that point is a FIXED POINT of the
+    # warp: plugging ``g = c`` into the formula gives ``s = c`` for ANY
+    # zoom. A shot mark at the firing crosshair is correctly placed at
+    # every later frame — scoped or not, whatever the zoom is then —
+    # without tracking a separate 3D position at all.
     match.shots.append((float(crosshair[0]), float(crosshair[1]), now,
                         best >= 0))
     del match.shots[:-SHOT_MARKS]
@@ -293,7 +481,6 @@ def fire(match: AlbumMatch, crosshair, aim: AimContext) -> tuple | None:
             match.stamina = max(0.0, match.stamina - MISS_STAMINA)
         logger.info("Ban hut tai (%.0f, %.0f)", crosshair[0], crosshair[1])
         return (-1, False)
-    match.state.found[best] = True
     logger.info("Ban trung bo #%d%s", best, " CHI MANG" if crit else "")
     return (best, crit)
 

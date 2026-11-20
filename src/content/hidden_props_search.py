@@ -98,6 +98,35 @@ def _rank(cands, n, radius_mm):
     return out
 
 
+#: TASK_hud_fix_1119 Fix 3: side of the eye-position grid used to double
+#: check a KEPT prop is actually exposable, independent of
+#: ``_candidate``'s own single-axis reveal scan above (which only walks
+#: ONE axis at a time, not the full 2D peek range at once). 5x5 = 25
+#: positions, matching the task's own number.
+EXPOSURE_GRID = 5
+
+
+def exposure_grid(x0, y0, z, span_x=120.0, span_y=60.0, grid=EXPOSURE_GRID):
+    """``grid`` x ``grid`` eye positions (mm), evenly covering
+    ``[x0-span_x, x0+span_x] x [y0-span_y, y0+span_y]`` at depth ``z`` —
+    the peek range a player can lean through at the screen distance."""
+    return [(x0 + dx, y0 + dy, z)
+           for dx in np.linspace(-span_x, span_x, grid)
+           for dy in np.linspace(-span_y, span_y, grid)]
+
+
+def exposure_count(planes, prop_mm, radius_mm, rest_xy, z,
+                   span_x=120.0, span_y=60.0, grid=EXPOSURE_GRID) -> int:
+    """How many of ``exposure_grid``'s eye positions expose ``prop_mm``
+    (``is_visible``, same ``ALPHA_BLOCK=0.5`` default as gameplay's own
+    "is this prop exposed right now" check) — 0 means a spot that can
+    NEVER be found, the TASK_hud_fix_1119 Fix 3 rejection case."""
+    near = _nearer(planes, prop_mm[2] / 1000.0)
+    x0, y0 = rest_xy
+    return sum(1 for eye in exposure_grid(x0, y0, z, span_x, span_y, grid)
+              if is_visible(eye, prop_mm, radius_mm, near))
+
+
 def place_props(planes, n, radius_mm, rest_eye_mm, screen_mm=(344.0, 194.0),
                 grid=9, z_rest=450.0, z_near=330.0, span_x=120.0, span_y=60.0):
     """

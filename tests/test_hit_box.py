@@ -220,7 +220,7 @@ class ShootableSetMatchesDrawnSetTest(unittest.TestCase):
         app = HcpdApplication.__new__(HcpdApplication)
         mask = H.SpriteMask.from_rgba(_bug_sprite())
         app._bugs = SimpleNamespace(sprite_mask=lambda level: mask)
-        app._virtual_camera = SimpleNamespace(eye_position_mm=np.array(EYE))
+        app._virtual_camera = SimpleNamespace(eye_position_mm=np.array(EYE), effective_eye_position_mm=np.array(EYE))
         app._glass_mm = lambda: (GLASS, (0.0, 0.0))
         app._content = SimpleNamespace(game_prop_radius_mm=RADIUS_MM,
                                        layer_alpha_threshold=0.05)

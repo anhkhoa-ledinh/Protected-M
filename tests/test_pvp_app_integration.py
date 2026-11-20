@@ -383,7 +383,7 @@ class PvpTickEyeTest(unittest.TestCase):
         app = _app()
         app._album.state.mode = F.PVP_MODES[1]
         app._album.state.pvp_role = "hunter"
-        app._virtual_camera = SimpleNamespace(eye_position_mm=np.array([1.0, 2.0, 300.0]))
+        app._virtual_camera = SimpleNamespace(eye_position_mm=np.array([1.0, 2.0, 300.0]), effective_eye_position_mm=np.array([1.0, 2.0, 300.0]))
         app._pvp_active = True
         return app
 
@@ -503,7 +503,7 @@ class AlbumShootSendsHitWhenPvpActiveTest(unittest.TestCase):
         app = _app()
         app._bugs = SimpleNamespace(sprite_mask=lambda level: mask,
                                     mark_found=lambda *a, **k: None)
-        app._virtual_camera = SimpleNamespace(eye_position_mm=np.array(_EYE))
+        app._virtual_camera = SimpleNamespace(eye_position_mm=np.array(_EYE), effective_eye_position_mm=np.array(_EYE))
         app._glass_mm = lambda: (_GLASS, (0.0, 0.0))
         app._content = SimpleNamespace(game_prop_radius_mm=_RADIUS_MM,
                                        layer_alpha_threshold=0.05)
@@ -530,7 +530,7 @@ class AlbumShootSendsHitWhenPvpActiveTest(unittest.TestCase):
         app = _app()
         app._bugs = SimpleNamespace(sprite_mask=lambda level: mask,
                                     mark_found=lambda *a, **k: None)
-        app._virtual_camera = SimpleNamespace(eye_position_mm=np.array(_EYE))
+        app._virtual_camera = SimpleNamespace(eye_position_mm=np.array(_EYE), effective_eye_position_mm=np.array(_EYE))
         app._glass_mm = lambda: (_GLASS, (0.0, 0.0))
         app._content = SimpleNamespace(game_prop_radius_mm=_RADIUS_MM,
                                        layer_alpha_threshold=0.05)

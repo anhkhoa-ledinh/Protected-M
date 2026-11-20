@@ -157,3 +157,35 @@ def test_it_follows_the_aim_point():
     for (ax, ay, aw, ah), (bx, by, bw, bh) in zip(first, second):
         assert (bx - ax, by - ay) == pytest.approx((40.0, 25.0))
         assert (aw, ah) == pytest.approx((bw, bh))
+
+
+# ---- TASK_game_feel_1118 P4: crosshair kick -------------------------------
+def draw_kicked(x: float, y: float, kick: float):
+    state = V3State()
+    state.aim = (x, y)
+    state.aim_kick_scale = kick
+    painter = FakePainter()
+    _draw_aim(painter, state)
+    return painter.fills
+
+
+def test_default_kick_scale_matches_the_plain_crosshair():
+    """``aim_kick_scale`` defaults to 1.0 — a no-op, same as before P4."""
+    assert draw_kicked(50.0, 50.0, 1.0) == draw_at(50.0, 50.0)
+
+
+def test_kick_grows_the_crosshair():
+    assert _span(draw_kicked(0.0, 0.0, 1.35)) > _span(draw_kicked(0.0, 0.0, 1.0))
+
+
+def test_kick_still_stays_symmetric_about_the_aim_point():
+    x, y = 500.0, 300.0
+    boxes = [r for r, _c in draw_kicked(x, y, 1.4)]
+    left = {(round(x - (rx + rw), 3), round(ry - y, 3)) for rx, ry, rw, _rh in boxes}
+    right = {(round(rx - x, 3), round(ry - y, 3)) for rx, ry, _rw, _rh in boxes}
+    assert left & right, "khong tim thay cap nhanh doi xung"
+
+
+def test_kick_still_leaves_the_centre_clear():
+    for (rx, ry, rw, rh), _c in draw_kicked(0.0, 0.0, 1.4):
+        assert not (rx < 0.0 < rx + rw and ry < 0.0 < ry + rh)

@@ -42,6 +42,15 @@ docs/HCPD_FOR_CLAUDE.md
 # file PNG của bộ này, nên phải mở ngoại lệ hẳn ra đây.
 !assets/ui_v3/**/*.png
 
+# TASK_ui_sakuga_1117: hiệu ứng Sakuga đã nướng sẵn (sheets/ + words/), bên
+# thứ ba MIT — cũng phải mở ngoại lệ giống assets/ui_v3 ở trên, nếu không
+# luật `*.png` xoá sạch 41 file atlas/chữ của bộ này.
+!assets/fx/**/*.png
+
+# TASK_perf_textures_1119 Fix 4: cùng bộ Sakuga, nướng lại ở image_scale=2
+# (framebuffer rộng hơn 1920px) — ngoại lệ giống đúng assets/fx/ ở trên.
+!assets/fx@2x/**/*.png
+
 # ─── Cấu hình riêng từng máy / từng người ─────────────────────────────────
 # user.json chứa face_scale đo riêng cho khuôn mặt của một người. Commit lên
 # thì người khác clone về sẽ chạy với hiệu chỉnh của người kia, và Z sai mà
@@ -65,6 +74,17 @@ assets/config/shared_album.json
 # Thiếu file này = client tự tìm server bằng UDP discovery (đúng thiết kế).
 # Commit `pvp.example.json` thay cho nó.
 assets/config/pvp.json
+
+# TASK_accounts_1119: tài khoản cục bộ, chỉ sống trên máy này — không có
+# server nào giữ bản sao. accounts.json chứa mật khẩu đã băm (scrypt) và
+# tiến trình đã lưu của từng người; .bak là bản trước đó, giữ lại mỗi lần
+# ghi; accounts.corrupt-*.json là file hỏng được đổi tên sang khi cả hai
+# bản chính lẫn .bak đều không đọc được. session.json chứa token "remember
+# me" của phiên đang nhớ trên máy này.
+assets/config/accounts.json
+assets/config/accounts.json.bak
+assets/config/accounts.corrupt-*.json
+assets/config/session.json
 
 # ─── IDE và hệ điều hành ──────────────────────────────────────────────────
 .idea/

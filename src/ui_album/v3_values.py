@@ -17,8 +17,10 @@ from __future__ import annotations
 
 import time
 
+from src.account import crypto as account_crypto
 from src.content import shared_album
 from src.ui_album import v3_flow as F
+from src.ui_album.game_bridge import WEAPON_LABEL
 from src.ui_album.v3 import V3State
 
 #: Bảng xếp hạng mẫu (U2: "The data stays the sample").
@@ -58,6 +60,49 @@ def mmss(seconds: float) -> str:
 def _initial(name: str) -> str:
     text = (name or "").strip()
     return text[:1].upper() if text else "?"
+
+
+#: TASK_accounts_1119: ellipsis for a username slot that doesn't fit —
+#: one character, so it costs almost nothing of the (narrow) rect it's
+#: cut INTO.
+_NAME_ELLIPSIS = "…"
+
+
+def _fit_name(manifest, painter, screen: str, key: str, text: str) -> str:
+    """Cuts ``text`` with "…" so it fits ``key``'s own rect on ``screen``,
+    measured with the REAL font (``painter.text_width`` — FreeType glyph
+    advances, not a character-count guess). Every text slot that shows a
+    username (``player_name``, the PvP ``you_name``/``host_name``/
+    ``opp_name`` — the LAST one is NETWORK-SUPPLIED, another player's
+    display name, so it must never be trusted to already fit) goes
+    through this.
+
+    ``painter`` may be ``None`` (``--ui-shots``' ``shot_state`` path, and
+    a couple of tests that don't need a real one) — returns ``text``
+    unfitted rather than crash; the manifest's own baked layout already
+    assumes its SAMPLE name fits, so this only matters for live data.
+    """
+    if painter is None or manifest is None:
+        return text
+    record = manifest.text(screen, key)
+    if record is None:
+        return text
+    run = record["runs"][0]
+    max_width = float(record["rect"][2])
+    if painter.text_width([run], [text]) <= max_width:
+        return text
+    if painter.text_width([run], [_NAME_ELLIPSIS]) > max_width:
+        return _NAME_ELLIPSIS       # pathological: rect too narrow even for "…"
+    lo, hi, best = 0, len(text), _NAME_ELLIPSIS
+    while lo <= hi:
+        mid = (lo + hi) // 2
+        candidate = text[:mid] + _NAME_ELLIPSIS
+        if painter.text_width([run], [candidate]) <= max_width:
+            best = candidate
+            lo = mid + 1
+        else:
+            hi = mid - 1
+    return best
 
 
 def _stem(path) -> str:
@@ -149,29 +194,91 @@ def extra_files(manifest, screen: str, state: V3State) -> tuple:
     return tuple(sorted(out))
 
 
+# ---- TASK_accounts_1119 Phase 6: recovery code + forgot-password dialogs --
+def _dialogs(state, flow) -> None:
+    """Populates both overlay dialogs' state — called UNCONDITIONALLY
+    (regardless of ``flow.screen``), since either can be open on top of
+    whatever screen is underneath (the recovery dialog after sign-up
+    lands on MENU; the forgot dialog opens on SIGN_IN/SIGN_IN_ERR)."""
+    state.recovery_code = flow.recovery_code_shown
+    state.forgot_open = flow.forgot_open
+    state.forgot_focus = flow.forgot_focus
+    if not flow.forgot_open:
+        return
+    state.texts["forgot_user"] = flow.forgot_user
+    state.texts["forgot_code"] = flow.forgot_code
+    state.texts["forgot_pass"] = flow.forgot_new_pass
+    state.texts["forgot_pass2"] = flow.forgot_new_pass2
+    state.texts["forgot_error"] = flow.forgot_error
+
+
 # ---- màn đăng nhập / đăng ký -------------------------------------------
-def _sign_in(state, flow) -> None:
+def _signup_problem(flow, accounts: dict | None) -> str | None:
+    """Vấn đề ĐẦU TIÊN (trên xuống: tên → mật khẩu → nhập lại) của một ô
+    người dùng đã THẬT SỰ gõ vào (``flow.touched``) — ``None`` nếu không
+    ô nào đã động tới có vấn đề. ``accounts`` là dữ liệu kho tài khoản
+    (để kiểm tên đã bị lấy chưa); ``None`` bỏ qua việc kiểm đó (vd. khi
+    gọi mà chưa có kho — không nên xảy ra ở đường chạy thật, nhưng tránh
+    văng thay vì giả định)."""
+    if "field_user" in flow.touched:
+        display, reason = account_crypto.validate_username(flow.player)
+        if display is None:
+            return reason
+        if accounts is not None and account_crypto.username_key(display) in accounts.get(
+                "accounts", {}):
+            return "Username already taken"
+    if "field_pass" in flow.touched:
+        ok, reason = account_crypto.validate_password(flow.password)
+        if not ok:
+            return reason
+    if "field_pass2" in flow.touched and flow.password2 != flow.password:
+        return "Passwords don't match"
+    return None
+
+
+def _sign_in(state, flow, accounts: dict | None = None) -> None:
     dots = flow.password if flow.show_password else "•" * len(flow.password)
     dots2 = flow.password2 if flow.show_password else "•" * len(flow.password2)
     state.texts["user"] = flow.player
     state.texts["pass"] = dots
     state.texts["pass2"] = dots2
+    state.remember = flow.remember
     state.caret = {"field_user": "user", "field_pass": "pass",
                    "field_pass2": "pass2"}.get(flow.focus or "")
     state.focus = flow.focus
+    if flow.screen == F.SIGN_IN_ERR:
+        state.texts["error"] = flow.sign_in_error
     if flow.screen == F.SIGN_UP:
-        if flow.player.strip():
+        # TASK_accounts_1119: "valid_user" chỉ bật khi tên VỪA hợp lệ VỪA
+        # còn trống — không còn là "có gõ gì đó" như bản mô phỏng cũ.
+        display, _reason = account_crypto.validate_username(flow.player)
+        taken = (display is not None and accounts is not None
+                and account_crypto.username_key(display) in accounts.get("accounts", {}))
+        if display is not None and not taken:
             state.sprites["valid_user"] = True
-        ok = len(flow.password) >= 8 and flow.password == flow.password2
-        if ok:
+        pass_ok, _reason2 = account_crypto.validate_password(flow.password)
+        if pass_ok and flow.password == flow.password2:
             state.sprites["valid_pass2"] = True
+        problem = _signup_problem(flow, accounts)
+        if problem is None:
             state.sprites["hint_ok"] = True
+            # Chưa đặt ``state.texts["hint"]`` KHÔNG có nghĩa là ẩn —
+            # lớp vẽ coi khoá vắng mặt là "giữ nguyên chữ mẫu trong
+            # manifest" (để màn nào cũng đủ chữ cho --ui-shots), nên
+            # phải ẩn THẬT bằng ``state.hidden`` ở đây, nếu không chữ
+            # mẫu "Username already taken" đè lên đúng lúc hint_ok xanh
+            # đang hiện.
+            state.hidden.add("hint")
+        else:
+            state.sprites["hint_bad"] = True
+            state.texts["hint"] = problem
 
 
 # ---- màn chính ---------------------------------------------------------
-def _menu(state, flow) -> None:
-    state.texts["player_name"] = flow.player or "guest"
-    state.texts["player_initial"] = _initial(flow.player or "guest")
+def _menu(state, flow, manifest=None, painter=None) -> None:
+    name = flow.player or "guest"
+    state.texts["player_name"] = _fit_name(manifest, painter, F.MENU, "player_name", name)
+    state.texts["player_initial"] = _initial(name)
     photo = flow.photo or (flow.recent[0] if flow.recent else None)
     state.photo = photo
     index = (len(flow.history) % 99) + 1
@@ -459,6 +566,12 @@ def _tilt(state, flow, manifest) -> None:
         if kind == "current":
             state.colours[key] = PRIMARY
             state.texts["check_hint"] = hints[index]
+            # TASK_ui_sakuga_1117 bug A: bản vẽ khoá "check_hint" ở y=549
+            # (hàng "Tilt right"); dời theo hàng ĐANG hỏi, giữ nguyên x.
+            hint_spec = _spec(manifest, screen, "check_hint")
+            if hint_spec is not None:
+                hx, _hy, hw, hh = hint_spec["rect"]
+                state.text_rect["check_hint"] = (hx, CHECK_ROWS_Y[index], hw, hh)
         elif kind == "todo":
             state.colours[key] = MUTED
         else:
@@ -471,21 +584,29 @@ def _tilt(state, flow, manifest) -> None:
 #: Ba hàng dấu kiểm (``screens[].notes`` của màn thử nghiêng).
 CHECK_ROWS_Y = (486.0, 518.0, 550.0)
 
+#: TASK_ui_sakuga_1117 bug A — mỗi biến thể (``check:done``/``current``/
+#: ``todo``) được XUẤT ở một hàng gốc khác nhau trong bản vẽ, không phải cả
+#: ba ở hàng 0 như code cũ giả định (``done`` ở hàng 0 = 486, còn
+#: ``current``/``todo`` ở hàng 2 = 550). Dời sai thì ``current``/``todo``
+#: lệch xuống dưới đúng khoảng ``550 - CHECK_ROWS_Y[hàng đích]``.
+CHECK_VARIANT_ANCHOR_Y = {"done": 486.0, "current": 550.0, "todo": 550.0}
+
 
 def _check_row(state, manifest, screen, index, kind, marker) -> None:
     """
     Dấu kiểm của hàng ``index``: một trong ``done|current|todo``.
 
-    Bản vẽ xuất ba dấu ở **cùng** hàng đầu (chúng là ba biến thể, không phải
-    ba hàng), nên hàng 2 và 3 dịch theo nhịp ghi trong ``screens[].notes``.
+    Đặt theo CHÍNH gốc của biến thể đang dùng
+    (``CHECK_VARIANT_ANCHOR_Y[kind]``), không phải luôn tính từ hàng 0 —
+    ``done`` neo ở 486, ``current``/``todo`` neo ở 550.
     """
     record = manifest.sprite(screen, f"check:{kind}")
     if record is None:
         return
-    shift = CHECK_ROWS_Y[index] - CHECK_ROWS_Y[0]
     rect = record["rect"]
+    y = rect[1] + (CHECK_ROWS_Y[index] - CHECK_VARIANT_ANCHOR_Y[kind])
     state.borrowed[f"check#{index}"] = (
-        screen, f"check:{kind}", (rect[0], rect[1] + shift, rect[2], rect[3]))
+        screen, f"check:{kind}", (rect[0], y, rect[2], rect[3]))
     _ = marker
 
 
@@ -540,6 +661,7 @@ def _hud(state, flow, game, manifest, now) -> None:
     if game is not None:
         state.shots = [(x, y, now - fired, hit)
                        for x, y, fired, hit in getattr(game, "shots", ())]
+        state.hp_bars = game.hp_bars(now)
         if game.reloading(now):
             # Không có ô nào trên bản vẽ dành cho việc nạp đạn, nên nói bằng
             # dòng báo — nếu không, bấm chuột mà súng im là khó hiểu.
@@ -592,7 +714,7 @@ def _hud_shot(state, flow, game, now, level) -> None:
 
 def _hud_weapon(state, flow, game, manifest, screen) -> None:
     name = flow.weapon_name() or (game.weapon_name if game else F.WEAPONS[0])
-    state.texts["weapon_name"] = name.upper()
+    state.texts["weapon_name"] = WEAPON_LABEL.get(name, name).upper()
     rounds, total = (10, 10) if game is None else game.rounds
     state.texts["ammo"] = [str(rounds), f"/{total}"]
     # Bản vẽ chỉ xuất 10 ô pip; băng 16 viên thì dãy pip kịch trần còn con số
@@ -643,7 +765,15 @@ def _hud_pvp_bug(state, flow, game) -> None:
 
 
 def _hud_items(state, flow, game, manifest, screen) -> None:
-    """Ba ô vật phẩm của HUD, dựng từ ``item_slots`` + ``item_slot_layout``."""
+    """Ba ô vật phẩm của HUD, dựng từ ``item_slots`` + ``item_slot_layout``.
+
+    TASK_hud_fix_1119 Fix 1: these always draw at full, designed size —
+    the alternate small-layout mode that used to shrink them (removed
+    this task) is gone. Fix 2's H-hide fades them via
+    ``state.hud_hidden_alpha`` instead (``v3.py``'s ``_draw_sprites``/
+    ``_draw_texts`` apply it to ``state.borrowed``/``state.extra``
+    directly, since these have no card of their own).
+    """
     record = manifest.screens[screen]
     slots = record.get("item_slots", ())
     layout = record.get("item_slot_layout", {})
@@ -811,14 +941,14 @@ def _board_rank(score: int) -> int | None:
 
 
 # ---- PvP ---------------------------------------------------------------
-def _pvp_lobby(state, flow, now) -> None:
+def _pvp_lobby(state, flow, now, manifest=None, painter=None) -> None:
     screen = flow.screen
     state.texts["eyebrow"] = (f"PVP · {flow.mode.upper()}"
                               if screen == F.PVP_INVITE else
                               f"PVP · {flow.mode.upper()} · LEVEL {flow.level}")
     name = flow.player or "guest"
     for key in ("you_name", "host_name"):
-        state.texts[key] = name
+        state.texts[key] = _fit_name(manifest, painter, screen, key, name)
     for key in ("you_initial", "host_initial"):
         state.texts[key] = _initial(name)
     if screen == F.PVP_SEARCH:
@@ -832,8 +962,12 @@ def _pvp_lobby(state, flow, now) -> None:
         state.focus = "field_join" if flow.focus == "field_join" else None
     elif screen == F.PVP_FOUND:
         state.texts["countdown"] = str(max(1, 3 - int(now - flow.found_at_s)))
+        # TASK_accounts_1119: NETWORK-SUPPLIED — the opponent's own typed
+        # display name, arrives over the wire with no length guarantee
+        # from this side. Fitting it is the one case here that is not
+        # just cosmetic.
         opp_name = flow.pvp_opponent_name or "Opponent"
-        state.texts["opp_name"] = opp_name
+        state.texts["opp_name"] = _fit_name(manifest, painter, screen, "opp_name", opp_name)
         state.texts["opp_initial"] = _initial(opp_name)
         # TASK_pvp_fix_1116: tính lại mỗi khung (app._pvp_lobby_message),
         # không phải một toast F.say 30 s — nếu không thì "đè" lên giá trị
@@ -843,7 +977,7 @@ def _pvp_lobby(state, flow, now) -> None:
             state.message = flow.pvp_lobby_message
 
 
-def _pvp_result(state, flow, manifest) -> None:
+def _pvp_result(state, flow, manifest=None, painter=None) -> None:
     """
     TASK_pvp_lan_1116: dữ liệu THẬT — ``flow.last_result`` được ``app.py``
     đổ từ thông điệp ``end`` của server (``winner``/``scores``/``rows``/
@@ -860,11 +994,12 @@ def _pvp_result(state, flow, manifest) -> None:
     state.colours["title"] = SAFE if won else DANGER
     state.texts["eyebrow"] = f"PVP · {flow.mode.upper()} · LEVEL {flow.level}"
     name = flow.player or "guest"
-    state.texts["you_name"] = name
+    state.texts["you_name"] = _fit_name(manifest, painter, screen, "you_name", name)
     state.texts["you_initial"] = _initial(name)
     state.texts["you_score"] = str(you)
+    # TASK_accounts_1119: NETWORK-SUPPLIED, same as _pvp_lobby's opp_name.
     opp_name = result.get("opp_name") or "Opponent"
-    state.texts["opp_name"] = opp_name
+    state.texts["opp_name"] = _fit_name(manifest, painter, screen, "opp_name", opp_name)
     state.texts["opp_initial"] = _initial(opp_name)
     state.texts["opp_score"] = str(opponent)
     state.pills["you_pill"] = ("won this match" if won else "runner-up",
@@ -904,28 +1039,65 @@ def _pvp_rows(rows) -> list:
 
 
 # ---- bảng xếp hạng -----------------------------------------------------
-def _board(state, flow) -> None:
+def _board(state, flow, manifest=None, painter=None) -> None:
+    """TASK_accounts_1119 Phase 5: ``flow.history`` is whatever the
+    SIGNED-IN account loaded at sign-in (``V3UI._load_progress``) and
+    updated after each match since — this just reads it; nothing here
+    needs to know an account was ever involved."""
     best = max([int((flow.last_result or {}).get("score", 0))]
                + [int(r.get("score", 0)) for r in flow.history.values()])
     rank = _board_rank(best)
     state.texts["you_rank"] = str(rank if rank is not None else
                                   len(SAMPLE_BOARD) + 1)
-    state.texts["you_name"] = f"You · {flow.player or 'guest'}"
+    you_name = f"You · {flow.player or 'guest'}"
+    state.texts["you_name"] = _fit_name(manifest, painter, F.BOARD, "you_name", you_name)
     state.texts["you_score"] = str(best)
 
 
+#: TASK_ui_sakuga_1117 Phase 5: ``tab_Solo`` targets ``F.LEVELS``
+#: (``F.TABS``), but the nav bar also renders — still highlighted — on
+#: ``PHOTOS``/``LOADOUT``/``TILT``, the rest of the solo flow upstream of
+#: a match. The other three tabs' screens are a straight 1:1 with
+#: ``F.TABS``, so only "Solo" needs its own wider set.
+_SOLO_TAB_SCREENS = frozenset({F.LEVELS, F.PHOTOS, F.LOADOUT, F.TILT})
+
+
+def _selected_hotspots(screen: str, flow) -> set:
+    """Hotspot names that are the CURRENT selection on ``screen`` — the
+    active tab/level/weapon/display/theme — for ``V3State.selected``
+    (Phase 5's halved hover-ring alpha on an already-selected row)."""
+    selected: set = set()
+    for name in F.TABS:
+        in_section = (screen in _SOLO_TAB_SCREENS if name == "tab_Solo"
+                     else screen == F.TABS[name])
+        if in_section:
+            selected.add(name)
+    if screen == F.LEVELS:
+        selected.add(f"level_row_{flow.level}")
+    if screen == F.LOADOUT:
+        selected.add(f"weapon_{flow.weapon_name()}")
+    if screen == F.SETTINGS:
+        selected.add("display_window" if flow.display == "window" else "display_full")
+        selected.add("theme_night" if flow.theme == "night" else "theme_day")
+    return selected
+
+
 # ---- điều phối ---------------------------------------------------------
-def state_for(manifest, painter, flow, game=None, aim=None) -> V3State:
-    """Bộ giá trị sống cho màn đang mở. ``aim`` là tâm ngắm (toạ độ thiết kế)."""
+def state_for(manifest, painter, flow, game=None, aim=None, accounts=None) -> V3State:
+    """Bộ giá trị sống cho màn đang mở. ``aim`` là tâm ngắm (toạ độ thiết kế).
+    ``accounts`` (TASK_accounts_1119): dữ liệu kho tài khoản hiện có, chỉ
+    màn đăng nhập/đăng ký đọc tới (kiểm tên đã bị lấy chưa)."""
     now = time.perf_counter()
     state = V3State()
     screen = flow.screen
     state.message = (flow.message if now < flow.message_until_s else "")
     state.confirm = flow.shared_album_pending
+    _dialogs(state, flow)
+    state.selected = _selected_hotspots(screen, flow)
     if screen in F.LOCKED:
-        _sign_in(state, flow)
+        _sign_in(state, flow, accounts)
     elif screen == F.MENU:
-        _menu(state, flow)
+        _menu(state, flow, manifest, painter)
     elif screen == F.SETTINGS:
         _settings(state, flow)
     elif screen == F.OFFLINE:
@@ -955,9 +1127,9 @@ def state_for(manifest, painter, flow, game=None, aim=None) -> V3State:
         _result(state, flow, manifest, win=False)
         state.photo = flow.photo
     elif screen in (F.PVP_SEARCH, F.PVP_INVITE, F.PVP_FOUND):
-        _pvp_lobby(state, flow, now)
+        _pvp_lobby(state, flow, now, manifest, painter)
     elif screen == F.PVP_RESULT:
-        _pvp_result(state, flow, manifest)
+        _pvp_result(state, flow, manifest, painter)
     elif screen == F.BOARD:
-        _board(state, flow)
+        _board(state, flow, manifest, painter)
     return state

@@ -114,7 +114,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(levelname)s | %(name)s | %(message)s",
+        # TASK_hud_fix_1119 Fix 4: ms-precision timestamps -- without them
+        # a real double-click and an actual duplicate-fire bug look
+        # identical in the log (both just two "Ban ..." lines in a row).
+        format="%(asctime)s.%(msecs)03d | %(levelname)s | %(name)s | %(message)s",
+        datefmt="%H:%M:%S",
     )
     # TASK_pvp_lan_1116: no free text slot on the Settings screen for this
     # (checked both texts keys — webcam_name/volume_value, both already

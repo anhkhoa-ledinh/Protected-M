@@ -24,44 +24,28 @@ def save_content_settings(
     content_type: str,
     project_root: Path,
 ) -> None:
-    """Write updated media path and type back to content.json."""
+    """Write the newly-opened media's path/type back to content.json.
+
+    TASK_perf_textures_1119 Fix 6: this used to also write every OTHER
+    ``content`` field — ``plane_position_m``, ``plane_width_m``, etc.
+    By the time a sandbox-mode media open calls this, those fields on
+    ``content`` already carry the RUNTIME D2 physical-window override
+    (``plane_position_m`` z -0.75 -> 0.0, ``plane_width_m`` 1.28 -> 0.344
+    — not something the user set), so writing them clobbered the user's
+    real calibration with that override. Only ``content_path``/
+    ``content_type``/``video_path`` ever need to persist here — every
+    other key in the file is left exactly as it was.
+    """
     stored = media_path_for_config(media_path, project_root)
     payload: dict = {}
     if config_path.exists():
         payload = json.loads(config_path.read_text(encoding="utf-8"))
 
-    payload.update(
-        {
-            "enabled": content.enabled,
-            "mode": content.mode,
-            "content_path": stored,
-            "content_type": content_type,
-            "video_path": stored if content_type == "video" else payload.get("video_path", stored),
-            "loop_video": content.loop_video,
-            "plane_position_m": list(content.plane_position_m),
-            "plane_width_m": content.plane_width_m,
-            "plane_height_m": content.plane_height_m,
-            "frame_z_m": content.frame_z_m,
-            "frame_bezel_m": content.frame_bezel_m,
-            "frame_color": list(content.frame_color),
-            "mid_layer_z_m": content.mid_layer_z_m,
-            "mid_layer_width_m": content.mid_layer_width_m,
-            "mid_layer_height_m": content.mid_layer_height_m,
-            "mid_layer_offset_x_m": content.mid_layer_offset_x_m,
-            "mid_layer_color_a": list(content.mid_layer_color_a),
-            "mid_layer_color_b": list(content.mid_layer_color_b),
-            "backdrop_z_m": content.backdrop_z_m,
-            "backdrop_width_m": content.backdrop_width_m,
-            "backdrop_height_m": content.backdrop_height_m,
-            "backdrop_color": list(content.backdrop_color),
-            "void_clear_color": list(content.void_clear_color),
-            "depth_enabled": content.depth_enabled,
-            "depth_scale_meters": content.depth_scale_meters,
-            "depth_mesh_resolution": content.depth_mesh_resolution,
-            "depth_model": content.depth_model,
-            "depth_backend": content.depth_backend,
-        }
-    )
+    payload["content_path"] = stored
+    payload["content_type"] = content_type
+    if content_type == "video":
+        payload["video_path"] = stored
+
     config_path.parent.mkdir(parents=True, exist_ok=True)
     # ensure_ascii=False keeps non-ASCII media paths (e.g. Vietnamese folder
     # names) readable instead of escaping them to \uXXXX.

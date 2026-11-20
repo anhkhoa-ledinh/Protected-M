@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np
 from OpenGL import GL
 
+from src.engine.stage_profile import stage
 from src.math.homogeneous import to_column_major_flat
 from src.renderer.camera import VirtualCamera
 from src.renderer.debug_geometry import DebugGeometryRenderer
@@ -355,7 +356,11 @@ class SceneRenderer:
             self._log_depth_state("sau glClear")
 
         view_flat, proj_flat = self._camera.view_projection_flat()
-        eye = self._camera.eye_position_m
+        # TASK_game_feel_1118 P6: the "steady eye" while scoped (a no-op
+        # otherwise) — ``uViewPos`` feeds specular lighting, which would
+        # otherwise use the raw tracked eye while the vertex transform
+        # above (view_flat/proj_flat) already uses the steadied one.
+        eye = self._camera.effective_eye_position_m
 
         self._shader.use()
         self._shader.set_mat4("uView", view_flat)
@@ -389,7 +394,8 @@ class SceneRenderer:
         if probe:
             self._log_depth_state("sau scene pass, truoc layer")
         if self.extra_scene_draw is not None:
-            self.extra_scene_draw(view_flat, proj_flat)
+            with stage("bugs"):
+                self.extra_scene_draw(view_flat, proj_flat)
             self._shader.use()
         if self._video_plane is not None:
             self._video_plane.update(dt_s)
@@ -399,7 +405,8 @@ class SceneRenderer:
             build_notice = self._video_plane.take_build_notice()
             if build_notice is not None:
                 self._toast.show(build_notice)
-            self._video_plane.draw(view_flat, proj_flat)
+            with stage("layer_render"):
+                self._video_plane.draw(view_flat, proj_flat)
         if probe:
             self._log_depth_state("sau layer")
 

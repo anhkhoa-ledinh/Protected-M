@@ -7,6 +7,7 @@ import binascii
 import hashlib
 import json
 import logging
+import math
 import os
 import time
 from dataclasses import asdict
@@ -38,6 +39,7 @@ from src.engine.adaptive_quality import AdaptiveQualityController
 from src.engine.camera_worker import CameraWorker
 from src.engine.pose_bus import PoseBus
 from src.engine.profiler import Profiler
+from src.engine import stage_profile
 from src.engine.tracking_worker import TrackingWorker
 from src.filters import PoseFilterPipeline
 from src.renderer import DebugMetrics, GlfwWindow, SceneRenderer, VirtualCamera
@@ -56,6 +58,31 @@ WATCH_S = 5.0
 #: cỡ) không hiện toast "đang tách lớp" mãi.
 LAYER_WAIT_TOAST_S = 2.0
 LAYER_WAIT_MAX_S = 120.0
+
+#: TASK_perf_textures_1119 Fix 8: every bench/evidence/shot env-var hook
+#: this codebase has — checked by ``HcpdApplication._is_scripted_run``
+#: so NONE of them can ever write the user's real config files, even one
+#: run without ``--demo`` (``--demo`` already guards this for everything
+#: ELSE; this specific list closes the gap for anything that doesn't
+#: pass it). Keep this in sync when a new hook is added.
+HOOK_ENV_VARS = (
+    "HCPD_FX_BENCH", "HCPD_SCOPE_BENCH", "HCPD_ALBUM_AUTOMATCH",
+    "HCPD_EVIDENCE_1118", "HCPD_ACCOUNTS_SHOTS", "HCPD_NAV_BENCH",
+    "HCPD_UI_SHOTS_1117", "HCPD_AA_BASELINE_1118", "HCPD_V3_LIVE",
+    "HCPD_PERF_PROFILE", "HCPD_PVP_AUTO", "HCPD_PVP_SHOTS",
+    "HCPD_PROP_PROBE", "HCPD_VIDEO_STATS", "HCPD_HUD_FIX_1119_SHOTS",
+)
+
+
+def is_scripted_run(*, demo: bool, shots: bool, ui_shots: bool) -> bool:
+    """TASK_perf_textures_1119 Fix 8: standalone so it's checkable BEFORE
+    ``HcpdApplication`` exists (account storage redirect needs to happen
+    before ``V3UI.__init__`` ever reads ``accounts.json``/``session.json`` —
+    see the account-store redirect in ``run()``), not just from
+    ``HcpdApplication._is_scripted_run``."""
+    if demo or shots or ui_shots:
+        return True
+    return any(os.environ.get(var) for var in HOOK_ENV_VARS)
 
 
 class HcpdApplication:
@@ -89,6 +116,22 @@ class HcpdApplication:
         # = không đổi một hành vi nào so với hôm nay.
         self._album_options = album or AlbumOptions()
         self._album = None
+        # TASK_game_feel_1118 P1: closure ``scene`` của khung vẽ GẦN NHẤT
+        # (chụp sẵn pose/khung webcam lúc đó) — ``_draw_frame_only`` dùng
+        # lại y hệt lúc cửa sổ cần vẽ lại giữa chừng kéo cạnh, vì nó
+        # KHÔNG được tự đọc webcam/pose mới. ``_drawing`` chặn vẽ lồng
+        # nhau (refresh trong lúc refresh, hoặc trong lúc main loop đang
+        # tự vẽ).
+        self._last_scene = None
+        self._drawing = False
+        # TASK_game_feel_1118 P5: full-auto (Heavy-mag gun) — tracks
+        # whether the PREVIOUS frame's trigger-held check fired, so
+        # releasing the button is detected exactly once (see
+        # ``_tick_auto_fire``).
+        self._heavy_mag_was_held = False
+        # TASK_game_feel_1118 P6: Precision-gun scope — dt tracker for
+        # stepping the zoom spring (``_tick_scope``).
+        self._scope_last_t = None
         # PB-055: demo đọc content.demo.json, không ghi file config nào, chỉ nhận
         # G, T, F6, kéo-thả, F4, Esc (lọc ở GlfwWindow).
         self._demo = bool(demo)
@@ -392,7 +435,41 @@ class HcpdApplication:
         mắt nghỉ, mở ván) làm ở đây — xem ``src/ui_album/routes.py``.
         """
         album = self._album
-        album.mouse = album.design_mouse(*self._window.cursor_pos())
+        sakuga_shots = os.environ.get("HCPD_UI_SHOTS_1117") == "1"
+        scope_bench = os.environ.get("HCPD_SCOPE_BENCH") == "1"
+        evidence_1118 = os.environ.get("HCPD_EVIDENCE_1118") == "1"
+        # TASK_hud_fix_1119 Fix 4 evidence: same reasoning as
+        # ``evidence_1118`` right below — ``_build_hud_fix_1119_steps``
+        # also drives its own fixed ``album.mouse`` per step.
+        hud_fix_1119_shots = os.environ.get("HCPD_HUD_FIX_1119_SHOTS") == "1"
+        if not sakuga_shots and not scope_bench and not evidence_1118 and not hud_fix_1119_shots:
+            # TASK_ui_sakuga_1117: lượt chụp 20 ảnh tự đặt ``album.mouse``
+            # cho từng bước (hover_*/press_*) — con trỏ OS thật ghi đè lên
+            # đúng mỗi khung thì KHÔNG BAO GIỜ thấy hover, bất kể bước nào
+            # (``album.mouse`` luôn là vị trí chuột thật, không phải vị trí
+            # hotspot bước đó muốn trỏ tới). TASK_game_feel_1118 P7:
+            # ``HCPD_SCOPE_BENCH=1`` drives its OWN circular crosshair —
+            # see ``_tick_scope_bench``. TASK_game_feel_fix_1118:
+            # ``HCPD_EVIDENCE_1118=1`` drives its own FIXED crosshair per
+            # step — see ``_build_evidence_steps``, which calls
+            # ``_tick_scope`` itself with its own chosen raw mouse.
+            raw_mouse = album.design_mouse(*self._window.cursor_pos())
+            album.mouse = self._tick_scope(now, raw_mouse)
+        fx_bench_heavy = (os.environ.get("HCPD_FX_BENCH") == "1"
+                         and os.environ.get("HCPD_BENCH_WEAPON") == "Heavy-mag gun")
+        if self._album_options.is_v3 and not sakuga_shots and not fx_bench_heavy:
+            # TASK_ui_sakuga_1117 Phase 5: press feedback needs HOLD state,
+            # not just the edge-triggered clicks ``pop_clicks()`` gives.
+            # (``sakuga_shots`` mode sets its OWN ``album.mouse_down`` per
+            # step — same reasoning as ``album.mouse`` above.)
+            #
+            # TASK_game_feel_1118 P7: ``fx_bench_heavy`` also skips this —
+            # ``_tick_fx_bench`` (called LATER this same frame) holds
+            # ``album.mouse_down`` down itself; running this line
+            # unconditionally every frame would reset it to the real
+            # (unpressed) mouse state before ``_tick_auto_fire`` (called
+            # EARLIER than ``_tick_fx_bench``) ever saw it held.
+            album.mouse_down = self._window.is_mouse_down()
         for char in self._window.pop_typed():
             album.key(char)
         if input_state.backspace:
@@ -405,11 +482,15 @@ class HcpdApplication:
             if self._album_shoot(now):
                 continue                     # đang trong trận: bấm = bắn
             self._album_action(album.click(), now)
-        if input_state.album_centre:
+        self._tick_auto_fire(now)
+        if input_state.album_centre and not self._v3_field_focused():
             self._album_action("rest_eye", now)
         if input_state.screenshot:
             self._save_album_shot()
-        if not self._v3_live:
+        if not self._v3_live and os.environ.get("HCPD_UI_SHOTS_1117") != "1":
+            # TASK_ui_sakuga_1117: lượt chụp 20 ảnh tự đặt face_seen/tilt_*
+            # cho từng bước (tilt_face/left/right/done) — tracker thật ghi
+            # đè lên đúng y mỗi khung thì bốn ảnh đó không bao giờ khác nhau.
             album.state.face_seen = bool(self._tracking.face_detected)
             album.state.tracker_simulated = not bool(
                 self._tracking.tracker_available)
@@ -417,6 +498,10 @@ class HcpdApplication:
             self._tick_v3_input(input_state, now)
         album.tick()
         self._tick_album_automatch(now)
+        self._tick_fx_bench(now)
+        self._tick_scope_bench(now)
+        self._tick_evidence_1118(now)
+        self._tick_hud_fix_1119_shots(now)
         self._tick_album_match(now)
         self._tick_pvp(now)
         self._tick_pvp_auto(now)
@@ -601,6 +686,23 @@ class HcpdApplication:
         painter.initialize()
         return painter
 
+    def _v3_field_focused(self) -> bool:
+        """TASK_hkey_profile_1119: a v3 text field (sign-in/up, the
+        forgot-password dialog's own four fields, the PvP join-code
+        field) has keyboard focus right now.
+
+        The char callback (``pop_typed``/``album.key``) and the single-
+        letter shortcut keys (H, C, 1-3 — see ``_on_key``'s ``V3_KEYS``)
+        fire from TWO INDEPENDENT GLFW callbacks for the SAME keypress:
+        typing "h" into a username both inserts the letter AND used to
+        toggle the HUD. ``False`` for the legacy album UI unconditionally
+        — it has no such focus concept at all, and its input handling
+        must not change (it is the thesis-defense fallback)."""
+        if not self._album_options.is_v3:
+            return False
+        state = self._album.state
+        return state.focus is not None or state.forgot_open
+
     def _tick_v3_input(self, input_state, now: float) -> None:
         """
         Phần nhập liệu CHỈ giao diện v3 có: Esc lùi, F11, ↑/↓, R, 1–3, U.
@@ -629,10 +731,24 @@ class HcpdApplication:
                 # TASK_shared_album_1111 P3: cung phim R, nghia khac theo man —
                 # y het Enter (album.submit()) da doi nghia theo man tu truoc.
                 self._album_action(album.activate("btn_Random from album"), now)
-        if input_state.item_slot:
+        if input_state.item_slot and not self._v3_field_focused():
             state.slot_selected = int(input_state.item_slot)
         if input_state.share_to_album and state.screen == album.flow.PHOTOS:
             self._album_action(album.activate("btn_Share to album"), now)
+        if (input_state.hud_hide_toggle and not self._v3_field_focused()
+                and state.screen in (album.flow.PLAY, album.flow.PVP_HUNT,
+                                     album.flow.PVP_HIDE)):
+            album.toggle_hud_hidden()
+        if album.pop_account_corrupt_toast():
+            album.flow.say(state, "Your saved accounts file was unreadable — started a fresh one.")
+        if input_state.paste_requested:
+            # TASK_accounts_1119: dán vào ô đang chọn, kể cả ô mật khẩu —
+            # đi qua ĐÚNG đường ``album.key()`` mỗi ký tự gõ tay cũng đi,
+            # nên trần ký tự từng ô (``F.FIELD_MAXLEN``) và việc đánh dấu
+            # "đã gõ vào" (gợi ý lỗi) áp dụng y hệt dán tay.
+            for char in self._window.get_clipboard():
+                if char not in ("\n", "\r", "\t"):
+                    album.key(char)
         # Thanh âm lượng: bấm HOẶC kéo. Kéo phải đọc trạng thái phím chuột,
         # không đọc được qua danh sách cú bấm.
         if (state.screen == album.flow.SETTINGS
@@ -657,7 +773,8 @@ class HcpdApplication:
 
         if self._album is not None:
             self._album.state.display = mode
-        P.save(self._root, mode, self._window.remembered_rect())
+        if not self._is_scripted_run():
+            P.save(self._root, mode, self._window.remembered_rect())
         self._refresh_window_plane()
 
     def _refresh_window_plane(self) -> None:
@@ -743,6 +860,90 @@ class HcpdApplication:
                 self._album_draw_errors = seen
                 logger.exception("Album: loi ve mot khung (%s) — bo qua", key)
 
+    def _draw_frame_only(self, scene) -> None:
+        """
+        Vẽ ĐÚNG MỘT khung toàn cảnh ở cỡ framebuffer HIỆN TẠI bằng ``scene``
+        đã dựng sẵn (đóng gói pose/khung webcam từ lúc dựng, không tự đọc
+        gì mới) — dùng cho khung bình thường của main loop. Không đọc
+        input, không tick ván/PvP, không đọc webcam, không gọi
+        ``pump_events``.
+
+        TASK_game_feel_fix_1118 Fix 9: trước đây đường mã này CŨNG là
+        đường vẽ-lại khi kéo cạnh cửa sổ (``_on_refresh`` gọi thẳng vào
+        đây) — chạy lại TOÀN BỘ full draw (bake HUD bằng PIL, upload lại
+        texture, v.v.) mỗi bước cỡ trong vòng modal resize của Windows là
+        quá chậm, đúng như báo lại của người dùng (khung rớt, không thấy
+        cửa sổ đã to tới đâu). Giờ ``_on_refresh`` không gọi hàm này nữa —
+        nó chỉ blit lại khung ĐÃ vẽ (xem ``Window.draw_last_frame_letterboxed``).
+        Hàm này vẫn là full draw duy nhất, và chụp lại khung vừa vẽ (TRƯỚC
+        khi swap) để đường blit đó có cái mà dùng.
+        """
+        if self._album is not None:
+            if self._should_freeze_on_screen_switch():
+                if self._window.draw_last_frame_letterboxed():
+                    return
+                # Nothing captured yet (very first frame ever) — fall
+                # through to a real draw instead of a black window.
+            if not self._album.has_viewport():
+                # Màn không có ô viewport: vẫn chạy đúng đường vẽ demo
+                # (render đầy đủ) nhưng cắt xuống 1 pixel — xem chú thích
+                # gốc ở chỗ gọi cũ trong main loop.
+                self._album.draw_hidden_scene(scene)
+            self._album_draw_guarded(scene)
+        else:
+            scene()
+        self._window.capture_last_frame()
+        with stage_profile.stage("swap_vsync"):
+            self._window.swap_buffers()
+
+    def _should_freeze_on_screen_switch(self) -> bool:
+        """TASK_perf_textures_1119 Fix 3: "swap only when ready" — up to
+        500 ms, keep the window showing the LAST drawn frame while the
+        screen just switched TO is still decoding its textures in the
+        background, instead of a broken partial draw (missing base/top
+        layer). ``V3UI.prepare_screen`` runs regardless of the verdict —
+        including on frames we end up freezing — so loading keeps
+        progressing even while frozen; skipping it there would mean a
+        screen that's still loading at the 500 ms mark NEVER finishes.
+
+        v3-only: the old album UI never got this cache/loader rework."""
+        if not self._album_options.is_v3:
+            return False
+        ready = self._album.prepare_screen()
+        screen = self._album.state.screen
+        now = time.perf_counter()
+        if screen != getattr(self, "_screen_switch_screen", None):
+            self._screen_switch_screen = screen
+            self._screen_switch_t = now
+        if ready:
+            return False
+        return (now - self._screen_switch_t) < 0.5
+
+    def _on_refresh(self) -> None:
+        """
+        ``window.set_refresh_handler``: GLFW báo cửa sổ cần vẽ lại NGAY —
+        đang kéo cạnh (modal loop bên trong ``glfw.poll_events()``, main
+        loop không chạy tới lượt) hoặc vừa đổi cỡ.
+
+        TASK_game_feel_fix_1118 Fix 9: KHÔNG chạy lại full draw nữa (xem
+        ``_draw_frame_only``'s docstring) — chỉ blit khung đã chụp sẵn,
+        letterbox 16:9 vào cỡ framebuffer MỚI. Khung đầy đủ, đúng cỡ
+        cuối cùng, vẽ ở lượt KẾ TIẾP của main loop, một lần, sau khi
+        ``poll_events()`` trả về — không cần gọi gì thêm ở đây cho việc
+        đó, main loop tự nhiên làm điều này.
+
+        Chặn lồng nhau: một refresh nổ ra TRONG một refresh khác, hoặc
+        trong lúc main loop đang tự vẽ khung của nó, thì bỏ qua — không
+        có gì để vẽ thêm mà an toàn hơn vẽ chồng.
+        """
+        if self._drawing or self._last_scene is None:
+            return
+        self._drawing = True
+        try:
+            self._window.draw_last_frame_letterboxed()
+        finally:
+            self._drawing = False
+
     def _photo_rgb_for_camo(self):
         """
         Ảnh gốc (RGB, CPU) để lấy màu nguỵ trang — KHÔNG đọc lại GL.
@@ -788,7 +989,12 @@ class HcpdApplication:
             if self._bugs is not None else None
         if mask is None:
             return None
-        eye = self._virtual_camera.eye_position_mm
+        # TASK_game_feel_1118 P6: the "steady eye" while scoped — equals
+        # ``eye_position_mm`` whenever not scoped, so this is a no-op
+        # change for every OTHER weapon/screen. Rendering reads the same
+        # property (``VirtualCamera.projection_matrix``/``view_matrix``),
+        # so a shot never hits something different from what's on screen.
+        eye = self._virtual_camera.effective_eye_position_mm
         glass, centre = self._glass_mm()
         radius = float(self._content.game_prop_radius_mm)
         bugs = {
@@ -830,15 +1036,37 @@ class HcpdApplication:
         aim = self._aim_context()
         if aim is None:
             return True
-        shot = fire(match, self._album.mouse, aim)
+        shot = fire(match, self._album.mouse, aim,
+                   pvp=(self._album.state.screen == F.PVP_HUNT))
         if shot is None:
             return True          # hết băng hoặc đang nạp: nuốt cú bấm
         hit, crit = shot
-        if hit >= 0:
-            self._renderer.set_prop_found(hit)
+        if self._album_options.is_v3:
+            # TASK_game_feel_1118 P4: kick/shake/hit marker/crit impact
+            # for THIS shot — every outcome (hit, crit, miss) gets
+            # it; only a hit gets a marker, only a crit gets the impact
+            # frame too (``ShotFeel.on_shot`` itself decides which).
+            self._album.register_shot(hit >= 0, crit)
+        # TASK_weapons_1119: a silhouette hit no longer always kills —
+        # ``fire()`` already ran damage per pellet (the shotgun fires
+        # several) and recorded which ones actually died in
+        # ``last_shot_hits``. Only a KILL removes the bug, counts, sends
+        # PvP's ``hit`` or plays ``hit_kill``/``hit_crit``; a non-lethal
+        # contact already got its marker above via ``register_shot``, and
+        # its HP bar comes straight back from ``match.bug_last_hit``
+        # (``v3_values._hud``) — nothing else to do for it here.
+        for index, pellet_crit, killed in match.last_shot_hits:
+            if not killed:
+                continue
+            self._renderer.set_prop_found(index)
             if self._bugs is not None:
                 self._bugs.mark_found(
-                    hit, [v / 1000.0 for v in self._game.props[hit]["pos_mm"]])
+                    index, [v / 1000.0 for v in self._game.props[index]["pos_mm"]])
+            if self._album_options.is_v3:
+                # TASK_ui_sakuga_1117 Phase 6: LOCAL hit only — this path
+                # never runs for the opponent's kills, so no extra guard
+                # is needed to keep their shots silent here.
+                self._album.spawn_hit_fx(pellet_crit)
             if self._pvp_active and self._pvp is not None:
                 # TASK_pvp_lan_1116: xác nhận trúng do SERVER quyết — đánh
                 # dấu "found" cục bộ ở trên chỉ là phản hồi tức thì, điểm/
@@ -846,11 +1074,393 @@ class HcpdApplication:
                 # ``_pvp_handle_killed``).
                 from src.net import protocol as proto
 
-                self._pvp.send({"t": proto.HIT, "bug": hit})
+                self._pvp.send({"t": proto.HIT, "bug": index})
             eye = aim.eye_mm
             logger.info("Prop BAN TRUNG #%d%s — eye (%.0f, %.0f, %.0f) mm",
-                        hit, " CHI MANG" if crit else "", eye[0], eye[1], eye[2])
+                        index, " CHI MANG" if pellet_crit else "",
+                        eye[0], eye[1], eye[2])
+        if hit < 0 and self._album_options.is_v3:
+            self._album.spawn_miss_fx()
         return True
+
+    def _tick_auto_fire(self, now: float) -> None:
+        """
+        TASK_game_feel_1118 P5: full-auto for the Heavy-mag gun only.
+
+        The first shot of a burst already happened through the normal
+        click path (``pop_clicks()`` above, same frame). This fires AGAIN
+        every subsequent frame the left button is still held, as long as
+        ``match.ready_to_fire(now)`` holds and the gun isn't reloading —
+        checked BEFORE calling ``_album_shoot`` (which calls ``fire()``),
+        so an unready frame never even logs "Bam co dan". Releasing the
+        gun — button up, weapon switch, or leaving the match screen — any
+        of those ends the bloom bump started below.
+
+        TASK_game_feel_fix_1118 Fix 3: the reload re-trigger race (fire
+        landing on the exact frame the reload deadline passes, before
+        anything has refilled ``rounds_left`` yet this frame) used to be
+        patched HERE with an explicit ``match.tick_reload(now)`` call —
+        but that only covered THIS call path, not a regular click. Fixed
+        at the root instead: ``AlbumMatch.take_round()`` calls
+        ``tick_reload(now)`` itself now, so every firing path (this one,
+        and ``pop_clicks()`` above) is covered without a duplicate call.
+        """
+        if not self._album_options.is_v3:
+            return
+        F = self._album.flow
+        match = self._album.game
+        firing = (match is not None
+                 and self._album.state.screen in (F.PLAY, F.PVP_HUNT)
+                 and match.weapon_name == "Heavy-mag gun"
+                 and bool(self._album.mouse_down))
+        if firing and match.ready_to_fire(now) and not match.reloading(now):
+            if self._album_shoot(now):
+                self._album.bump_auto_bloom()
+        elif self._heavy_mag_was_held and not firing:
+            self._album.release_auto_bloom()
+        self._heavy_mag_was_held = firing
+
+    def _tick_scope(self, now: float, raw_mouse: tuple) -> tuple:
+        """
+        TASK_game_feel_1118 P6: Precision-gun scope — right mouse, held.
+
+        Called once per frame, BEFORE anything else reads
+        ``self._album.mouse`` — returns the crosshair this frame should
+        actually use: the raw mouse position unscoped, or the finer-aim
+        crosshair while scoped. Also keeps ``self._virtual_camera``'s
+        scope fields in sync, so rendering (``projection_matrix``/
+        ``view_matrix``) and the hit test (``_aim_context``, which reads
+        ``effective_eye_position_mm``) always agree.
+        """
+        if not self._album_options.is_v3:
+            return raw_mouse
+        F = self._album.flow
+        match = self._album.game
+        on_screen = (match is not None
+                    and self._album.state.screen in (F.PLAY, F.PVP_HUNT))
+        is_precision = match is not None and match.weapon_name == "Precision gun"
+        # TASK_game_feel_1118 P7: HCPD_SCOPE_BENCH=1 holds the (fake)
+        # trigger the whole run, exactly as a real right-mouse hold would.
+        held = (os.environ.get("HCPD_SCOPE_BENCH") == "1"
+               or self._window.is_right_mouse_down())
+        reloading = match is not None and match.reloading(now)
+        want = on_screen and is_precision and held and not reloading
+        if want and not self._album.is_scoped:
+            self._album.enter_scope()
+            self._virtual_camera.scope_eye_anchor_mm = \
+                self._virtual_camera.eye_position_mm.copy()
+        elif not want and self._album.is_scoped:
+            self._end_scope()
+        dt = (0.0 if self._scope_last_t is None
+             else max(0.0, now - self._scope_last_t))
+        self._scope_last_t = now
+        self._album.step_scope(dt)
+        crosshair = raw_mouse
+        if self._album.is_scoped:
+            crosshair = self._album.apply_scope_aim(raw_mouse)
+        self._sync_scope_camera(crosshair)
+        return crosshair
+
+    def _end_scope(self) -> None:
+        """Right mouse released (or reload started, or weapon/screen
+        changed) — warp the OS cursor to the crosshair's CURRENT window
+        pixel so the next frame's raw mouse read doesn't jump it."""
+        wx, wy = self._album.painter.map(*self._album.mouse)
+        self._window.set_cursor_pos(wx, wy)
+        self._album.exit_scope()
+        self._virtual_camera.scope_eye_anchor_mm = None
+
+    def _sync_scope_camera(self, crosshair: tuple) -> None:
+        from src.ui_album.scope import design_to_glass_m
+
+        camera = self._virtual_camera
+        if self._album.scope_visually_active:
+            glass, centre = self._glass_mm()
+            sx, sy = design_to_glass_m(crosshair, glass, centre)
+            camera.scope_active = True
+            camera.scope_zoom = self._album.scope_zoom
+            camera.scope_crosshair_m = np.array(
+                [sx, sy, float(camera.screen_center_m[2])], dtype=np.float64)
+        else:
+            camera.scope_active = False
+
+    def _tick_scope_bench(self, now: float) -> None:
+        """
+        TASK_game_feel_1118 P7: ``HCPD_SCOPE_BENCH=1`` (dùng cùng
+        ``HCPD_ALBUM_AUTOMATCH=1``, lấy sẵn khẩu Precision gun mặc định) —
+        10 giây scoped, tâm ngắm chạy vòng tròn chậm, một phát mỗi 0.6 s.
+        ``_tick_scope`` tự coi ``HCPD_SCOPE_BENCH=1`` là "đang giữ chuột
+        phải" (xem ở đó), nên hàm này chỉ còn việc đưa tâm ngắm vòng tròn
+        và bắn theo nhịp.
+        """
+        if (os.environ.get("HCPD_SCOPE_BENCH") != "1" or not self._album_options.is_v3
+                or os.environ.get("HCPD_EVIDENCE_1118") == "1"):
+            # TASK_game_feel_fix_1118: the evidence hook flips
+            # HCPD_SCOPE_BENCH itself (so _tick_scope treats it as "held"
+            # for ITS OWN fixed crosshair) — this bench must not also
+            # react to that and take mouse control away with its own
+            # circular motion.
+            return
+        F = self._album.flow
+        if self._album.state.screen != F.PLAY:
+            return
+        if not hasattr(self, "_scope_bench_start"):
+            if not self._measurement_ready():
+                return
+            self._scope_bench_start = now
+            self._scope_bench_last_shot = now
+            self._scope_bench_last_frame_t = now
+            self._scope_bench_frame_times: list = []
+            return
+        elapsed = now - self._scope_bench_start
+        angle = elapsed * (2.0 * math.pi / 10.0)      # one slow turn over 10s
+        circle_mouse = (640.0 + 150.0 * math.cos(angle),
+                        360.0 + 150.0 * math.sin(angle))
+        self._album.mouse = self._tick_scope(now, circle_mouse)
+        self._scope_bench_frame_times.append(now - self._scope_bench_last_frame_t)
+        self._scope_bench_last_frame_t = now
+        if now - self._scope_bench_last_shot >= 0.6:
+            self._scope_bench_last_shot += 0.6
+            self._album_shoot(now)
+        if elapsed >= 10.0:
+            times = sorted(self._scope_bench_frame_times)
+            n = len(times)
+            median_dt = times[n // 2] if n else 0.0
+            fps = (1.0 / median_dt) if median_dt > 0.0 else 0.0
+            logger.info("SCOPE_BENCH: %d khung trong 10s, FPS median %.1f, "
+                        "zoom cuoi %.2f", n, fps, self._album.scope_zoom)
+            self._window.request_close()
+
+    def _tick_evidence_1118(self, now: float) -> None:
+        """``HCPD_EVIDENCE_1118=1`` (with ``HCPD_ALBUM_AUTOMATCH=1`` +
+        ``HCPD_V3_SCREEN=v3_08_gameplay_hud``): one-off screenshot
+        sequence into ``results/game_feel_fix_1118/`` for the fix
+        report's evidence section, then self-closes — same spirit as
+        ``HCPD_FX_BENCH``/``HCPD_SCOPE_BENCH``, not meant to ship."""
+        if os.environ.get("HCPD_EVIDENCE_1118") != "1" or not self._album_options.is_v3:
+            return
+        F = self._album.flow
+        if self._album.state.screen not in (F.PLAY, F.WIN):
+            return
+        if not hasattr(self, "_evidence_step"):
+            if not self._measurement_ready():
+                return
+            self._evidence_step = 0
+            self._evidence_step_t = now
+            self._evidence_out = self._root / "results" / "game_feel_fix_1118"
+            self._evidence_steps = self._build_evidence_steps()
+            return
+        if self._evidence_step >= len(self._evidence_steps):
+            self._window.request_close()
+            return
+        name, setup, hold_s = self._evidence_steps[self._evidence_step]
+        setup(self)
+        if now - self._evidence_step_t >= hold_s:
+            if name is not None:
+                from OpenGL import GL
+
+                from src.ui_album.shots import save_framebuffer
+
+                self._window.restore_and_focus()
+                self._window.pump_events()
+                # Force an explicit, synchronous redraw against the
+                # state THIS tick just set, instead of trusting whatever
+                # the main loop's own next render happens to land on —
+                # this hook runs during the TICK phase, one step removed
+                # from the render/swap phase, and a one-shot state change
+                # (go_win()) was observed to still show the PREVIOUS
+                # screen's content without this. Reuse the last real
+                # scene closure (Fix 9's own ``_last_scene``, same thing
+                # ``_on_refresh`` redraws with) for steps that DO have a
+                # 3D viewport (scope/HUD proximity) — a no-op would
+                # render those as an empty void instead of the real scene.
+                scene = self._last_scene or (lambda: None)
+                if not self._album.has_viewport():
+                    self._album.draw_hidden_scene(scene)
+                self._album_draw_guarded(scene)
+                width, height = self._window.framebuffer_size()
+                if width >= 2 and height >= 2:
+                    GL.glFinish()
+                    save_framebuffer(self._evidence_out / f"{name}.png", width, height)
+                    logger.info("EVIDENCE_1118: %s.png (screen=%s game=%s)",
+                               name, self._album.state.screen,
+                               self._album.game is not None)
+                self._window.swap_buffers()
+            self._evidence_step += 1
+            self._evidence_step_t = now
+
+    def _build_evidence_steps(self) -> list:
+        def crosshair(xy):
+            def setup(app):
+                app._album.mouse = xy
+            return setup
+
+        def scoped(xy):
+            # Drives the REAL _tick_scope pipeline (entering, camera
+            # sync, zoom spring, finer-aim) with a FIXED raw mouse — not
+            # just setting ``album.mouse``/``scope_zoom`` by hand, which
+            # would move the 2D overlay number without ever warping the
+            # 3D camera (exactly the 1118 report's own scope_in.png bug:
+            # evidence that didn't come from an actually-magnified render).
+            def setup(app):
+                import os as _os
+
+                _os.environ["HCPD_SCOPE_BENCH"] = "1"
+                app._album.mouse = app._tick_scope(time.perf_counter(), xy)
+            return setup
+
+        def unscoped(xy):
+            def setup(app):
+                import os as _os
+
+                _os.environ.pop("HCPD_SCOPE_BENCH", None)
+                app._album.mouse = app._tick_scope(time.perf_counter(), xy)
+            return setup
+
+        def crit_impact(active):
+            # ``crit_impact_alpha`` is a read-only property, computed from
+            # ``_crit_impact_age`` — go through the real ``on_shot()``
+            # entry point (same as an actual crit would) instead of
+            # poking a private field, except for turning it back OFF
+            # (nothing public does that early; the real path is just
+            # waiting out CRIT_IMPACT_S).
+            def setup(app):
+                feel = app._album._shot_feel
+                if active:
+                    if feel._crit_impact_age is None:
+                        feel.on_shot("Precision gun", (640.0, 360.0),
+                                     hit=True, crit=True)
+                else:
+                    feel._crit_impact_age = None
+            return setup
+
+        def go_win():
+            def setup(app):
+                if app._album.state.screen != app._album.flow.WIN:
+                    app._album.state.go(app._album.flow.WIN)
+            return setup
+
+        centre, corner, edge = (640.0, 360.0), (120.0, 120.0), (1180.0, 620.0)
+        return [
+            # G2: scope magnification, 3 crosshair positions, eye frozen.
+            ("scope_proof_centre_unscoped", unscoped(centre), 1.0),
+            ("scope_proof_centre_scoped", scoped(centre), 1.5),
+            ("scope_proof_corner_unscoped", unscoped(corner), 1.0),
+            ("scope_proof_corner_scoped", scoped(corner), 1.5),
+            ("scope_proof_edge_unscoped", unscoped(edge), 1.0),
+            ("scope_proof_edge_scoped", scoped(edge), 1.5),
+            # G3: crit impact frame vs normal, crosshair away from cards.
+            # Reset the scope zoom spring back to 1.0 first — the edge
+            # step above left it scoped, and nothing after this touches
+            # _tick_scope again, so a stale zoom would leak into every
+            # later step's vignette otherwise.
+            (None, unscoped(centre), 0.6),
+            ("hud_layer_check_normal", crit_impact(False), 0.5),
+            ("hud_layer_check_crit",
+             lambda app: (crit_impact(True)(app), crosshair((640.0, 360.0))(app)),
+             0.5),
+            (None, crit_impact(False), 0.1),   # reset before continuing
+            # G12: proximity fade (crosshair over a weapon card).
+            ("hud_proximity", crosshair((1130.0, 650.0)), 1.0),
+            # G3/10.3: scoped near the user's own screenshot spot.
+            ("hud_scope", scoped((980.0, 560.0)), 1.5),
+            (None, unscoped(centre), 0.6),
+            # Fix 7: star_five on WIN.
+            # star_five's own duration is 0.95s — capture mid-burst, not
+            # after it's already faded to its final tiny-particle frames.
+            ("fx_win", go_win(), 0.5),
+        ]
+
+    def _tick_hud_fix_1119_shots(self, now: float) -> None:
+        """``HCPD_HUD_FIX_1119_SHOTS=1`` (with ``HCPD_ALBUM_AUTOMATCH=1``):
+        one-off screenshot sequence into ``results/hud_fix_1119/`` for Fix
+        1/2's own evidence (the designed HUD with every card, proximity
+        fade, H-hidden, scoped) — same spirit as ``HCPD_EVIDENCE_1118``,
+        not meant to ship."""
+        if (os.environ.get("HCPD_HUD_FIX_1119_SHOTS") != "1"
+                or not self._album_options.is_v3):
+            return
+        F = self._album.flow
+        if self._album.state.screen != F.PLAY:
+            return
+        if not hasattr(self, "_hud1119_step"):
+            if not self._measurement_ready():
+                return
+            self._hud1119_step = 0
+            self._hud1119_step_t = now
+            self._hud1119_out = self._root / "results" / "hud_fix_1119"
+            self._hud1119_steps = self._build_hud_fix_1119_steps()
+            return
+        if self._hud1119_step >= len(self._hud1119_steps):
+            self._window.request_close()
+            return
+        name, setup, hold_s = self._hud1119_steps[self._hud1119_step]
+        setup(self)
+        if now - self._hud1119_step_t >= hold_s:
+            if name is not None:
+                from OpenGL import GL
+
+                from src.ui_album.shots import save_framebuffer
+
+                self._window.restore_and_focus()
+                self._window.pump_events()
+                scene = self._last_scene or (lambda: None)
+                if not self._album.has_viewport():
+                    self._album.draw_hidden_scene(scene)
+                self._album_draw_guarded(scene)
+                width, height = self._window.framebuffer_size()
+                if width >= 2 and height >= 2:
+                    GL.glFinish()
+                    save_framebuffer(self._hud1119_out / f"{name}.png", width, height)
+                    logger.info("HUD_FIX_1119: %s.png", name)
+                self._window.swap_buffers()
+            self._hud1119_step += 1
+            self._hud1119_step_t = now
+
+    def _build_hud_fix_1119_steps(self) -> list:
+        def crosshair(xy):
+            def setup(app):
+                app._album.mouse = xy
+            return setup
+
+        def scoped(xy):
+            def setup(app):
+                import os as _os
+
+                _os.environ["HCPD_SCOPE_BENCH"] = "1"
+                app._album.mouse = app._tick_scope(time.perf_counter(), xy)
+            return setup
+
+        def hidden(want: bool):
+            def setup(app):
+                if app._album.hud_hidden != want:
+                    app._album.toggle_hud_hidden()
+            return setup
+
+        def weapon(name):
+            def setup(app):
+                app._apply_bench_weapon(name)
+            return setup
+
+        def clear_toast():
+            def setup(app):
+                app._album.state.message = ""
+            return setup
+
+        centre, weapon_card = (640.0, 360.0), (1130.0, 650.0)
+        return [
+            ("hud_full", crosshair(centre), 1.0),
+            ("hud_proximity", crosshair(weapon_card), 1.0),
+            (None, hidden(True), 0.05),
+            ("hud_hidden", crosshair(centre), 0.3),
+            (None, hidden(False), 0.05),
+            (None, weapon("Precision gun"), 0.1),
+            # the H-hidden toast above is a timed (6s) message, not
+            # cleared by un-hiding (Fix 2: "nothing on show") -- clear it
+            # by hand so it doesn't linger into the scope screenshot.
+            (None, clear_toast(), 0.1),
+            ("hud_scope", scoped(centre), 1.5),
+        ]
 
     def _album_action(self, action: str, now: float) -> None:
         """Thực hiện một hành động mà giao diện album yêu cầu."""
@@ -885,7 +1495,12 @@ class HcpdApplication:
             state.level = min(5, state.level + 1)
             state.go(F.LOADOUT)
         elif action == "logout":
+            # TASK_accounts_1119 Phase 4: a "remember me" session (if any)
+            # must not outlive a deliberate sign-out.
+            if self._album_options.is_v3:
+                self._album.sign_out()
             state.player = state.password = state.password2 = ""
+            state.account_key = ""
             state.focus = None
             state.go(F.SIGN_IN if hasattr(F, "SIGN_IN") else F.LOGIN)
         elif action == "copy_code":
@@ -903,6 +1518,15 @@ class HcpdApplication:
                 self._apply_display_mode(mode)
         elif action.startswith("pvp_"):
             self._pvp_action(action, now)
+        elif action == "account_sign_in":
+            self._album.sign_in_submit()
+        elif action == "account_sign_up":
+            self._album.sign_up_submit()
+        elif action == "account_forgot_submit":
+            self._album.forgot_submit()
+        elif action == "account_copy_recovery_code":
+            self._album.copy_recovery_code()
+            F.say(state, "Code copied")
 
     def _tick_album_automatch(self, now: float) -> None:
         """
@@ -918,6 +1542,12 @@ class HcpdApplication:
         if self._album.game is not None or self._renderer.waiting_for_depth:
             return
         if self._album.state.screen != F.PLAY:
+            # TASK_hud_fix_1119 Fix 4: accounts added a sign-in screen
+            # ahead of MENU since this hook was written -- a cold
+            # ``--album-guest`` launch now lands on MENU, not PLAY, so
+            # "no clicking through the whole flow" needs to jump there
+            # itself instead of just waiting for it.
+            self._album.state.go(F.PLAY)
             return
         self._album.state.weapon = 0
         if os.environ.get("HCPD_ALBUM_AUTOMATCH") == "2":
@@ -942,6 +1572,167 @@ class HcpdApplication:
             logger.info("DEBUG MATCH: dat tay %d bo", len(props))
             return
         self._start_album_match(now)
+        # TASK_hud_fix_1119 Fix 4: the real-click SendInput check needs a
+        # SPECIFIC gun (Spread, mag 8) rather than automatch's always-
+        # Precision default -- reuses ``_apply_bench_weapon`` (until now
+        # only reachable via ``HCPD_FX_BENCH``) so ``HCPD_BENCH_WEAPON``
+        # alone, without the 20 s synthetic-fire loop, picks the weapon.
+        weapon = os.environ.get("HCPD_BENCH_WEAPON", "").strip()
+        if weapon:
+            from src.ui_album.game_bridge import WEAPONS_SPEC
+
+            if weapon in WEAPONS_SPEC:
+                self._apply_bench_weapon(weapon)
+
+    def _measurement_ready(self) -> bool:
+        """
+        TASK_game_feel_fix_1118 "Measurement hygiene": a bench/screenshot
+        hook's measured window starts only once ALL of — fx preload done,
+        depth layers built, 2 s have passed since — hold. Logs the wait
+        once. Benches that measured through the preload/layer-build
+        window (the 1118 report's own ``bench_precision.log``: preload
+        still finishing 11 s in, 16 skipped spawns, first 5 s at 16.6
+        FPS) were measuring one-time launch cost, not steady-state play.
+        """
+        fx = getattr(self._album, "_fx_library", None)
+        fx_ready = fx is None or not self._album.fx_enabled or fx.preload_remaining == 0
+        depth_ready = not self._renderer.waiting_for_depth
+        now = time.perf_counter()
+        if not (fx_ready and depth_ready):
+            self._measurement_ready_since = None
+            return False
+        since = getattr(self, "_measurement_ready_since", None)
+        if since is None:
+            self._measurement_ready_since = now
+            logger.info("Do luong: fx+lop da xong, cho on dinh 2s truoc khi bat dau do")
+            return False
+        return (now - since) >= 2.0
+
+    def _tick_fx_bench(self, now: float) -> None:
+        """
+        Móc đo ``HCPD_FX_BENCH=1`` (dùng cùng ``HCPD_ALBUM_AUTOMATCH=1``):
+        4 phát/giây trong 20 giây trên ``PLAY``, xoay vòng giết/chí mạng/hụt
+        — qua ĐÚNG API Sakuga thật (``spawn_hit_fx``/``spawn_miss_fx``),
+        không giả bằng cách bắn thật (ngắm trúng/hụt không kiểm soát được) —
+        rồi ghi khung hình để tính FPS median (TASK_ui_sakuga_1117 G2).
+
+        TASK_game_feel_1118 P7: ``HCPD_BENCH_WEAPON`` (one of
+        ``WEAPONS_SPEC``'s keys) also exercises that weapon's
+        ``shot_feel`` (kick/shake/hit marker) via ``register_shot`` on
+        each cycled shot — and for the Heavy-mag gun specifically, holds
+        the (fake) trigger down the whole 20 s so the REAL
+        ``_tick_auto_fire`` path fires, instead of the synthetic cycle.
+
+        TASK_game_feel_fix_1118 "Measurement hygiene": does not start its
+        20 s window until ``_measurement_ready()`` holds — see there.
+        Also logs, for the single slowest frame in the window, how much
+        of it was fx GL-thread work (mipmap+upload) versus everything
+        else, and the single slowest decode/bleed/mipmap/upload file
+        recorded across the whole window (G6's own check).
+        """
+        if os.environ.get("HCPD_FX_BENCH") != "1" or not self._album_options.is_v3:
+            return
+        F = self._album.flow
+        if self._album.state.screen != F.PLAY:
+            return
+        if not hasattr(self, "_fx_bench_start"):
+            if not self._measurement_ready():
+                return
+            self._fx_bench_start = now
+            self._fx_bench_last_shot = now
+            self._fx_bench_last_frame_t = now
+            self._fx_bench_frame_times: list = []
+            self._fx_bench_fx_times: list = []
+            self._fx_bench_cycle = 0
+            requested = os.environ.get("HCPD_BENCH_WEAPON", "").strip()
+            from src.ui_album.game_bridge import WEAPONS_SPEC
+
+            self._fx_bench_weapon = requested if requested in WEAPONS_SPEC else None
+            self._fx_bench_weapon_applied = False
+            return
+        weapon = getattr(self, "_fx_bench_weapon", None)
+        if weapon and not self._fx_bench_weapon_applied and self._album.game is not None:
+            self._apply_bench_weapon(weapon)
+            self._fx_bench_weapon_applied = True
+        self._fx_bench_frame_times.append(now - self._fx_bench_last_frame_t)
+        self._fx_bench_last_frame_t = now
+        fx = getattr(self._album, "_fx_library", None)
+        self._fx_bench_fx_times.append(
+            (fx.frame_mipmap_s + fx.frame_upload_s) if fx is not None else 0.0)
+        if weapon == "Heavy-mag gun":
+            # P7: "holds the button so auto-fire is exercised" — the real
+            # click-and-hold path (``_tick_auto_fire``), not the
+            # synthetic cycle below.
+            self._album.mouse_down = True
+        elif now - self._fx_bench_last_shot >= 0.25:       # 4 phat/s
+            self._fx_bench_last_shot += 0.25
+            kind = self._fx_bench_cycle % 3
+            self._fx_bench_cycle += 1
+            if weapon:
+                self._album.register_shot(kind != 2, kind == 1)
+            if kind == 0:
+                self._album.spawn_hit_fx(False)
+            elif kind == 1:
+                self._album.spawn_hit_fx(True)
+            else:
+                self._album.spawn_miss_fx()
+        if now - self._fx_bench_start >= 20.0:
+            times = sorted(self._fx_bench_frame_times)
+            n = len(times)
+            median_dt = times[n // 2] if n else 0.0
+            fps = (1.0 / median_dt) if median_dt > 0.0 else 0.0
+            p99_dt = times[min(n - 1, int(round(0.99 * (n - 1))))] if n else 0.0
+            hitches = sum(1 for t in times if t > 0.050)
+            logger.info("FX_BENCH%s: %d khung trong 20s, FPS median %.1f, "
+                        "p99 %.1f ms, khung >50ms: %d, khung cham nhat %.1f ms",
+                        f" ({weapon})" if weapon else "", n, fps,
+                        p99_dt * 1000.0, hitches,
+                        max(times) * 1000.0 if times else 0.0)
+            self._log_slowest_frame_stage(self._fx_bench_frame_times,
+                                          self._fx_bench_fx_times, fx)
+            self._window.request_close()
+
+    def _log_slowest_frame_stage(self, frame_times: list, fx_times: list, fx) -> None:
+        """TASK_game_feel_fix_1118 Fix 2: breaks down the single slowest
+        frame in a bench window into fx GL-thread cost vs everything
+        else, and names the single slowest file per stage across the
+        whole window — "no frame > 50ms whose slowest stage is fx
+        decode, bleed or upload" (G6) needs this to actually check."""
+        if not frame_times:
+            return
+        worst_i = max(range(len(frame_times)), key=lambda i: frame_times[i])
+        worst_ms = frame_times[worst_i] * 1000.0
+        fx_ms = (fx_times[worst_i] * 1000.0) if worst_i < len(fx_times) else 0.0
+        logger.info(
+            "Khung cham nhat: %.1f ms tong, fx (mipmap+upload) %.1f ms, "
+            "con lai %.1f ms", worst_ms, fx_ms, worst_ms - fx_ms)
+        if fx is not None:
+            for stage in ("decode_s", "bleed_s", "mipmap_s", "upload_s"):
+                found = fx.slowest_file(stage)
+                if found is not None:
+                    key, seconds = found
+                    logger.info("  %s cham nhat: %s (%.1f ms)",
+                               stage, key, seconds * 1000.0)
+
+    def _apply_bench_weapon(self, weapon_name: str) -> None:
+        """TASK_game_feel_1118 P7: force the live match onto
+        ``weapon_name`` (automatch always picks the Precision gun) with a
+        fresh magazine, for ``HCPD_BENCH_WEAPON``."""
+        from src.ui_album.game_bridge import WEAPONS_SPEC
+
+        match = self._album.game
+        if match is None:
+            return
+        spec = WEAPONS_SPEC[weapon_name]
+        match.weapon_name = weapon_name
+        match.mag_size = spec.mag
+        match.rounds_left = spec.mag
+        match.fire_interval_s = spec.fire_s
+        match.reload_s = spec.reload_s
+        match.reload_until_s = 0.0
+        match.next_shot_s = 0.0
+        logger.info("FX_BENCH: ep vu khi %s (bang %d, nhip %.2fs, nap %.1fs)",
+                    weapon_name, spec.mag, spec.fire_s, spec.reload_s)
 
     def _tick_album_match(self, now: float) -> None:
         """Nhịp của màn tách lớp và của ván đang chơi."""
@@ -949,6 +1740,8 @@ class HcpdApplication:
 
         if self._album_options.shots or self._album_options.ui_shots:
             return          # lượt chụp: kế hoạch màn là của _album_shots_step
+        if os.environ.get("HCPD_UI_SHOTS_1117") == "1":
+            return          # TASK_ui_sakuga_1117: _tick_sakuga_shots so sanh man
         if self._v3_live:
             return          # U3: màn và ván do preset đặt, đừng nhịp đè lên
         state = self._album.state
@@ -996,6 +1789,10 @@ class HcpdApplication:
                         "date": time.strftime("%d/%m/%Y"),
                         "eaten": match.eaten_pct,
                         "score": match.score()}
+                # TASK_accounts_1119 Phase 5: save right after a match
+                # result (a signed-in account) or the one-time guest
+                # toast (never saved) — see V3UI.note_match_finished.
+                self._album.note_match_finished()
             state.go(F.WIN if ended == "win" else F.LOSE)
             self._album.game = None
 
@@ -1619,6 +2416,7 @@ class HcpdApplication:
         F = self._album.flow
         from src.ui_album.game_bridge import start_match
 
+        from src.content.hidden_props_search import exposure_count
         from src.ui_album.viewport_filter import filter_props
 
         state = self._album.state
@@ -1633,8 +2431,37 @@ class HcpdApplication:
             glass, centre = self._glass_mm()
             kept, outside = filter_props(self._game.props, rest, count, glass,
                                          self._viewport_rect(), centre)
-            logger.info("Album bo: xin %d · dat %d · ngoai o %d",
-                        count, len(kept), outside)
+            # TASK_hud_fix_1119 Fix 3: ``kept`` is only "inside the
+            # viewport" — place_props' own reveal scan (hidden_props_search
+            # ._candidate) only walked ONE axis at a time, so a spot that
+            # never reveals on the 2D peek range (both axes moving
+            # together, the shape a real lean actually takes) could still
+            # slip through and reach the player as an unwinnable bug,
+            # exactly logs/game_20261119_150429.log's t22.png case (1 bug
+            # placed behind the cat, 0/191 khung co vat lo, every shot's
+            # alpha=0.00). Double-check with a real 5x5 grid over the
+            # peek range, at the screen (rest) distance, and drop anything
+            # that's exposed at NONE of the 25 positions.
+            winnable = []
+            for prop in kept:
+                exposed_n = exposure_count(self._game_planes, prop["pos_mm"],
+                                           prop["radius_mm"], rest[:2], rest[2])
+                logger.info("Album bo tai (%.0f, %.0f, %.0f): lo o %d/25 vi tri mat",
+                           *prop["pos_mm"], exposed_n)
+                if exposed_n > 0:
+                    winnable.append(prop)
+            dropped_unwinnable = len(kept) - len(winnable)
+            kept = winnable
+            logger.info("Album bo: xin %d · dat %d · ngoai o %d · khong the lo %d",
+                        count, len(kept), outside, dropped_unwinnable)
+            if not kept:
+                # Không còn chỗ nào THẬT SỰ lộ được — đừng mở ván không thể
+                # thắng (F3.3's own gap). Ở lại màn chọn ảnh, nói thẳng tại
+                # sao, như lời báo "can only hide N" bên dưới.
+                F.say(state, "This photo has no spot a bug can be found "
+                             "from — pick a photo with more depth", 6.0)
+                state.go(F.PHOTOS)
+                return
             if self._album_options.is_v3 and len(kept) < count:
                 # Màn chọn cấp hứa 12 con mà ván chỉ có 1 thì người chơi
                 # tưởng hỏng. Nói thẳng ra: lỗi ở tấm ảnh, không ở họ.
@@ -1706,11 +2533,19 @@ class HcpdApplication:
         Ba điều đã làm hỏng lượt chụp đầu (18/50 ảnh đen, 6 nhóm trùng md5):
         đọc ngay khung đầu sau khi đổi màn, đọc theo cỡ cửa sổ đã rơi về
         1280×720 lúc cửa sổ bị thu nhỏ, và đồng hồ mô phỏng tự nhảy màn.
+
+        TASK_perf_textures_1119 Fix 3: texture của màn giờ nạp NGOÀI
+        LUỒNG — "đủ 3 khung" không còn chắc nghĩa là "đã xong" (trước
+        đây ``bind_screen`` chặn luồng tới khi xong nên 3 khung luôn
+        thừa). Phải tự hỏi ``current_screen_ready()``; đếm 3 khung chỉ
+        bắt đầu SAU khi nó thật đã xong.
         """
         from OpenGL import GL
 
         if self._window.is_iconified():
             logger.warning("Album shots: cua so dang thu nho — cho")
+            return
+        if self._album_options.is_v3 and not self._album.current_screen_ready():
             return
         self._shot_hold = getattr(self, "_shot_hold", 0) + 1
         if self._shot_hold < 3:
@@ -1755,6 +2590,303 @@ class HcpdApplication:
             return path
         save_framebuffer(path, width, height)
         return path
+
+    # ---- TASK_ui_sakuga_1117 G5: 20 ảnh hover/press/focus/tilt/fx --------
+    def _sakuga_shot_plan(self) -> list:
+        """20 bước, mỗi bước ``(tên file, setup(), số khung giữ trước khi
+        chụp)``. ``setup()`` chỉ chạy Ở KHUNG ĐẦU của bước — sau đó nhịp
+        bình thường (``album.tick()``/``draw()``) tự chạy tiếp, đúng như
+        người chơi thật đứng yên ở trạng thái đó."""
+        F = self._album.flow
+        # HOVER_HOLD: đủ để spring hover/press ổn định (k=420,d=26 lắng
+        # trong vài chục khung). AUTO_FX_HOLD: cho hiệu ứng tự spawn qua
+        # ``_step_fx_triggers`` (loading/toast/win/primary) đủ thời gian
+        # decode+spawn (~0,3-0,5s) VẪN còn sống khi chụp (đời hiệu ứng
+        # 0,4-1,3s) — khác FX_HOLD cũ 150 khung (~4s ở 37fps), đủ lâu để
+        # MỌI hiệu ứng chết hẳn trước khi chụp (ba ảnh fx_kill/fx_crit/
+        # fx_miss ra giống hệt nhau lúc kiểm — xem báo cáo G5).
+        HOVER_HOLD, AUTO_FX_HOLD = 90, 25
+
+        def hotspot_rect(screen, name):
+            from src.ui_album.v3 import hotspot_rect as _rect
+
+            for hotspot in self._album.manifest.screens[screen].get(
+                    "hotspots", ()):
+                if hotspot["n"] == name:
+                    return _rect(screen, hotspot)
+            return None
+
+        def hover_at(screen, name, press=False):
+            def setup():
+                self._album.state.go(screen)
+                self._album.state.focus = None
+                rect = hotspot_rect(screen, name)
+                if rect is not None:
+                    self._album.mouse = (rect[0] + rect[2] * 0.5,
+                                         rect[1] + rect[3] * 0.5)
+                self._album.mouse_down = press
+            return setup
+
+        def focus_at(screen, name):
+            def setup():
+                self._album.state.go(screen)
+                self._album.mouse = (-1000.0, -1000.0)
+                self._album.mouse_down = False
+                self._album.state.focus = name
+            return setup
+
+        def tilt_state(face, left, right):
+            def setup():
+                self._album.state.go(F.TILT)
+                self._album.state.face_seen = face
+                self._album.state.tilt_left_done = left
+                self._album.state.tilt_right_done = right
+                self._album.mouse = (-1000.0, -1000.0)
+            return setup
+
+        def fx_shot(screen, name, point, **kwargs):
+            def setup():
+                self._album.state.go(screen)
+                self._album.mouse = (-1000.0, -1000.0)
+                # TASK_game_feel_1118 P3: fx_kill/fx_crit/fx_miss all fire
+                # on the SAME screen back to back — a screen change is
+                # what normally clears the previous shot's effect, so
+                # without this the next shot's screenshot still shows it
+                # (fx_miss.png showing fx_crit's red DON).
+                self._album.clear_fx()
+                self._fx_shot_pending = (name, point, kwargs)
+            return setup
+
+        def loading_state(pct):
+            def setup():
+                self._album.state.go(F.LOADING)
+                self._album.state.pipeline_pct = pct
+                self._album.state.layer_count = 4
+                self._album.mouse = (-1000.0, -1000.0)
+            return setup
+
+        def primary_click(screen):
+            def setup():
+                self._album.state.go(screen)
+                self._album.mouse = (-1000.0, -1000.0)
+                self._album.submit()
+            return setup
+
+        def toast_shot():
+            def setup():
+                self._album.state.go(F.MENU)
+                self._album.mouse = (-1000.0, -1000.0)
+                F.say(self._album.state, "Reloading")
+            return setup
+
+        def win_shot():
+            def setup():
+                # TASK_game_feel_1118 P3: prove the match-toast-leak fix —
+                # a "Reloading" toast set while actually ON PLAY must NOT
+                # survive the PLAY -> WIN transition (1117's own fx_win.png
+                # showed it lingering; a MENU -> WIN jump never exercises
+                # that path at all).
+                self._album.state.go(F.PLAY)
+                F.say(self._album.state, "Reloading")
+                self._album.state.last_result = {
+                    "found": 3, "total": 3, "score": 120,
+                    "time_left": 10, "used": {}}
+                self._album.state.go(F.WIN)
+                self._album.mouse = (-1000.0, -1000.0)
+            return setup
+
+        return [
+            # TASK_game_feel_1118 P3: MENU has no "tab_Solo" hotspot (its
+            # four big cards are "btn_Solo" etc — the top tab bar only
+            # exists on LEVELS/PHOTOS/LOADOUT/TILT/SETTINGS/...), so the
+            # old shot never moved the mouse and just showed a plain menu.
+            ("hover_tab_solo", hover_at(F.LEVELS, "tab_Solo"), HOVER_HOLD),
+            ("hover_display_full", hover_at(F.SETTINGS, "display_full"), HOVER_HOLD),
+            ("hover_link_guest", hover_at(F.SIGN_IN, "link_guest"), HOVER_HOLD),
+            ("hover_level_row_2", hover_at(F.LEVELS, "level_row_2"), HOVER_HOLD),
+            ("hover_btn_sign_in", hover_at(F.SIGN_IN, "btn_Sign in"), HOVER_HOLD),
+            ("hover_slider", hover_at(F.SETTINGS, "slider"), HOVER_HOLD),
+            ("press_btn_sign_in", hover_at(F.SIGN_IN, "btn_Sign in", press=True), HOVER_HOLD),
+            ("focus_field_user", focus_at(F.SIGN_IN, "field_user"), HOVER_HOLD),
+            ("tilt_face", tilt_state(False, False, False), HOVER_HOLD),
+            ("tilt_left", tilt_state(True, False, False), HOVER_HOLD),
+            ("tilt_right", tilt_state(True, True, False), HOVER_HOLD),
+            ("tilt_done", tilt_state(True, True, True), HOVER_HOLD),
+            # fx_kill/crit/miss dùng cơ chế chờ KHÔNG GIỚI HẠN riêng
+            # (``_fx_shot_pending`` trong ``_tick_sakuga_shots``) — số ở đây
+            # bị bỏ qua cho ba bước này.
+            ("fx_kill", fx_shot(F.PLAY, "hit_kill", (640.0, 360.0)), 0),
+            ("fx_crit", fx_shot(F.PLAY, "hit_crit", (640.0, 360.0)), 0),
+            ("fx_miss", fx_shot(F.PLAY, "hit_block", (640.0, 360.0)), 0),
+            ("fx_loading_50", loading_state(50.0), AUTO_FX_HOLD),
+            ("fx_loading_done", loading_state(100.0), AUTO_FX_HOLD),
+            # TASK_game_feel_1118 P3: redo on LEVELS — "btn_Next: choose a
+            # photo" is an obvious advancing CTA; SETTINGS' primary button
+            # is the much less representative "btn_recalibrate".
+            ("fx_button_primary", primary_click(F.LEVELS), AUTO_FX_HOLD),
+            ("fx_toast", toast_shot(), AUTO_FX_HOLD),
+            ("fx_win", win_shot(), AUTO_FX_HOLD),
+        ]
+
+    #: fx_kill/crit/miss: once ``_fx_shot_pending`` finally spawns (texture
+    #: decode is unbounded — depends on disk/CPU), hold this many MORE
+    #: frames so the capture lands mid-animation, not frame 0.
+    _FX_PENDING_POST_FRAMES = 8
+
+    def _tick_sakuga_shots(self) -> None:
+        """``HCPD_UI_SHOTS_1117=1``: chạy ``_sakuga_shot_plan`` rồi thoát —
+        20 ảnh vào ``results/ui_sakuga_1117/`` (TASK_ui_sakuga_1117 G5).
+
+        ``_sakuga_shot_started`` (KHÔNG phải ``hold == 0``) là cờ "đã gọi
+        ``setup()`` cho bước này chưa" — dùng ``hold`` làm cờ đó từng là
+        lỗi thật: trong lúc CHỜ ``_fx_shot_pending`` (có thể nhiều khung),
+        ``hold`` đứng ở 0, nên ``setup()`` bị gọi lại MỖI KHUNG, ghi đè
+        ``_fx_shot_pending`` vừa chốt ``None`` trở lại y lúc đầu — kẹt vô
+        hạn ở bước ``fx_kill`` (texture đã lên GPU từ lâu, vẫn không bao
+        giờ chụp được vì cờ chốt xong bị xoá lại đúng khung sau đó).
+        """
+        from OpenGL import GL
+
+        if self._window.is_iconified():
+            return
+        plan = self._sakuga_shot_plan()
+        index = getattr(self, "_sakuga_shot_index", 0)
+        if index >= len(plan):
+            return
+        stem, setup, hold_frames = plan[index]
+        if not getattr(self, "_sakuga_shot_started", False):
+            setup()
+            self._sakuga_shot_started = True
+            self._sakuga_shot_hold = 0
+            self._sakuga_shot_post = None
+        pending = getattr(self, "_fx_shot_pending", None)
+        if pending is not None:
+            name, point, kwargs = pending
+            if self._album.spawn_fx(name, point[0], point[1], **kwargs):
+                self._fx_shot_pending = None
+                self._sakuga_shot_post = 0
+            return      # moi spawn xong (chua du khung de chup) HOAC van
+                        # cho decode — ca hai deu chua san sang chup ngay.
+        post = getattr(self, "_sakuga_shot_post", None)
+        if post is not None:
+            post += 1
+            self._sakuga_shot_post = post
+            ready = post >= self._FX_PENDING_POST_FRAMES
+        else:
+            hold = getattr(self, "_sakuga_shot_hold", 0) + 1
+            self._sakuga_shot_hold = hold
+            ready = hold >= hold_frames
+        if not ready:
+            return
+        GL.glFinish()
+        self._save_sakuga_shot(stem)
+        self._sakuga_shot_started = False
+        self._sakuga_shot_hold = 0
+        self._sakuga_shot_post = None
+        self._fx_shot_pending = None
+        self._sakuga_shot_index = index + 1
+        if self._sakuga_shot_index >= len(plan):
+            logger.info("Sakuga UI shots: xong %d anh", len(plan))
+            self._window.request_close()
+
+    def _save_sakuga_shot(self, stem: str) -> None:
+        from src.ui_album.shots import save_framebuffer
+
+        self._window.restore_and_focus()
+        self._window.pump_events()
+        width, height = self._window.framebuffer_size()
+        if width < 2 or height < 2:
+            logger.warning("Sakuga shot bo qua: framebuffer %dx%d", width, height)
+            return
+        path = self._root / "results" / "ui_sakuga_1117" / f"{stem}.png"
+        save_framebuffer(path, width, height)
+        logger.info("Sakuga UI shot: %s (%dx%d)", path, width, height)
+
+    # ---- TASK_game_feel_1118 Phase 0/7: anti-aliasing before/after crops ---
+    def _aa_shot_plan(self) -> list:
+        """5 bước — màn/khoảnh khắc y hệt cho cả ảnh "trước" (Phase 0) và
+        "sau" (Phase 7); việc cắt/zoom 3x làm ở bước riêng, ngoài app."""
+        F = self._album.flow
+        HOLD = 30
+
+        def go_levels():
+            self._album.state.go(F.LEVELS)
+            self._album.state.level = 2
+            self._album.mouse = (-1000.0, -1000.0)
+
+        def go_play_static():
+            self._album.state.go(F.PLAY)
+            self._album.mouse = (-1000.0, -1000.0)
+
+        def spawn_burst():
+            self._album.state.go(F.PLAY)
+            self._album.mouse = (640.0, 360.0)
+            self._aa_burst_pending = True
+
+        return [
+            ("aa_level_row", go_levels, HOLD),
+            ("aa_tab", go_levels, HOLD),
+            ("aa_burst", spawn_burst, 6),        # ~0.1s @ ~60fps cua so nho
+            ("aa_layer_edge", go_play_static, HOLD),
+            ("aa_bug", go_play_static, HOLD),
+        ]
+
+    def _tick_aa_baseline_shots(self) -> None:
+        """``HCPD_AA_BASELINE_1118=1`` (dùng cùng
+        ``HCPD_ALBUM_AUTOMATCH=1``): 5 ảnh thô (chưa cắt) vào thư mục
+        ``HCPD_AA_OUT`` (mặc định ``results/game_feel_1118/baseline/aa_raw``)
+        — màn PLAY cần ván thật (bọ + lớp ảnh) nên đợi ``_album.game`` có
+        trước khi chụp hai bước cuối."""
+        from OpenGL import GL
+
+        if self._window.is_iconified():
+            return
+        plan = self._aa_shot_plan()
+        index = getattr(self, "_aa_shot_index", 0)
+        if index >= len(plan):
+            return
+        stem, setup, hold_frames = plan[index]
+        if not getattr(self, "_aa_shot_started", False):
+            setup()
+            self._aa_shot_started = True
+            self._aa_shot_hold = 0
+        if stem in ("aa_layer_edge", "aa_bug", "aa_burst"):
+            F = self._album.flow
+            if (self._album.state.screen != F.PLAY or self._album.game is None
+                    or self._renderer.waiting_for_depth):
+                return          # cho ván thật mở xong (lop + bo)
+        if getattr(self, "_aa_burst_pending", False):
+            if self._album.spawn_fx("hit_kill", 640.0, 360.0):
+                self._aa_burst_pending = False
+            else:
+                return
+        hold = getattr(self, "_aa_shot_hold", 0) + 1
+        self._aa_shot_hold = hold
+        if hold < hold_frames:
+            return
+        GL.glFinish()
+        self._save_aa_shot(stem)
+        self._aa_shot_started = False
+        self._aa_shot_hold = 0
+        self._aa_burst_pending = False
+        self._aa_shot_index = index + 1
+        if self._aa_shot_index >= len(plan):
+            logger.info("AA baseline: xong %d anh", len(plan))
+            self._window.request_close()
+
+    def _save_aa_shot(self, stem: str) -> None:
+        from src.ui_album.shots import save_framebuffer
+
+        self._window.restore_and_focus()
+        self._window.pump_events()
+        width, height = self._window.framebuffer_size()
+        if width < 2 or height < 2:
+            logger.warning("AA shot bo qua: framebuffer %dx%d", width, height)
+            return
+        out = os.environ.get("HCPD_AA_OUT") or "results/game_feel_1118/baseline/aa_raw"
+        path = self._root / out / f"raw_{stem}.png"
+        save_framebuffer(path, width, height)
+        logger.info("AA baseline shot: %s (%dx%d)", path, width, height)
 
     def _begin_rest_measure(self, now: float) -> None:
         """Phím G: đo mắt nghỉ 2 giây thay vì đặt vật ngay."""
@@ -1901,10 +3033,13 @@ class HcpdApplication:
         self._album.game = None
         if self._album.state.screen not in (flow.PLAY, flow.PVP_HUNT):
             return
+        self._album.state.go(flow.LOADOUT)
         if self._album_options.is_v3:
+            # TASK_game_feel_1118 P3: ``go()`` clears any match toast when
+            # LEAVING PLAY/PVP_HUNT/PVP_HIDE — must run first, or it would
+            # wipe out THIS deliberate explanation right after setting it.
             flow.say(self._album.state,
                      "The photo layers changed — set up the match again.")
-        self._album.state.go(flow.LOADOUT)
         logger.info("Ván giao diện dừng theo ván vật ẩn (%s)", reason)
 
     def _toggle_tracking(self) -> None:
@@ -2020,6 +3155,11 @@ class HcpdApplication:
         # nhỏ tới khi có lớp. Giữ thứ tự cũ: mở camera TRƯỚC cửa sổ (run13) làm cửa
         # sổ hiện muộn hơn và phím không ăn [GIẢ ĐỊNH về cơ chế].
         self._window.create()
+        # TASK_game_feel_1118 P1: GLFW chạy một modal loop bên trong
+        # poll_events() khi người dùng đang kéo cạnh cửa sổ — main loop
+        # không tới lượt, nên đăng ký NGAY để khung đầu tiên trong lúc kéo
+        # cũng vẽ lại (``_on_refresh`` tự bỏ qua nếu chưa có khung nào).
+        self._window.set_refresh_handler(self._on_refresh)
         self._window.pump_events()
         self._renderer = SceneRenderer(
             self._window,
@@ -2036,8 +3176,27 @@ class HcpdApplication:
             if self._album_options.is_v3:
                 from src.ui_album.v3_ui import V3UI
 
+                if self._is_scripted_run():
+                    # TASK_perf_textures_1119 Fix 8: V3UI.__init__ itself
+                    # reads accounts.json/session.json (and, with a valid
+                    # "remember me" session, WRITES session_expires_at
+                    # back) the moment it's constructed — too early for
+                    # _shutdown's guard above to help. Redirect BEFORE
+                    # that constructor call, every scripted run, so it
+                    # can never touch the real files regardless of what
+                    # this machine's account/session state happens to be.
+                    import tempfile
+
+                    from src.account import store as account_store
+
+                    tmp_dir = Path(tempfile.mkdtemp(prefix="hcpd_scripted_run_"))
+                    self._scripted_run_tmp_dir = tmp_dir
+                    account_store.accounts_path = (
+                        lambda root: tmp_dir / "assets" / "config" / "accounts.json")
+                    account_store.session_path = (
+                        lambda root: tmp_dir / "assets" / "config" / "session.json")
                 self._album = V3UI(self._root, self._shader_dir,
-                                   self._album_options)
+                                   self._album_options, window=self._window)
             else:
                 from src.ui_album.ui import AlbumUI
 
@@ -2100,6 +3259,7 @@ class HcpdApplication:
         try:
             while not self._window.should_close:
                 frame_start = self._profiler.begin_frame()
+                stage_profile.begin_frame()
                 now = time.perf_counter()
                 dt = now - last_input
                 last_input = now
@@ -2214,7 +3374,8 @@ class HcpdApplication:
                     dropped = self._window.pop_dropped_path()
 
                 if self._album is not None:
-                    self._tick_album(input_state, now)
+                    with stage_profile.stage("tick_album_logic"):
+                        self._tick_album(input_state, now)
                 # G đã bị bỏ khỏi giao diện v3 (xem V3_KEYS); chặn luôn ở đây
                 # để nhánh này không còn đường chạy nào trong luồng v3.
                 if input_state.game_toggle and not self._album_options.is_v3:
@@ -2235,18 +3396,20 @@ class HcpdApplication:
                 pose = snapshot.pose
                 pose_age_s = snapshot.age_ms(now) * 0.001
 
-                if self._render_extrapolation and self._filters.stage_info.prediction_enabled:
-                    pose = self._filters.extrapolate_for_display(pose, pose_age_s)
+                with stage_profile.stage("filters"):
+                    if self._render_extrapolation and self._filters.stage_info.prediction_enabled:
+                        pose = self._filters.extrapolate_for_display(pose, pose_age_s)
 
-                eye_offset_mm = np.asarray(
-                    self._screen_cal["eye_offset"],
-                    dtype=np.float64,
-                ) * 1000.0
-                self._virtual_camera.set_eye_mm(pose.translation_mm + eye_offset_mm)
-                control_eye = self._control_eye()
-                if control_eye is not None:
-                    # Điều kiện đối chứng: mắt đứng im ở tư thế nghỉ ĐO ĐƯỢC.
-                    self._virtual_camera.set_eye_mm(control_eye)
+                with stage_profile.stage("kooima_camera"):
+                    eye_offset_mm = np.asarray(
+                        self._screen_cal["eye_offset"],
+                        dtype=np.float64,
+                    ) * 1000.0
+                    self._virtual_camera.set_eye_mm(pose.translation_mm + eye_offset_mm)
+                    control_eye = self._control_eye()
+                    if control_eye is not None:
+                        # Điều kiện đối chứng: mắt đứng im ở tư thế nghỉ ĐO ĐƯỢC.
+                        self._virtual_camera.set_eye_mm(control_eye)
                 live_eye = self._virtual_camera.eye_position_mm
                 self._tick_rest_measure(now, live_eye, self._tracking.face_detected)
                 self._tick_prop_game(now, live_eye)
@@ -2261,28 +3424,56 @@ class HcpdApplication:
                     tracking_preview=preview,
                     dt_s=dt,
                 )
+                # TASK_game_feel_1118 P1: nhớ lại closure này — lúc cửa sổ
+                # bị kéo cạnh, ``_on_refresh`` vẽ lại bằng ĐÚNG scene này
+                # (pose/khung webcam đã chụp ở trên), không tự đọc gì mới.
+                self._last_scene = scene
+                self._drawing = True
+                try:
+                    with stage_profile.stage("draw_total"):
+                        self._draw_frame_only(scene)
+                finally:
+                    self._drawing = False
                 if self._album is not None:
-                    if not self._album.has_viewport():
-                        # Màn không có ô viewport: vẫn chạy ĐÚNG đường vẽ của
-                        # bản demo (render đầy đủ) nhưng cắt xuống 1 pixel nên
-                        # không thấy gì và gần như không tốn gì. Gọi riêng
-                        # video_plane.update() ngoài render() đã làm app văng
-                        # giữa lúc dựng lớp (log 23:01, không có traceback).
-                        self._album.draw_hidden_scene(scene)
-                    self._album_draw_guarded(scene)
                     if self._album_options.shots or self._album_options.ui_shots:
                         self._album_shots_step()
                     elif os.environ.get("HCPD_V3_LIVE") == "1":
                         self._tick_v3_live_shots()
-                else:
-                    scene()
-                self._window.swap_buffers()
+                    elif os.environ.get("HCPD_UI_SHOTS_1117") == "1":
+                        self._tick_sakuga_shots()
+                    elif os.environ.get("HCPD_AA_BASELINE_1118") == "1":
+                        self._tick_aa_baseline_shots()
                 self._profiler.render_latency_ms = (
                     time.perf_counter() - render_start
                 ) * 1000.0
                 self._profiler.capture_latency_ms = self._camera.capture_latency_ms
                 self._profiler.tracking_latency_ms = self._tracking.tracking_latency_ms
                 self._profiler.pose_age_ms = snapshot.age_ms()
+                if stage_profile.ENABLED:
+                    # Sample the EXISTING stage logger's own webcam/tracking
+                    # numbers into the same history, instead of re-timing
+                    # them — they're already measured on their own worker
+                    # threads (src/camera/async_capture.py,
+                    # src/engine/tracking_worker.py), not the main thread.
+                    stage_profile.record_ms("webcam_capture",
+                                           self._profiler.capture_latency_ms)
+                    stage_profile.record_ms("pose_tracking",
+                                           self._profiler.tracking_latency_ms)
+                if stage_profile.ENABLED:
+                    # "ui_painter" is draw_total MINUS the sub-stages nested
+                    # inside it (bugs/layer_render/mist/fx/swap are all
+                    # timed INSIDE the same _draw_frame_only call) — the
+                    # remainder is the 2D HUD/screen painter itself plus
+                    # V3UI.draw()'s own per-frame state-building. Peek
+                    # THIS frame's totals before flushing so it lands in
+                    # the same frame's history, not the next one's.
+                    this_frame = stage_profile.current_frame()
+                    nested = sum(this_frame.get(name, 0.0) for name in
+                                ("bugs", "layer_render", "mist", "fx",
+                                 "swap_vsync"))
+                    stage_profile.record_ms(
+                        "ui_painter", max(0.0, this_frame.get("draw_total", 0.0) - nested))
+                stage_profile.end_frame()
 
                 profile = self._profiler.end_frame(frame_start)
                 quality = self._adaptive.update(profile.fps)
@@ -2328,15 +3519,34 @@ class HcpdApplication:
             ),
         )
 
+    def _is_scripted_run(self) -> bool:
+        """TASK_perf_textures_1119 Fix 8: true for ``--demo``, ``--album-shots``/
+        ``--ui-shots``, or any bench/evidence hook env var (``HOOK_ENV_VARS``) —
+        none of those may ever write the user's real ``assets/config/*.json``.
+        Found via a real violation: ``_shutdown`` used to save
+        ``user_prefs.json`` on EVERY exit regardless of mode, clobbering the
+        real window_rect/display with whatever a `--ui-shots` run's hidden
+        window happened to be."""
+        return is_scripted_run(demo=self._demo, shots=self._album_options.shots,
+                               ui_shots=self._album_options.ui_shots)
+
     def _shutdown(self) -> None:
-        if self._album_options.is_v3:
+        if self._album_options.is_v3 and not self._is_scripted_run():
             # D1: nhớ chế độ và khung cửa sổ cho lần chạy sau.
             from src.config import prefs as _prefs
 
             _prefs.save(self._root, self._window.display_mode,
                         self._window.remembered_rect())
+            # TASK_accounts_1119 Phase 5: save on exit too, not just after
+            # every match result — a no-op for guest/no account signed in.
+            self._album.save_progress()
         self._tracking.stop()
         self._camera.stop()
         if self._renderer is not None:
             self._renderer.release()
         self._window.destroy()
+        tmp_dir = getattr(self, "_scripted_run_tmp_dir", None)
+        if tmp_dir is not None:
+            import shutil
+
+            shutil.rmtree(tmp_dir, ignore_errors=True)

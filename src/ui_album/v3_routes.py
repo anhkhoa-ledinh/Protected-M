@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 
+from src.account import crypto as _account_crypto
 from src.content import shared_album
 from src.ui_album import v3_flow as F
 
@@ -36,6 +37,15 @@ ACT_PVP_JOIN_ROOM = "pvp_join_room"
 ACT_PVP_CANCEL = "pvp_cancel"
 ACT_PVP_REMATCH = "pvp_rematch"
 ACT_PVP_RECONNECT = "pvp_reconnect"
+#: TASK_accounts_1119: băm/kiểm mật khẩu CHẠY TRÊN LUỒNG RIÊNG (app.py) —
+#: giao diện chỉ hỏi, giống hệt các hành động mạng PvP ở trên.
+ACT_SIGN_IN = "account_sign_in"
+ACT_SIGN_UP = "account_sign_up"
+ACT_FORGOT_OPEN = "account_forgot_open"
+ACT_FORGOT_SUBMIT = "account_forgot_submit"
+ACT_FORGOT_CLOSE = "account_forgot_close"
+ACT_RECOVERY_SAVED = "account_recovery_saved"
+ACT_COPY_RECOVERY_CODE = "account_copy_recovery_code"
 
 #: Nút chính của từng màn — Enter bấm đúng nút này (U2 "Enter = the primary
 #: button"). Màn không có tên trong bảng thì Enter không làm gì.
@@ -89,17 +99,34 @@ def on_back(state, now: float) -> str:
 
 
 def _sign_in(state, name: str) -> str:
+    """
+    TASK_accounts_1119: thật — không còn mô phỏng.
+
+    Băm/kiểm mật khẩu CHẠY NGOÀI LUỒNG VẼ (``app.py``, tương tự mọi hành
+    động mạng PvP) — hàm này chỉ kiểm được những gì KHÔNG cần đọc kho tài
+    khoản (hình dạng tên, độ dài mật khẩu, mật khẩu khớp), và trả về một
+    ``ACT_*`` để app.py tự quyết phần còn lại off-thread, đúng khuôn mọi
+    hành động khác trong file này.
+    """
     if name == "btn_Sign in":
-        # Mật khẩu **phải có**; tài khoản vẫn là mô phỏng (chưa lưu ra file,
-        # chưa băm) nên không kiểm nội dung, chỉ kiểm có nhập hay không.
-        ok = bool(state.player.strip()) and bool(state.password)
         state.focus = None
-        state.go(F.MENU if ok else F.SIGN_IN_ERR)
+        if not state.player.strip() or not state.password:
+            state.sign_in_error = "Enter a username and password."
+            state.go(F.SIGN_IN_ERR)
+            return ""
+        return ACT_SIGN_IN
     elif name == "btn_Create album" and state.screen == F.SIGN_UP:
-        ok = (bool(state.player.strip()) and len(state.password) >= 8
-              and state.password == state.password2)
         state.focus = None
-        state.go(F.MENU if ok else F.SIGN_UP)
+        # Chạm hết ba ô: bấm thẳng nút mà chưa gõ ô nào (vd. chỉ gõ mật
+        # khẩu rồi Tab qua nút) vẫn phải thấy đúng gợi ý, không im lặng.
+        state.touched |= {"field_user", "field_pass", "field_pass2"}
+        display, reason = _account_crypto.validate_username(state.player)
+        if display is None:
+            return ""                          # gợi ý đã hiện qua state_for
+        pass_ok, _reason = _account_crypto.validate_password(state.password)
+        if not pass_ok or state.password != state.password2:
+            return ""
+        return ACT_SIGN_UP
     elif name in ("btn_Create album", "btn_Create a new album"):
         state.focus = None
         state.go(F.SIGN_UP)                    # trên màn đăng nhập = sang đăng ký
@@ -110,15 +137,29 @@ def _sign_in(state, name: str) -> str:
             state.go(F.SIGN_IN)
         else:
             state.player = state.player or "guest"
+            state.account_key = _account_crypto.GUEST_KEY
+            # TASK_accounts_1119 Phase 5: khách không có tiến trình riêng
+            # — nếu còn history/recent của tài khoản TRƯỚC đó (đăng xuất
+            # rồi vào khách) thì phải dọn, không thì màn chính/bảng xếp
+            # hạng hiện nhầm dữ liệu của người khác.
+            state.history, state.recent = {}, []
             state.go(F.MENU)
     elif name == "link_guest":
         state.focus = None
         state.player = state.player or "guest"
+        state.account_key = _account_crypto.GUEST_KEY
+        state.history, state.recent = {}, []
         state.go(F.MENU)
     elif name == "link_forgot":
-        F.say(state, "Password reset isn't available in the demo.")
+        state.forgot_open = True
+        state.forgot_user = state.player
+        state.forgot_code = ""
+        state.forgot_new_pass = state.forgot_new_pass2 = ""
+        state.forgot_error = ""
+        state.forgot_touched = set()
+        state.forgot_focus = "field_forgot_user"
     elif name == "switch_remember":
-        state.remember = not state.remember   # U2: không có tác dụng gì khác
+        state.remember = not state.remember
     elif name == "icon_show_password":
         state.show_password = not state.show_password
     elif name.startswith("field_"):
@@ -172,6 +213,53 @@ def _confirm_share(state, name: str) -> str:
     state.shared_album_confirmed.add(path)
     state.shared_album_upload_path = path
     return ACT_SHARE_CONFIRMED
+
+
+def _recovery_dialog(state, name: str) -> str:
+    """TASK_accounts_1119 Phase 6: the one-time recovery-code dialog —
+    "Copy" (clipboard, app.py's job) and "I saved it" (closes it)."""
+    if name == "btn_recovery_copy":
+        return ACT_COPY_RECOVERY_CODE
+    elif name == "btn_recovery_saved":
+        state.recovery_code_shown = ""
+        return ACT_RECOVERY_SAVED
+    return ""
+
+
+def _forgot_dialog(state, name: str) -> str:
+    """The forgot-password dialog's own four fields + Reset/Cancel.
+
+    Same split as sign-up: only FORMAT-level checks happen here
+    (synchronous, no store access) — the code itself can only be
+    verified against the store, off-thread, via ``ACT_FORGOT_SUBMIT``.
+    """
+    if name.startswith("field_forgot_"):
+        state.forgot_focus = name
+    elif name == "btn_forgot_cancel":
+        state.forgot_open = False
+        state.forgot_focus = None
+        state.forgot_error = ""
+    elif name == "btn_forgot_submit":
+        state.forgot_touched |= {"field_forgot_user", "field_forgot_code",
+                                 "field_forgot_pass", "field_forgot_pass2"}
+        display, reason = _account_crypto.validate_username(state.forgot_user)
+        if display is None:
+            state.forgot_error = reason
+            return ""
+        code = _account_crypto.normalize_recovery_code(state.forgot_code)
+        if len(code) != _account_crypto.RECOVERY_CODE_CHARS:
+            state.forgot_error = "Enter the 12-character code."
+            return ""
+        pass_ok, reason2 = _account_crypto.validate_password(state.forgot_new_pass)
+        if not pass_ok:
+            state.forgot_error = reason2
+            return ""
+        if state.forgot_new_pass != state.forgot_new_pass2:
+            state.forgot_error = "Passwords don't match"
+            return ""
+        state.forgot_error = ""
+        return ACT_FORGOT_SUBMIT
+    return ""
 
 
 def _solo(state, name: str) -> str:
@@ -291,6 +379,10 @@ def on_click(state, name: str | None, now: float, point=None) -> str:
     logger.info("UI v3 click: %s (man %s)", name, state.screen)
     if state.shared_album_pending and name in ("btn_confirm_yes", "btn_confirm_no"):
         return _confirm_share(state, name)
+    if state.recovery_code_shown:
+        return _recovery_dialog(state, name)
+    if state.forgot_open:
+        return _forgot_dialog(state, name)
     if state.screen in F.LOCKED:
         return _sign_in(state, name)
     if name in F.TABS:
@@ -319,3 +411,56 @@ def on_click(state, name: str | None, now: float, point=None) -> str:
                         F.PVP_HUNT, F.PVP_HIDE, F.PVP_RESULT, F.OFFLINE):
         return _pvp(state, name, now)
     return _solo(state, name)
+
+
+# ---- TASK_perf_textures_1119 Fix 3: prefetch graph ------------------------
+#
+# For every v3 screen, the screens reachable by exactly one click — hand-
+# built from ``on_click``/``BACK``/``TABS`` above (plus app.py's own
+# ``state.go`` calls for the off-thread actions this module only REQUESTS:
+# sign-in/up success, the split-layers pipeline, match start/end, PvP
+# matchmaking). tests/test_screen_prefetch.py cross-checks every
+# ``state.go(...)`` target actually found in THIS file against it.
+#
+# Tabs (``F.TABS``) work from every unlocked screen, so they're added to
+# every entry below except the three ``F.LOCKED`` ones, instead of repeated
+# by hand on each row.
+_TAB_NEIGHBOURS = (F.LEVELS, F.PVP_MODE, F.BOARD, F.SETTINGS)
+
+_NEXT_SCREENS_BASE: dict[str, tuple[str, ...]] = {
+    F.SIGN_IN: (F.SIGN_UP, F.SIGN_IN_ERR, F.MENU),
+    F.SIGN_UP: (F.SIGN_IN, F.MENU),
+    F.SIGN_IN_ERR: (F.SIGN_IN, F.SIGN_UP, F.MENU),
+    F.MENU: (F.LEVELS, F.PVP_MODE, F.BOARD, F.SETTINGS),
+    F.SETTINGS: (F.MENU, F.SIGN_IN),
+    F.OFFLINE: (F.PVP_MODE,),
+    F.LEVELS: (F.MENU, F.PHOTOS),
+    F.PHOTOS: (F.LEVELS, F.LOADING),
+    F.LOADING: (F.PHOTOS, F.LOADING_READY),
+    F.LOADING_READY: (F.PHOTOS, F.LOADOUT),
+    F.LOADOUT: (F.PHOTOS, F.TILT),
+    F.TILT: (F.LOADOUT, F.PLAY),
+    F.PLAY: (F.WIN, F.LOSE),
+    F.WIN: (F.MENU, F.TILT, F.PHOTOS, F.LEVELS),
+    F.LOSE: (F.MENU, F.TILT, F.PHOTOS, F.LEVELS),
+    F.PVP_MODE: (F.MENU, F.PVP_SEARCH, F.PVP_INVITE),
+    F.PVP_SEARCH: (F.PVP_MODE, F.PVP_FOUND, F.OFFLINE),
+    F.PVP_INVITE: (F.PVP_MODE, F.PVP_FOUND),
+    F.PVP_FOUND: (F.PVP_HUNT, F.PVP_HIDE, F.PVP_MODE),
+    F.PVP_HUNT: (F.PVP_RESULT, F.PVP_MODE),
+    F.PVP_HIDE: (F.PVP_RESULT, F.PVP_MODE),
+    F.PVP_RESULT: (F.MENU, F.PVP_MODE, F.BOARD),
+    F.BOARD: (F.MENU,),
+}
+
+
+def _build_next_screens() -> dict[str, tuple[str, ...]]:
+    out: dict[str, tuple[str, ...]] = {}
+    for screen, neighbours in _NEXT_SCREENS_BASE.items():
+        extra = () if screen in F.LOCKED else (s for s in _TAB_NEIGHBOURS if s != screen)
+        out[screen] = tuple(dict.fromkeys((*neighbours, *extra)))
+    return out
+
+
+#: ``screen -> (screens one click away)``. See ``V3UI._prefetch_neighbours``.
+NEXT_SCREENS: dict[str, tuple[str, ...]] = _build_next_screens()

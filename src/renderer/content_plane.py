@@ -14,6 +14,7 @@ import numpy.typing as npt
 from OpenGL import GL
 
 from src.config.schema import ContentSettings
+from src.engine.stage_profile import stage
 from src.content.bake import BakeWorker
 from src.content.depth_worker import DepthWorker
 from src.content.formats import detect_content_type
@@ -28,6 +29,7 @@ from src.math.homogeneous import to_column_major_flat, translation_matrix
 from src.renderer.shader import ShaderProgram
 from src.renderer.textured_mesh import TexturedMesh
 from src.renderer.video_player import VideoPlayer
+from src.ui_album.textures import bleed_transparent
 from src.scene.primitives import (
     RELIEF_CLAMP_GAP_FRACTION,
     create_displaced_vertical_plane_uv,
@@ -784,7 +786,11 @@ class ContentPlaneRenderer:
             GL.glDeleteTextures(1, [self._texture])
         self._texture = int(GL.glGenTextures(1))
         GL.glBindTexture(GL.GL_TEXTURE_2D, self._texture)
-        GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MIN_FILTER, GL.GL_LINEAR)
+        # TASK_game_feel_1118 P2: mipmap — mặt kính/ảnh luôn lớn hơn cỡ
+        # hiển thị thật, không mip thì cạnh khối ảnh alias ở cửa sổ nhỏ.
+        # RGB thuần (không kênh alpha) nên không cần loang màu.
+        GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MIN_FILTER,
+                           GL.GL_LINEAR_MIPMAP_LINEAR)
         GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MAG_FILTER, GL.GL_LINEAR)
         GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_WRAP_S, GL.GL_CLAMP_TO_EDGE)
         GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_WRAP_T, GL.GL_CLAMP_TO_EDGE)
@@ -967,7 +973,8 @@ class ContentPlaneRenderer:
                 and self._mist is not None
                 and len(self._layers) >= 2
             ):
-                self._draw_mist(model_flat, view_flat, proj_flat)
+                with stage("mist"):
+                    self._draw_mist(model_flat, view_flat, proj_flat)
         GL.glDepthMask(GL.GL_TRUE)
         GL.glDisable(GL.GL_BLEND)
         GL.glEnable(GL.GL_CULL_FACE)
@@ -1210,7 +1217,9 @@ class ContentPlaneRenderer:
             # Dựng texture SAU khi đã chốt rgba: ở chế độ pad là mảng đã đệm.
             # Dựng sẵn từ ``layer.rgba`` ở đầu vòng rồi dựng lại sẽ rò một
             # texture GL mỗi lớp mỗi lần nạp ảnh.
-            texture = self._create_rgba_texture(rgba_l)
+            # TASK_game_feel_fix_1118 Fix 2: ``apply_bleed=False`` — xem
+            # docstring ``_create_rgba_texture``.
+            texture = self._create_rgba_texture(rgba_l, apply_bleed=False)
             self._warn_if_front_layer_too_wide(layer_idx, layer, t_mm, width_s)
             overscan_lines.append(
                 f"L{layer_idx} t={t_mm:.0f}mm {note} x{scale:.3f} "
@@ -1322,12 +1331,41 @@ class ContentPlaneRenderer:
             ", ".join(f"{lyr.coverage:.0%}" for lyr in layers),
         )
 
-    def _create_rgba_texture(self, rgba: npt.NDArray[np.uint8]) -> int:
-        data = np.ascontiguousarray(np.flipud(rgba), dtype=np.uint8)
+    def _create_rgba_texture(self, rgba: npt.NDArray[np.uint8], *,
+                             apply_bleed: bool = True) -> int:
+        """
+        ``apply_bleed=False`` (TASK_game_feel_fix_1118 Fix 2): photo LAYER
+        arrays never need it. ``extract_layer_rgba`` keeps the full
+        graded-photo RGB at every pixel, even where alpha is 0 — "RGB is
+        kept everywhere (not zeroed outside the cluster) so the soft edge
+        blends the true image colors" (its own docstring) — and
+        ``_pad_layer``'s border is ``cv2.BORDER_REPLICATE`` (copies the
+        real edge pixel outward), never zero-fill. So a layer's RGB under
+        a transparent pixel was never black to begin with; the bug
+        ``bleed_transparent`` exists for (straight-alpha PNGs whose
+        AUTHORING pipeline left RGB=0 under alpha=0) does not apply here.
+        Skipping it removes a 6-iteration box-blur pass over a full-
+        resolution array from the MAIN RENDER THREAD (``_apply_bake``,
+        called from ``update()``'s per-frame tick path — every OTHER
+        caller already does its own GL-only work, per that method's own
+        docstring; this blur broke that invariant). The layer-SHADOW
+        texture (``_build_layer_shadows``) is a different, small,
+        procedurally generated array — not verified safe, keeps bleeding
+        (the default).
+        """
+        # TASK_game_feel_1118 P2: loang màu TRƯỚC ``flipud`` — loang không
+        # quan tâm hướng trục, và làm trên mảng gốc (liên tục trong bộ
+        # nhớ) rẻ hơn làm sau khi lật.
+        bled = bleed_transparent(rgba) if apply_bleed else rgba
+        data = np.ascontiguousarray(np.flipud(bled), dtype=np.uint8)
         h, w = data.shape[:2]
         texture = int(GL.glGenTextures(1))
         GL.glBindTexture(GL.GL_TEXTURE_2D, texture)
-        GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MIN_FILTER, GL.GL_LINEAR)
+        # Mipmap: lớp ảnh/bóng co lại rõ rệt theo khoảng cách camera ảo,
+        # viền cắt lớp (alpha nhị phân, đã loang màu ở trên) alias mạnh
+        # nhất trong cả app nếu không mip.
+        GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MIN_FILTER,
+                           GL.GL_LINEAR_MIPMAP_LINEAR)
         GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MAG_FILTER, GL.GL_LINEAR)
         GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_WRAP_S, GL.GL_CLAMP_TO_EDGE)
         GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_WRAP_T, GL.GL_CLAMP_TO_EDGE)
@@ -1336,6 +1374,7 @@ class ContentPlaneRenderer:
             GL.GL_TEXTURE_2D, 0, GL.GL_RGBA, w, h, 0,
             GL.GL_RGBA, GL.GL_UNSIGNED_BYTE, data,
         )
+        GL.glGenerateMipmap(GL.GL_TEXTURE_2D)
         return texture
 
     def _build_layer_shadows(self) -> None:
@@ -1517,6 +1556,10 @@ class ContentPlaneRenderer:
                 GL.GL_TEXTURE_2D, 0, 0, 0, w, h,
                 GL.GL_RGB, GL.GL_UNSIGNED_BYTE, rgb,
             )
+        # TASK_game_feel_1118 P2: bậc mip phải theo kịp nội dung mới —
+        # nhánh glTexSubImage2D (video đang phát) cũng cần, không chỉ
+        # nhánh cấp phát lại.
+        GL.glGenerateMipmap(GL.GL_TEXTURE_2D)
 
 
 # Backward-compatible alias
