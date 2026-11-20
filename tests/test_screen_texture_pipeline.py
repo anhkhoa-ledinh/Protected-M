@@ -13,7 +13,8 @@ from pathlib import Path
 import pytest
 
 from src.ui_album.texture_loader import PRIORITY_PREFETCH
-from src.ui_album.v3 import SCREEN_CACHE_MAX_TEXTURES, V3Manifest, V3Painter
+from src.ui_album.v3 import V3Manifest
+from src.ui_album.v3_painter import SCREEN_CACHE_MAX_TEXTURES, V3Painter
 
 ROOT = Path(".").resolve()
 

@@ -14,8 +14,10 @@ from __future__ import annotations
 
 import pytest
 
-from src.ui_album.v3 import (AIM_ARM, AIM_EDGE, AIM_GAP, AIM_THICK, V3State,
-                             _draw_aim, rgba, AIM_COL, AIM_EDGE_COL)
+from src.ui_album.v3 import V3State
+from src.ui_album.v3_painter import rgba
+from src.ui_album.v3_screen_draw import (AIM_ARM, AIM_COL, AIM_EDGE,
+                             AIM_EDGE_COL, AIM_GAP, AIM_THICK, _draw_aim)
 
 
 class FakePainter:

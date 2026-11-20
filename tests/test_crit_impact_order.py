@@ -15,6 +15,8 @@ from pathlib import Path
 
 from src.ui_album import v3
 from src.ui_album import v3_flow as F
+from src.ui_album import v3_painter
+from src.ui_album import v3_screen_draw
 from src.ui_album import v3_values
 
 ROOT = Path(".").resolve()
@@ -22,7 +24,7 @@ ROOT = Path(".").resolve()
 
 def test_crit_impact_draws_before_the_top_layer(gl_context, monkeypatch):
     manifest = v3.V3Manifest(ROOT)
-    painter = v3.V3Painter(manifest, ROOT / "assets" / "shaders")
+    painter = v3_painter.V3Painter(manifest, ROOT / "assets" / "shaders")
     painter.initialize()
     painter.set_frame((1280, 720))
 
@@ -32,8 +34,8 @@ def test_crit_impact_draws_before_the_top_layer(gl_context, monkeypatch):
     state.crit_impact_alpha = 0.55
 
     order: list = []
-    real_crit_impact = v3._draw_crit_impact
-    real_layer_region = v3.V3Painter.layer_region
+    real_crit_impact = v3_screen_draw._draw_crit_impact
+    real_layer_region = v3_painter.V3Painter.layer_region
 
     def tracking_crit_impact(painter_arg, state_arg):
         order.append("crit_impact")
@@ -45,7 +47,7 @@ def test_crit_impact_draws_before_the_top_layer(gl_context, monkeypatch):
         return real_layer_region(self, rect, relative, alpha)
 
     monkeypatch.setattr(v3, "_draw_crit_impact", tracking_crit_impact)
-    monkeypatch.setattr(v3.V3Painter, "layer_region", tracking_layer_region)
+    monkeypatch.setattr(v3_painter.V3Painter, "layer_region", tracking_layer_region)
 
     painter.bind_screen(F.PLAY, v3_values.extra_files(manifest, F.PLAY, state))
     painter.begin()

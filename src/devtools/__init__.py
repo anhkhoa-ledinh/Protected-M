@@ -846,7 +846,7 @@ class DevTools:
         HOVER_HOLD, AUTO_FX_HOLD = 90, 25
 
         def hotspot_rect(screen, name):
-            from src.ui_album.v3 import hotspot_rect as _rect
+            from src.ui_album.v3_hit import hotspot_rect as _rect
 
             for hotspot in app._album.manifest.screens[screen].get(
                     "hotspots", ()):

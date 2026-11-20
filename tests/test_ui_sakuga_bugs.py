@@ -12,7 +12,7 @@ from types import SimpleNamespace
 
 from PIL import Image
 
-from src.ui_album import v3, v3_values
+from src.ui_album import v3, v3_hit, v3_values
 from src.ui_album import v3_flow as F
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -128,42 +128,42 @@ class HotspotShapeCoverageTest(unittest.TestCase):
         for screen, s in MANIFEST_DATA["screens"].items():
             for h in s.get("hotspots", ()):
                 with self.subTest(screen=screen, name=h["n"]):
-                    rect = v3.hotspot_rect(screen, h)
-                    shape = v3.hotspot_shape(h["n"], rect)
-                    self.assertIsInstance(shape, v3.HotspotShape)
+                    rect = v3_hit.hotspot_rect(screen, h)
+                    shape = v3_hit.hotspot_shape(h["n"], rect)
+                    self.assertIsInstance(shape, v3_hit.HotspotShape)
 
     def test_unknown_hotspot_name_raises_not_silently_falls_back(self) -> None:
         with self.assertRaises(ValueError):
-            v3.hotspot_shape("totally_unknown_hotspot_xyz", (0, 0, 10, 10))
+            v3_hit.hotspot_shape("totally_unknown_hotspot_xyz", (0, 0, 10, 10))
 
     def test_continue_is_none_shape(self) -> None:
-        shape = v3.hotspot_shape("continue", (0.0, 0.0, 1280.0, 720.0))
+        shape = v3_hit.hotspot_shape("continue", (0.0, 0.0, 1280.0, 720.0))
         self.assertEqual(shape.kind, "none")
 
     def test_a_hotspot_covering_half_the_screen_is_none_regardless_of_name(self) -> None:
-        shape = v3.hotspot_shape("btn_whatever", (0.0, 0.0, 1280.0, 400.0))
+        shape = v3_hit.hotspot_shape("btn_whatever", (0.0, 0.0, 1280.0, 400.0))
         self.assertEqual(shape.kind, "none")
 
     def test_pill_kinds(self) -> None:
         for name in ("tab_Solo", "seg_Solo", "display_full", "theme_day",
                      "switch_remember"):
             with self.subTest(name=name):
-                shape = v3.hotspot_shape(name, (0.0, 0.0, 88.0, 36.0))
+                shape = v3_hit.hotspot_shape(name, (0.0, 0.0, 88.0, 36.0))
                 self.assertEqual(shape.kind, "pill")
 
     def test_underline_kinds(self) -> None:
         for name in ("link_guest", "link_forgot", "footer_link", "sign_out",
                      "leave"):
             with self.subTest(name=name):
-                shape = v3.hotspot_shape(name, (0.0, 0.0, 100.0, 16.0))
+                shape = v3_hit.hotspot_shape(name, (0.0, 0.0, 100.0, 16.0))
                 self.assertEqual(shape.kind, "underline")
 
     def test_circle_kind(self) -> None:
-        shape = v3.hotspot_shape("icon_show_password", (0.0, 0.0, 20.0, 20.0))
+        shape = v3_hit.hotspot_shape("icon_show_password", (0.0, 0.0, 20.0, 20.0))
         self.assertEqual(shape.kind, "circle")
 
     def test_thumb_kind(self) -> None:
-        shape = v3.hotspot_shape("slider", (0.0, 0.0, 194.0, 30.0))
+        shape = v3_hit.hotspot_shape("slider", (0.0, 0.0, 194.0, 30.0))
         self.assertEqual(shape.kind, "thumb")
 
 
@@ -173,28 +173,28 @@ class MeasuredRadiusMatchesTableTest(unittest.TestCase):
 
     CASES_BASE_PNG = [
         ("v3_01a_sign_in", "btn_Sign in", (462, 450, 356, 54),
-         v3.BTN_CORNER_RADIUS_PX),
+         v3_hit.BTN_CORNER_RADIUS_PX),
         ("v3_03_level_select", "level_row_1", (648, 150, 568, 84),
-         v3.ROW_CORNER_RADIUS_PX),
+         v3_hit.ROW_CORNER_RADIUS_PX),
         ("v3_05_loadout", "weapon_Precision gun", (64, 180, 300, 112),
-         v3.ROW_CORNER_RADIUS_PX),
+         v3_hit.ROW_CORNER_RADIUS_PX),
         ("v3_01a_sign_in", "field_user", (462, 272, 356, 56),
-         v3.FIELD_CORNER_RADIUS_PX),
+         v3_hit.FIELD_CORNER_RADIUS_PX),
         ("v3_10_pvp_mode", "mode_Competitive", (64, 150, 560, 450),
-         v3.MODE_CORNER_RADIUS_PX),
+         v3_hit.MODE_CORNER_RADIUS_PX),
         ("v3_04_choose_photo", "dropzone", (84, 172, 600, 400),
-         v3.DROPZONE_CORNER_RADIUS_PX),
+         v3_hit.DROPZONE_CORNER_RADIUS_PX),
         ("v3_04_choose_photo", "recent_memory", (728, 176, 488, 262),
-         v3.RECENT_MEMORY_CORNER_RADIUS_PX),
+         v3_hit.RECENT_MEMORY_CORNER_RADIUS_PX),
         ("v3_02b_settings", "dropdown_webcam", (520, 362, 220, 40),
-         v3.DROPDOWN_CORNER_RADIUS_PX),
+         v3_hit.DROPDOWN_CORNER_RADIUS_PX),
     ]
 
     def test_base_png_classes(self) -> None:
         for screen, name, rect, expected in self.CASES_BASE_PNG:
             with self.subTest(name=name):
                 image = _image_for(screen)
-                measured = v3.measure_corner_radius_px(
+                measured = v3_hit.measure_corner_radius_px(
                     image, rect, MANIFEST_DATA["image_scale"], probe_y=0)
                 self.assertIsNotNone(measured, f"{name}: khong do duoc")
                 self.assertAlmostEqual(measured, expected, delta=2.0)
@@ -202,14 +202,14 @@ class MeasuredRadiusMatchesTableTest(unittest.TestCase):
     def test_sticker_and_slot_sprite_png(self) -> None:
         cases = [
             ("sprites/v3_05_loadout__sticker_Flare.png",
-             v3.STICKER_CORNER_RADIUS_PX),
+             v3_hit.STICKER_CORNER_RADIUS_PX),
             ("sprites/v3_05_loadout__slot_empty_1.png",
-             v3.SLOT_CORNER_RADIUS_PX),
+             v3_hit.SLOT_CORNER_RADIUS_PX),
         ]
         for relpath, expected in cases:
             with self.subTest(relpath=relpath):
                 image = Image.open(ROOT / "assets" / "ui_v3" / relpath).convert("RGBA")
-                measured = v3.measure_alpha_radius_px(image, 1.5)
+                measured = v3_hit.measure_alpha_radius_px(image, 1.5)
                 self.assertIsNotNone(measured)
                 self.assertAlmostEqual(measured, expected, delta=2.0)
 
@@ -233,9 +233,9 @@ class LinkHitAreaWidthTest(unittest.TestCase):
         for screen, name, original_rect in self.CASES:
             with self.subTest(screen=screen, name=name):
                 image = _image_for(screen)
-                ink = v3.measure_ink_bounds(image, original_rect, 1.5)
+                ink = v3_hit.measure_ink_bounds(image, original_rect, 1.5)
                 self.assertIsNotNone(ink, f"{name}: khong thay chu")
-                final_rect = v3.LINK_HIT_RECTS[(screen, name)]
+                final_rect = v3_hit.LINK_HIT_RECTS[(screen, name)]
                 self.assertLessEqual(final_rect[2], ink[2] + 16.0 + 1e-6)
 
     def test_final_hit_rects_are_narrower_than_the_old_manifest_rect(self) -> None:
@@ -247,7 +247,7 @@ class LinkHitAreaWidthTest(unittest.TestCase):
             if name == "sign_out":
                 continue
             with self.subTest(screen=screen, name=name):
-                final_rect = v3.LINK_HIT_RECTS[(screen, name)]
+                final_rect = v3_hit.LINK_HIT_RECTS[(screen, name)]
                 self.assertLess(final_rect[2], original_rect[2])
 
     def test_hit_test_uses_the_narrower_rect(self) -> None:
@@ -255,7 +255,7 @@ class LinkHitAreaWidthTest(unittest.TestCase):
         manifest.screens = MANIFEST_DATA["screens"]
         # A point inside the OLD wide rect but outside the new narrow one
         # (far left of the "Play as guest" card, no real link text there).
-        result = v3.hit_test(manifest, "v3_01a_sign_in", 440.0, 630.0)
+        result = v3_hit.hit_test(manifest, "v3_01a_sign_in", 440.0, 630.0)
         self.assertNotEqual(result, "link_guest")
 
 

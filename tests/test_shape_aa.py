@@ -22,8 +22,8 @@ import numpy as np
 import pytest
 from PIL import ImageDraw
 
-from src.ui_album import v3
-from src.ui_album.v3 import _AA_FACTOR, _aa_build
+from src.ui_album import v3, v3_painter
+from src.ui_album.v3_painter import _AA_FACTOR, _aa_build
 
 ROOT = Path(".").resolve()
 
@@ -107,7 +107,7 @@ def test_aa_build_draw_receives_the_supersampled_dimensions():
 @pytest.fixture
 def painter(gl_context):
     manifest = v3.V3Manifest(ROOT)
-    instance = v3.V3Painter(manifest, ROOT / "assets" / "shaders")
+    instance = v3_painter.V3Painter(manifest, ROOT / "assets" / "shaders")
     instance.initialize()
     instance.set_frame((1280, 720))
     yield instance
@@ -119,13 +119,13 @@ def _capture_upload(monkeypatch):
     real-GL test inspect the exact pixels ``_aa_build`` produced for a
     real painter method, without needing to read a texture back."""
     captured: list = []
-    real_upload = v3.upload_rgba
+    real_upload = v3_painter.upload_rgba
 
     def fake_upload(array, **kwargs):
         captured.append(array.copy())
         return real_upload(array, **kwargs)
 
-    monkeypatch.setattr(v3, "upload_rgba", fake_upload)
+    monkeypatch.setattr(v3_painter, "upload_rgba", fake_upload)
     return captured
 
 

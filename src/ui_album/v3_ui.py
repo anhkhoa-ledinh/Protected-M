@@ -30,7 +30,9 @@ from src.ui_album.hud_cards import card_index_for_point, cards_for_screen
 from src.ui_album.texture_loader import PRIORITY_PREFETCH
 from src.ui_album.scope import ScopeState
 from src.ui_album.shot_feel import ShotFeel
-from src.ui_album.v3 import V3Manifest, V3Painter, draw_screen, hit_test, shot_state
+from src.ui_album.v3 import V3Manifest, draw_screen, shot_state
+from src.ui_album.v3_hit import hit_test
+from src.ui_album.v3_painter import V3Painter
 from src.ui_album.v3_hover import HoverFx, cursor_for
 
 logger = logging.getLogger(__name__)
@@ -288,7 +290,7 @@ class V3UI:
 
     def _dialog_hover(self, x: float, y: float) -> str | None:
         """Hộp xác nhận chia sẻ che cả màn — hai nút của nó, không gì khác."""
-        from src.ui_album.v3 import CONFIRM_NO_RECT, CONFIRM_YES_RECT
+        from src.ui_album.v3_screen_draw import CONFIRM_NO_RECT, CONFIRM_YES_RECT
 
         for name, rect in (("btn_confirm_yes", CONFIRM_YES_RECT),
                           ("btn_confirm_no", CONFIRM_NO_RECT)):
@@ -301,7 +303,7 @@ class V3UI:
         """TASK_accounts_1119 Phase 6: the recovery-code dialog's own two
         buttons, same "covers the whole screen, nothing else" rule as
         the share-confirm dialog."""
-        from src.ui_album.v3 import RECOVERY_COPY_RECT, RECOVERY_SAVED_RECT
+        from src.ui_album.v3_screen_draw import RECOVERY_COPY_RECT, RECOVERY_SAVED_RECT
 
         for name, rect in (("btn_recovery_copy", RECOVERY_COPY_RECT),
                           ("btn_recovery_saved", RECOVERY_SAVED_RECT)):
@@ -312,7 +314,7 @@ class V3UI:
 
     def _forgot_hover(self, x: float, y: float) -> str | None:
         """The forgot-password dialog's four fields + Reset/Cancel."""
-        from src.ui_album.v3 import (FORGOT_CANCEL_RECT, FORGOT_FIELD_H,
+        from src.ui_album.v3_screen_draw import (FORGOT_CANCEL_RECT, FORGOT_FIELD_H,
                                      FORGOT_FIELD_W, FORGOT_FIELD_X,
                                      FORGOT_FIELDS, FORGOT_SUBMIT_RECT)
 
@@ -395,8 +397,8 @@ class V3UI:
         positioning and rendering never disagree. ``None`` for anything
         that isn't one of the caret-bearing fields (``field_join`` keeps
         its own append/backspace-last model, out of this task's scope)."""
-        from src.ui_album.v3 import (_FIELD_VALUE_FONT, FORGOT_FIELDS,
-                                     _field_box_rect, forgot_field_value_rect)
+        from src.ui_album.v3_screen_draw import _FIELD_VALUE_FONT, FORGOT_FIELDS
+        from src.ui_album.v3_text_field import _field_box_rect, forgot_field_value_rect
 
         if name in F.FORGOT_FIELD_ATTR:
             for fname, _label, field_y, masked in FORGOT_FIELDS:
@@ -446,11 +448,12 @@ class V3UI:
 
     def _click_rect(self, screen: str, name: str, in_dialog: bool):
         if in_dialog:
-            from src.ui_album.v3 import (CONFIRM_NO_RECT, CONFIRM_YES_RECT,
-                                         FORGOT_CANCEL_RECT, FORGOT_FIELD_H,
-                                         FORGOT_FIELD_W, FORGOT_FIELD_X,
-                                         FORGOT_FIELDS, FORGOT_SUBMIT_RECT,
-                                         RECOVERY_COPY_RECT, RECOVERY_SAVED_RECT)
+            from src.ui_album.v3_screen_draw import (
+                CONFIRM_NO_RECT, CONFIRM_YES_RECT,
+                FORGOT_CANCEL_RECT, FORGOT_FIELD_H,
+                FORGOT_FIELD_W, FORGOT_FIELD_X,
+                FORGOT_FIELDS, FORGOT_SUBMIT_RECT,
+                RECOVERY_COPY_RECT, RECOVERY_SAVED_RECT)
 
             rects = {"btn_confirm_yes": CONFIRM_YES_RECT, "btn_confirm_no": CONFIRM_NO_RECT,
                     "btn_recovery_copy": RECOVERY_COPY_RECT,
@@ -460,7 +463,7 @@ class V3UI:
             for field_name, _label, field_y, _masked in FORGOT_FIELDS:
                 rects[field_name] = (FORGOT_FIELD_X, field_y, FORGOT_FIELD_W, FORGOT_FIELD_H)
             return rects.get(name)
-        from src.ui_album.v3 import hotspot_rect
+        from src.ui_album.v3_hit import hotspot_rect
 
         for hotspot in self.manifest.screens[screen].get("hotspots", ()):
             if hotspot["n"] == name:

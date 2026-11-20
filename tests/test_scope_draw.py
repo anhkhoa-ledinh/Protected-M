@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import pytest
 
-from src.ui_album.v3 import (V3State, _draw_aim, _draw_scope_mini_readout,
+from src.ui_album.v3 import V3State
+from src.ui_album.v3_screen_draw import (_draw_aim, _draw_scope_mini_readout,
                              _draw_scope_reticle, _draw_scope_vignette)
 
 
@@ -206,7 +207,8 @@ def test_no_mini_readout_in_shot_mode():
 def test_outlined_label_renders_on_real_gl(gl_context):
     from pathlib import Path
 
-    from src.ui_album.v3 import V3Manifest, V3Painter
+    from src.ui_album.v3 import V3Manifest
+    from src.ui_album.v3_painter import V3Painter
 
     manifest = V3Manifest(Path(".").resolve())
     painter = V3Painter(manifest, Path(".").resolve() / "assets" / "shaders")

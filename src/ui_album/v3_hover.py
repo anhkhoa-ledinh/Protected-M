@@ -22,9 +22,11 @@ from PIL import Image
 
 from src.fx import screens as fx_screens
 from src.fx.anim import Spring
-from src.ui_album.v3 import (CARET_COL, FOCUS_INSET, FOCUS_PX, INK,
-                             hotspot_rect, hotspot_shape, measure_ink_bounds,
-                             ring_draw_radius, rgba)
+from src.ui_album.v3 import FOCUS_INSET, FOCUS_PX, INK
+from src.ui_album.v3_hit import (hotspot_rect, hotspot_shape,
+                                 measure_ink_bounds, ring_draw_radius)
+from src.ui_album.v3_painter import rgba
+from src.ui_album.v3_text_field import CARET_COL
 
 #: Hover spring: 0 (idle) -> 1 (fully hovered) and back, stepped with real dt.
 HOVER_SPRING_K, HOVER_SPRING_D = 420.0, 26.0
