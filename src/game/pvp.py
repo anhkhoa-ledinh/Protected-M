@@ -6,10 +6,11 @@ namespace (a genuine consumer — the v3 UI state machine still reads
 everywhere), not a compatibility shim.
 
 NOT the same table as ``src.game.match.LEVEL_TABLE``/``ITEM_WEIGHT`` —
-those are the OLD v2 album UI's Vietnamese-named version (``src.ui_album
-.flow``, kept for its own reasons in R1, moved in R5); this is the v3 UI's
-English-named version (its sprite keys, e.g. ``item_tile:Flare``, need
-English names) — same numbers, different display/item-name strings.
+those are the OLD v2 album UI's Vietnamese-named version (moved from
+``src.ui_album.flow`` in R5; that module itself was deleted as dead code
+in TASK_cleanup_readme_1121); this is the v3 UI's English-named version
+(its sprite keys, e.g. ``item_tile:Flare``, need English names) — same
+numbers, different display/item-name strings.
 """
 
 from __future__ import annotations
