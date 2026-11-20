@@ -61,10 +61,8 @@ LAYER_WAIT_MAX_S = 120.0
 
 #: TASK_perf_textures_1119 Fix 8: every bench/evidence/shot env-var hook
 #: this codebase has — checked by ``HcpdApplication._is_scripted_run``
-#: so NONE of them can ever write the user's real config files, even one
-#: run without ``--demo`` (``--demo`` already guards this for everything
-#: ELSE; this specific list closes the gap for anything that doesn't
-#: pass it). Keep this in sync when a new hook is added.
+#: so NONE of them can ever write the user's real config files. Keep this
+#: in sync when a new hook is added.
 HOOK_ENV_VARS = (
     "HCPD_FX_BENCH", "HCPD_SCOPE_BENCH", "HCPD_ALBUM_AUTOMATCH",
     "HCPD_EVIDENCE_1118", "HCPD_ACCOUNTS_SHOTS", "HCPD_NAV_BENCH",
@@ -75,13 +73,18 @@ HOOK_ENV_VARS = (
 )
 
 
-def is_scripted_run(*, demo: bool, shots: bool, ui_shots: bool) -> bool:
+def is_scripted_run(*, shots: bool, ui_shots: bool) -> bool:
     """TASK_perf_textures_1119 Fix 8: standalone so it's checkable BEFORE
     ``HcpdApplication`` exists (account storage redirect needs to happen
     before ``V3UI.__init__`` ever reads ``accounts.json``/``session.json`` —
     see the account-store redirect in ``run()``), not just from
-    ``HcpdApplication._is_scripted_run``."""
-    if demo or shots or ui_shots:
+    ``HcpdApplication._is_scripted_run``.
+
+    TASK_account_persist_1121: neither ``--demo`` nor ``--album`` makes a
+    run "scripted" — only the shot/automatch sequencers and the
+    bench/evidence hooks do. Demo and album are real, interactive modes
+    whose accounts/session/prefs must persist like any other real run."""
+    if shots or ui_shots:
         return True
     return any(os.environ.get(var) for var in HOOK_ENV_VARS)
 
@@ -369,9 +372,9 @@ class HcpdApplication:
 
         L2 (TASK_game_1110): ``--album`` đọc ``content.game.json`` — hồ sơ
         RIÊNG cho ván chơi, để ``content.demo.json`` (bản trình chiếu ảnh)
-        đứng yên không đổi một khoá nào. Album thắng cả cờ demo: hai cờ
-        thường đi cùng nhau (``run_game.bat`` gọi ``--demo --album``), và
-        ván chơi luôn cần hồ sơ game dù demo có bật hay không.
+        đứng yên không đổi một khoá nào. Album thắng cả cờ demo: ván chơi
+        luôn cần hồ sơ game dù demo có bật hay không (TASK_account_persist_1121:
+        ``run_game.bat`` nay chỉ gọi ``--album``, không còn ``--demo``).
         """
         if self._album_options.enabled:
             name = "content.game.json"
@@ -443,7 +446,10 @@ class HcpdApplication:
         self._content.content_path = media_path_for_config(path, self._root)
         self._content.content_type = kind
         self._content.mode = "video"
-        if not self._demo:                # PB-055: demo không ghi file config
+        # PB-055: demo không ghi file config. TASK_account_persist_1121:
+        # album không ghi content.json (research config) nữa — dù demo có
+        # bật hay không; ván chơi không cần nhớ ảnh vừa mở qua file này.
+        if not self._demo and not self._album_options.enabled:
             config_path = self._root / "assets" / "config" / "content.json"
             save_content_settings(
                 config_path, self._content, path, kind, self._root
@@ -2144,7 +2150,10 @@ class HcpdApplication:
             if self._layer_wait_since is not None:
                 logger.info("Cho tach lop: %.1f s", now - self._layer_wait_since)
                 self._layer_wait_since = None
-                if self._demo:            # PB-055: một toast mỗi khi lớp dựng xong
+                # PB-055: một toast mỗi khi lớp dựng xong. TASK_account_persist_1121:
+                # không hiện trong album — v3 đã bỏ phím G (xem V3_KEYS), nên
+                # "Bam G de choi" sai ngay cả khi demo+album cùng bật hôm nay.
+                if self._demo and not self._album_options.enabled:
                     self._renderer.show_toast("Bam G de choi")
             return
         if self._layer_wait_since is None:
@@ -2303,7 +2312,10 @@ class HcpdApplication:
             "F10 relief A/B, G do mat nghi + dat vat, T tracking off, "
             "+/- zoom offset, [ ] plane Z (can gat chinh), , . far layer Z, ; ' overscan e_max"
         )
-        if self._demo:
+        # TASK_account_persist_1121: chi log khi demo chay MOT MINH — trong
+        # album (v3) G/T/F4/F6 da khong con tac dung (xem V3_KEYS), nen dong
+        # nay sai neu in ca luc --demo --album cung bat.
+        if self._demo and not self._album_options.enabled:
             logger.info(
                 "DEMO MODE (PB-055): chi G, T, F6, keo-tha, F4, Esc co tac dung; "
                 "doc content.demo.json, khong ghi file config"
@@ -2574,14 +2586,20 @@ class HcpdApplication:
         )
 
     def _is_scripted_run(self) -> bool:
-        """TASK_perf_textures_1119 Fix 8: true for ``--demo``, ``--album-shots``/
-        ``--ui-shots``, or any bench/evidence hook env var (``HOOK_ENV_VARS``) —
-        none of those may ever write the user's real ``assets/config/*.json``.
-        Found via a real violation: ``_shutdown`` used to save
-        ``user_prefs.json`` on EVERY exit regardless of mode, clobbering the
-        real window_rect/display with whatever a `--ui-shots` run's hidden
-        window happened to be."""
-        return is_scripted_run(demo=self._demo, shots=self._album_options.shots,
+        """TASK_perf_textures_1119 Fix 8: true for ``--ui-shots`` or any
+        bench/evidence hook env var (``HOOK_ENV_VARS``) — none of those may
+        ever write the user's real ``assets/config/*.json``. Found via a
+        real violation: ``_shutdown`` used to save ``user_prefs.json`` on
+        EVERY exit regardless of mode, clobbering the real
+        window_rect/display with whatever a `--ui-shots` run's hidden
+        window happened to be.
+
+        TASK_account_persist_1121: ``--demo`` used to count too, which made
+        EVERY real game launch (``run_game.bat`` ran ``--demo --album``)
+        look scripted — accounts/session/prefs were redirected to a fresh
+        temp dir every time and never persisted. Demo and album are real
+        interactive modes now; only the shot sequencers and hooks redirect."""
+        return is_scripted_run(shots=self._album_options.shots,
                                ui_shots=self._album_options.ui_shots)
 
     def _shutdown(self) -> None:
