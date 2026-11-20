@@ -30,7 +30,7 @@ sys.path.insert(0, str(ROOT))
 
 from src.net import client as pvp_client  # noqa: E402
 from src.net import protocol as proto  # noqa: E402
-from src.ui_album.v3_flow import LEVEL_TABLE, PVP_MODES  # noqa: E402
+from src.game.pvp import LEVEL_TABLE, PVP_MODES  # noqa: E402
 
 logger = logging.getLogger("pvp_bot")
 

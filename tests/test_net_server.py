@@ -17,7 +17,7 @@ import pytest
 from src import VERSION
 from src.net import protocol as proto
 from src.net.server import Server
-from src.ui_album.v3_flow import PVP_MODES
+from src.game.pvp import PVP_MODES
 
 COMPETITIVE, HUNT_HIDE = PVP_MODES
 

@@ -110,3 +110,18 @@ def test_game_package_has_no_upward_dependency():
             if any(imp == p or imp.startswith(p + ".") for p in _GAME_FORBIDDEN_PREFIXES):
                 offenders.append((str(path.relative_to(ROOT)), imp))
     assert offenders == [], f"src/game imports an upper layer: {offenders}"
+
+
+#: TASK_arch_refactor_1120 R6: ``net`` depends on ``game`` for match
+#: rules/constants, never on the UI layer directly (the task's exact
+#: wording names these three).
+_NET_FORBIDDEN_PREFIXES = ("src.ui_album", "src.engine", "src.renderer")
+
+
+def test_net_package_does_not_depend_on_ui_or_engine():
+    offenders = []
+    for path in import_graph.iter_py_files(ROOT / "src" / "net"):
+        for imp in import_graph.extract_imports(path):
+            if any(imp == p or imp.startswith(p + ".") for p in _NET_FORBIDDEN_PREFIXES):
+                offenders.append((str(path.relative_to(ROOT)), imp))
+    assert offenders == [], f"src/net imports ui_album/engine/renderer: {offenders}"
