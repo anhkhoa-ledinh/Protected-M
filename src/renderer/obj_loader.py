@@ -6,7 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
-from src.renderer.mesh import Mesh, MeshData
+from src.scene.mesh import Mesh, MeshData
 
 
 def load_obj(path: Path) -> MeshData:

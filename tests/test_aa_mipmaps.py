@@ -18,7 +18,8 @@ import numpy as np
 import pytest
 
 import src.ui_album.textures as textures_module
-from src.ui_album.textures import bleed_transparent, bleed_transparent_band
+from src.common.textures import bleed_transparent
+from src.ui_album.textures import bleed_transparent_band
 
 
 def test_bleed_alpha_is_unchanged():

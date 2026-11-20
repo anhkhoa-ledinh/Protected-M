@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 from OpenGL import GL
 
-from src.engine.stage_profile import stage
+from src.common.stage_profile import stage
 from src.math.homogeneous import to_column_major_flat
 from src.renderer.camera import VirtualCamera
 from src.renderer.debug_geometry import DebugGeometryRenderer

@@ -39,7 +39,7 @@ from src.engine.adaptive_quality import AdaptiveQualityController
 from src.engine.camera_worker import CameraWorker
 from src.engine.pose_bus import PoseBus
 from src.engine.profiler import Profiler
-from src.engine import stage_profile
+from src.common import stage_profile
 from src.engine.tracking_worker import TrackingWorker
 from src.filters import PoseFilterPipeline
 from src.renderer import DebugMetrics, GlfwWindow, SceneRenderer, VirtualCamera

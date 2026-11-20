@@ -8,7 +8,7 @@ import math
 import cv2
 import numpy as np
 
-from src.renderer.mesh import Mesh, MeshData
+from src.scene.mesh import Mesh, MeshData
 
 logger = logging.getLogger(__name__)
 
@@ -292,7 +292,7 @@ def create_layer_relief_vertical_plane_uv(
     is unchanged. Displacement is clamped so vertices never cross adjacent layers.
     """
     from src.content.layer_clustering import relief_depth_scale
-    from src.renderer.textured_mesh import TexturedMeshData
+    from src.scene.textured_mesh import TexturedMeshData
 
     sx = max(2, int(segments_x))
     sy = max(2, int(segments_y))
@@ -416,7 +416,7 @@ def create_displaced_vertical_plane_uv(
 
     Depth 1.0 (near) displaces toward the viewer (+Z); 0.0 stays at ``z_base``.
     """
-    from src.renderer.textured_mesh import TexturedMeshData
+    from src.scene.textured_mesh import TexturedMeshData
 
     sx = max(2, int(segments_x))
     sy = max(2, int(segments_y))
@@ -458,7 +458,7 @@ def create_vertical_plane_uv(
     The plane sits behind the physical monitor (negative Z into the scene)
     so head movement reveals parallax against the surrounding void.
     """
-    from src.renderer.textured_mesh import TexturedMeshData
+    from src.scene.textured_mesh import TexturedMeshData
 
     hw, hh = width * 0.5, height * 0.5
     vertices = np.array(

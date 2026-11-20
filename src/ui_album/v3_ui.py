@@ -19,7 +19,7 @@ from OpenGL import GL
 from src.account import crypto as account_crypto
 from src.account import store as account_store
 from src.config import prefs as _prefs
-from src.engine.stage_profile import stage
+from src.common.stage_profile import stage
 from src.fx.anim import Spring
 from src.fx.library import FxLibrary
 from src.fx.player import FxPlayer
