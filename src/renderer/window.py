@@ -157,6 +157,12 @@ class InputState:
     hud_hide_toggle: bool = False
     #: TASK_accounts_1119: Ctrl+V dán vào ô đang chọn (kể cả ô mật khẩu).
     paste_requested: bool = False
+    #: TASK_small_fixes_1120: di chuyển/xoá con trỏ trong ô nhập.
+    caret_left: bool = False
+    caret_right: bool = False
+    caret_home: bool = False
+    caret_end: bool = False
+    delete_forward: bool = False
 
 
 #: Phím có tác dụng ở chế độ demo (PB-055; quyết định 11/10: demo không có phím
@@ -199,6 +205,9 @@ V3_KEYS = frozenset({
     glfw.KEY_U,                        # TASK_shared_album_1111: Share to album
     glfw.KEY_H,                        # TASK_game_feel_fix_1118 Fix 10.4: HUD gọn
     glfw.KEY_V,                        # TASK_accounts_1119: Ctrl+V dan vao o nhap
+    # TASK_small_fixes_1120: di chuyen/xoa con tro trong o nhap.
+    glfw.KEY_LEFT, glfw.KEY_RIGHT, glfw.KEY_HOME, glfw.KEY_END,
+    glfw.KEY_DELETE,
 })
 
 
@@ -299,6 +308,11 @@ class GlfwWindow:
         self._share_to_album_requested = False
         self._hud_hide_requested = False
         self._paste_requested = False
+        self._caret_left_requested = False
+        self._caret_right_requested = False
+        self._caret_home_requested = False
+        self._caret_end_requested = False
+        self._delete_requested = False
         self._dropped_paths: list[str] = []
         #: TASK_album_ui_1106: chuột và chữ, chỉ giao diện album đọc tới.
         self._clicks: list[tuple[float, float]] = []
@@ -518,6 +532,11 @@ class GlfwWindow:
             share_to_album=self._share_to_album_requested,
             hud_hide_toggle=self._hud_hide_requested,
             paste_requested=self._paste_requested,
+            caret_left=self._caret_left_requested,
+            caret_right=self._caret_right_requested,
+            caret_home=self._caret_home_requested,
+            caret_end=self._caret_end_requested,
+            delete_forward=self._delete_requested,
             # Giao diện v3: Esc là "lùi một bước", và app tự quyết khi nào cú
             # lùi ấy nghĩa là thoát (``v3_routes.on_back``).
             quit_app=(False if self._ui_v3 else
@@ -556,6 +575,11 @@ class GlfwWindow:
         self._share_to_album_requested = False
         self._hud_hide_requested = False
         self._paste_requested = False
+        self._caret_left_requested = False
+        self._caret_right_requested = False
+        self._caret_home_requested = False
+        self._caret_end_requested = False
+        self._delete_requested = False
         return result
 
     # ---- D1: chế độ hiển thị -------------------------------------------
@@ -1173,6 +1197,16 @@ class GlfwWindow:
             self._hud_hide_requested = True
         elif key == glfw.KEY_V and (mods & glfw.MOD_CONTROL):
             self._paste_requested = True
+        elif key == glfw.KEY_LEFT:
+            self._caret_left_requested = True
+        elif key == glfw.KEY_RIGHT:
+            self._caret_right_requested = True
+        elif key == glfw.KEY_HOME:
+            self._caret_home_requested = True
+        elif key == glfw.KEY_END:
+            self._caret_end_requested = True
+        elif key == glfw.KEY_DELETE:
+            self._delete_requested = True
 
     def _on_drop(self, window, paths) -> None:
         _ = window

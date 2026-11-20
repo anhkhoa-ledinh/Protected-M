@@ -144,7 +144,7 @@ def test_progress_survives_a_sign_out_and_sign_back_in(ui, isolated_accounts):
     _wait_until_not_busy(ui)
 
     assert ui.state.history == {"p.jpg": {"date": "02/02/2026", "eaten": 10.0, "score": 77}}
-    assert ui.state.recent == ["p.jpg"]
+    assert ui.state.recent == [Path("p.jpg")]
 
 
 def test_progress_survives_a_full_relaunch(monkeypatch, isolated_accounts, gl_context):
@@ -168,7 +168,7 @@ def test_progress_survives_a_full_relaunch(monkeypatch, isolated_accounts, gl_co
     relaunched = _make_ui(monkeypatch)
     assert relaunched.state.screen == F.MENU   # remembered session
     assert relaunched.state.history == {"q.jpg": {"date": "03/03/2026", "eaten": 5.0, "score": 55}}
-    assert relaunched.state.recent == ["q.jpg"]
+    assert relaunched.state.recent == [Path("q.jpg")]
     relaunched.release()
 
 
@@ -198,6 +198,24 @@ def test_signed_in_account_gets_no_guest_toast(ui, isolated_accounts):
     ui.note_match_finished()
     assert "guest" not in ui.state.message.lower()
     assert ui._guest_toast_shown is False
+
+
+def test_a_failed_save_does_not_crash_the_match_result(ui, isolated_accounts, monkeypatch, caplog):
+    """TASK_arch_refactor_1120 Part A: a save that raises must never take
+    the result screen down with it (``note_match_finished`` is called
+    right after the score is written into history)."""
+    _sign_up(ui, "SaveFailUser1")
+    ui.state.history = {"x.jpg": {"score": 1}}
+
+    def boom(root, data):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(account_store, "save", boom)
+    with caplog.at_level("ERROR"):
+        ui.note_match_finished()   # must not raise
+
+    assert any(record.levelname == "ERROR" for record in caplog.records)
+    assert ui.state.message == "Couldn't save your progress."
 
 
 def test_guest_history_is_never_persisted_via_note_match_finished(ui, isolated_accounts):

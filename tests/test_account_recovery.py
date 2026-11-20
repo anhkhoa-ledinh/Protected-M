@@ -182,8 +182,19 @@ def test_forgot_backspace_removes_the_last_character():
     flow = _flow(F.SIGN_IN)
     flow.forgot_focus = "field_forgot_user"
     flow.forgot_user = "abc"
+    flow.caret_index = 3   # TASK_small_fixes_1120: backspace deletes LEFT of the caret
     F.forgot_backspace(flow)
     assert flow.forgot_user == "ab"
+
+
+def test_forgot_backspace_deletes_at_the_caret_not_always_the_end():
+    flow = _flow(F.SIGN_IN)
+    flow.forgot_focus = "field_forgot_user"
+    flow.forgot_user = "abc"
+    flow.caret_index = 1   # caret between 'a' and 'b'
+    F.forgot_backspace(flow)
+    assert flow.forgot_user == "bc"
+    assert flow.caret_index == 0
 
 
 def test_forgot_field_respects_its_own_maxlen():

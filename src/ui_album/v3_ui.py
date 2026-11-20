@@ -329,17 +329,23 @@ class V3UI:
 
     def click(self) -> str:
         """Bấm chuột trái tại vị trí hiện tại; trả hành động cho app."""
-        return self._click(self.hover())
+        return self._click(self.hover(), from_pointer=True)
 
     def activate(self, name: str) -> str:
         """Kích hoạt một hotspot CỤ THỂ (phím tắt U/R…), bỏ qua vị trí chuột."""
-        return self._click(name)
+        return self._click(name, from_pointer=False)
 
-    def _click(self, name: str | None) -> str:
+    def _click(self, name: str | None, *, from_pointer: bool = True) -> str:
         """``on_click`` + (TASK_ui_sakuga_1117 Phase 6) a ui_tap/ui_confirm
         burst at the hotspot's PRE-click position — captured before
         ``on_click`` runs, since it may change ``self.state.screen`` out
-        from under a post-click lookup."""
+        from under a post-click lookup.
+
+        ``from_pointer`` (TASK_small_fixes_1120): ``True`` only for a real
+        mouse click (``click()``) — ``activate()`` (keyboard shortcuts,
+        test harnesses) ignores ``self.mouse`` for HOTSPOT resolution
+        already (its own docstring), so the caret it leaves behind must
+        land at the field's END, not at some stale mouse position."""
         if not name:
             self.pending = ""
             return ""
@@ -351,11 +357,92 @@ class V3UI:
         is_primary = (not in_dialog and
                      name == v3_routes.primary_button(self.manifest, self.state))
         pre_items = list(self.state.items) if hasattr(self.state, "items") else None
+        pre_focus = self.state.forgot_focus if self.state.forgot_open else self.state.focus
         action = v3_routes.on_click(self.state, name, time.perf_counter(),
                                     self.mouse)
         self.pending = action
+        self._sync_caret_after_click(name, pre_focus, from_pointer)
         self._spawn_click_fx(name, screen, rect, in_dialog, is_primary, pre_items)
         return action
+
+    # ---- TASK_small_fixes_1120: caret -------------------------------------
+    def _sync_caret_after_click(self, name: str, pre_focus: str | None,
+                                from_pointer: bool) -> None:
+        """A click can move the caret two different ways: clicking the
+        ALREADY-focused field repositions the caret under the mouse;
+        clicking anything else that happens to leave a field focused
+        (``link_forgot`` prefilling+focusing ``field_forgot_user``, Tab
+        is handled separately in ``focus_next``) puts the caret at that
+        field's END, same as a fresh focus always has."""
+        focused = self.state.forgot_focus if self.state.forgot_open else self.state.focus
+        if focused is None:
+            return
+        geometry = self._field_caret_geometry(focused)
+        if geometry is None:
+            return
+        rect, run, text = geometry
+        if from_pointer and name == focused:
+            was_focused = (pre_focus == focused)
+            old_caret = self.state.caret_index if was_focused else None
+            self.state.caret_index = self._caret_index_for_click(rect, run, text,
+                                                                 old_caret)
+        else:
+            self.state.caret_index = len(text)
+
+    def _field_caret_geometry(self, name: str):
+        """``(value_rect, run, display_text)`` for ``name``'s caret math —
+        the SAME rect/run/text ``v3.py`` draws it with, so click
+        positioning and rendering never disagree. ``None`` for anything
+        that isn't one of the caret-bearing fields (``field_join`` keeps
+        its own append/backspace-last model, out of this task's scope)."""
+        from src.ui_album.v3 import (_FIELD_VALUE_FONT, FORGOT_FIELDS,
+                                     _field_box_rect, forgot_field_value_rect)
+
+        if name in F.FORGOT_FIELD_ATTR:
+            for fname, _label, field_y, masked in FORGOT_FIELDS:
+                if fname != name:
+                    continue
+                raw = F.field_value(self.state, name)
+                value = "•" * len(raw) if masked else raw
+                return forgot_field_value_rect(field_y), _FIELD_VALUE_FONT, value
+            return None
+        key = {"field_user": "user", "field_pass": "pass",
+              "field_pass2": "pass2"}.get(name)
+        if key is None:
+            return None
+        spec = self.manifest.text(self.state.screen, key)
+        if spec is None:
+            return None
+        raw = F.field_value(self.state, name)
+        masked = name in ("field_pass", "field_pass2") and not self.state.show_password
+        value = "•" * len(raw) if masked else raw
+        rect = _field_box_rect(self.manifest, self.state.screen, key,
+                              [float(v) for v in spec["rect"]])
+        return rect, spec["runs"][0], value
+
+    def _caret_index_for_click(self, rect, run: dict, text: str,
+                               old_caret: int | None) -> int:
+        """Nearest character boundary (0..len(text)) to ``self.mouse``'s
+        x inside ``rect`` — accounting for the SAME scroll the field was
+        drawn with a moment ago (``old_caret`` is this field's caret
+        index from the frame BEFORE this click, or ``None`` if it wasn't
+        the focused field yet, meaning it was drawn unscrolled)."""
+        offsets = self.painter.caret_offsets(run, text)
+        total = offsets[-1] if offsets else 0.0
+        box_w = float(rect[2])
+        if old_caret is None:
+            scroll = 0.0
+        else:
+            caret_clamped = max(0, min(len(text), old_caret))
+            scroll = max(0.0, offsets[caret_clamped] - box_w)
+            scroll = min(scroll, max(0.0, total - box_w))
+        click_x = float(self.mouse[0]) - float(rect[0]) + scroll
+        best_i, best_d = 0, abs(offsets[0] - click_x)
+        for index, offset in enumerate(offsets):
+            dist = abs(offset - click_x)
+            if dist < best_d:
+                best_d, best_i = dist, index
+        return best_i
 
     def _click_rect(self, screen: str, name: str, in_dialog: bool):
         if in_dialog:
@@ -431,6 +518,23 @@ class V3UI:
             F.forgot_backspace(self.state)
             return
         F.backspace(self.state)
+
+    def delete_char(self) -> None:
+        """Delete key: removes the character RIGHT of the caret."""
+        if self.state.forgot_open:
+            F.forgot_delete_char(self.state)
+            return
+        F.delete_char(self.state)
+
+    def move_caret(self, delta: int) -> None:
+        """Left/Right arrow keys."""
+        F.move_caret(self.state, delta)
+
+    def caret_home(self) -> None:
+        F.caret_home(self.state)
+
+    def caret_end(self) -> None:
+        F.caret_end(self.state)
 
     def focus_next(self) -> None:
         if self.state.forgot_open:
@@ -797,9 +901,13 @@ class V3UI:
         scores = [float(record.get("score", 0.0)) for record in self.state.history.values()
                  if isinstance(record, dict)]
         best_score = max(scores) if scores else None
-        account_store.save_progress(self._account_data, key, self.state.history,
-                                    self.state.recent, best_score)
-        account_store.save(self._account_root, self._account_data)
+        try:
+            account_store.save_progress(self._account_data, key, self.state.history,
+                                        self.state.recent, best_score)
+            account_store.save(self._account_root, self._account_data)
+        except Exception:
+            logger.error("Khong luu duoc tien trinh tai khoan", exc_info=True)
+            F.say(self.state, "Couldn't save your progress.")
 
     def note_match_finished(self) -> None:
         """TASK_accounts_1119 Phase 5: call once right after a match
@@ -824,7 +932,7 @@ class V3UI:
         if progress is None:
             return
         self.state.history = progress["history"]
-        self.state.recent = progress["recent"]
+        self.state.recent = [Path(p) for p in progress["recent"]]
 
     def sign_out(self) -> None:
         """TASK_accounts_1119 Phase 4: a deliberate sign-out must not

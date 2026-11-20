@@ -205,6 +205,7 @@ def _dialogs(state, flow) -> None:
     state.forgot_focus = flow.forgot_focus
     if not flow.forgot_open:
         return
+    state.caret_index = flow.caret_index
     state.texts["forgot_user"] = flow.forgot_user
     state.texts["forgot_code"] = flow.forgot_code
     state.texts["forgot_pass"] = flow.forgot_new_pass
@@ -245,6 +246,7 @@ def _sign_in(state, flow, accounts: dict | None = None) -> None:
     state.remember = flow.remember
     state.caret = {"field_user": "user", "field_pass": "pass",
                    "field_pass2": "pass2"}.get(flow.focus or "")
+    state.caret_index = flow.caret_index
     state.focus = flow.focus
     if flow.screen == F.SIGN_IN_ERR:
         state.texts["error"] = flow.sign_in_error

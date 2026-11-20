@@ -358,7 +358,7 @@ def save_progress(data: dict, key: str, history: dict, recent: list,
     if record is None:
         return
     record["history"] = dict(history)
-    record["recent"] = list(recent)
+    record["recent"] = [str(p) for p in recent]
     record["best_score"] = best_score
 
 
