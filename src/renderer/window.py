@@ -901,7 +901,7 @@ class GlfwWindow:
         glfw.focus_window(self._window)
 
     def request_close(self) -> None:
-        """Yêu cầu đóng cửa sổ (--album-shots dùng khi chụp xong)."""
+        """Yêu cầu đóng cửa sổ (--ui-shots dùng khi chụp xong)."""
         if self._window is not None:
             glfw.set_window_should_close(self._window, True)
 

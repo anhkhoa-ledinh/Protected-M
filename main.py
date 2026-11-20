@@ -64,16 +64,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Bo qua man dang nhap, vao thang bia album",
     )
-    parser.add_argument(
-        "--album-shots",
-        action="store_true",
-        help="Di qua moi man o ca hai theme, luu mot PNG moi man roi thoat",
-    )
-    parser.add_argument(
-        "--album-seed-leaderboard",
-        action="store_true",
-        help="Them vai dong mau (danh dau 'mau') vao bang xep hang",
-    )
     # TASK_ui_v3_1107: bo giao dien v3 ("v2 · Redesign") la bo duy nhat
     # con lai (TASK_arch_refactor_1120 R1 da xoa bo cu "album").
     parser.add_argument(
@@ -98,9 +88,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     args = parser.parse_args(argv)
     if args.ui_shots and args.ui != "v3":
-        parser.error("--ui-shots chi co nghia voi --ui v3 (bo cu dung --album-shots)")
-    if args.album_shots and args.ui != "album":
-        parser.error("--album-shots chi co nghia voi --ui album")
+        parser.error("--ui-shots chi co nghia voi --ui v3")
     if args.demo and args.calibrate:
         # Wizard hiệu chuẩn ghi user.json; demo không được ghi file config nào.
         parser.error("--demo khong dung chung voi --calibrate")
@@ -145,8 +133,6 @@ def main(argv: list[str] | None = None) -> int:
     app = HcpdApplication(
         config, PROJECT_ROOT, demo=args.demo, no_webcam=args.no_webcam,
         album=AlbumOptions(enabled=args.album, guest=args.album_guest,
-                           shots=args.album_shots,
-                           seed_leaderboard=args.album_seed_leaderboard,
                            ui=args.ui, ui_shots=args.ui_shots),
     )
     try:
