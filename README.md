@@ -126,7 +126,7 @@ never committed.
 run_game.bat
 ```
 
-This runs `python main.py --demo --album` with the `.venv` in this folder and
+This runs `python main.py --album` with the `.venv` in this folder and
 writes a log to `logs\game_<date>_<time>.log`. If `.venv` does not exist yet,
 the script tells you how to create it.
 
@@ -343,9 +343,13 @@ report a bug.
 To run the engine on its own, without the game UI:
 
 ```bat
-python main.py            :: sandbox: all research keys
-python main.py --demo     :: presentation mode: only G, T, F4, F6, Esc
+tools\launch\run.bat        :: sandbox: all research keys (main.py, no flags)
+tools\launch\run_demo.bat   :: presentation mode: only G, T, F4, F6, Esc (main.py --demo)
 ```
+
+`--album` is the game (`run_game.bat` in the repo root); `--demo` is this
+research presentation mode. They are independent — the game no longer needs
+`--demo`, and running both together behaves exactly like `--album` alone.
 
 | Key | Action (sandbox) |
 |---|---|
@@ -420,9 +424,11 @@ plugs into `app` through one entry point and is only imported when an
 ## Project layout
 
 ```
-main.py                 Entry point (--album = game, --demo = no config writes)
+main.py                 Entry point (--album = game, --demo = research demo)
 run_game.bat            Launch the game
 run_server.bat          Launch the PvP LAN server
+tools/launch/           Research launchers: run.bat/run.ps1 (sandbox),
+                        run_demo.bat (presentation mode)
 src/
   engine/               Main loop, worker threads, app wiring (app.py)
   game/                 Match and weapon rules, plain Python — no engine/

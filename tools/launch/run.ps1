@@ -1,5 +1,6 @@
 # Run HCPD with the project virtual environment (recommended)
-$Root = Split-Path -Parent $MyInvocation.MyCommand.Path
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$Root = Split-Path -Parent (Split-Path -Parent $ScriptDir)
 $Python = Join-Path $Root ".venv\Scripts\python.exe"
 
 if (-not (Test-Path $Python)) {
