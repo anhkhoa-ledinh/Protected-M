@@ -18,8 +18,10 @@ from typing import NamedTuple
 logger = logging.getLogger(__name__)
 
 #: Bảng cấp: (tên, số bọ, giây, ô vật phẩm, phản công). Moved from
-#: ``src.ui_album.flow`` (TASK_arch_refactor_1120 R5) — ``flow.py`` imports
-#: it back for its own ``AlbumFlow.slots()``/``level_name()``.
+#: ``src.ui_album.flow`` (TASK_arch_refactor_1120 R5) — the v2 UI's own
+#: (Vietnamese-named) table; that module was deleted as dead code in
+#: TASK_cleanup_readme_1121, leaving this one with no importer either
+#: (not removed here — out of that task's own scope, noted in its report).
 LEVEL_TABLE = {
     1: ("Dễ", 6, 180, 2, False), 2: ("Cơ bản", 8, 150, 3, False),
     3: ("Khó", 10, 150, 3, True), 4: ("Xâm thực", 12, 120, 4, True),
