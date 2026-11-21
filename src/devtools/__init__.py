@@ -436,6 +436,14 @@ class DevTools:
 
         if self.env("HCPD_ALBUM_AUTOMATCH") not in ("1", "2"):
             return
+        if getattr(self, "_automatch_fired", False):
+            # TASK_automatch_regress_1121: a won/lost match clears
+            # ``app._album.game`` and leaves the result screen (see
+            # ``_tick_album_match``'s ``state.go(F.WIN/F.LOSE)``) -- to
+            # this hook that looks identical to the cold-launch MENU
+            # state below, so without this guard it jumps back to PLAY
+            # and starts a new match every tick, forever.
+            return
         if app._album.game is not None or app._renderer.waiting_for_depth:
             return
         if app._album.state.screen != F.PLAY:
@@ -446,6 +454,7 @@ class DevTools:
             # itself instead of just waiting for it.
             app._album.state.go(F.PLAY)
             return
+        self._automatch_fired = True
         app._album.state.weapon = 0
         if self.env("HCPD_ALBUM_AUTOMATCH") == "2":
             # Bọ đặt TAY ở chỗ biết trước: để kiểm riêng phần VẼ sprite, tách
