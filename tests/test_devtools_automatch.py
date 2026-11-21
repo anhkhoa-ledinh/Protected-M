@@ -15,6 +15,7 @@ paper over by closing the window after the first win.
 """
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 
 from src.devtools import DevTools
@@ -37,7 +38,8 @@ def _make_app():
         album.game = "match"
 
     app = SimpleNamespace(_album=album, _renderer=renderer,
-                          _start_album_match=start_album_match)
+                          _start_album_match=start_album_match,
+                          _try_load_media=lambda path, now: None)
     return app, calls
 
 
@@ -63,3 +65,29 @@ def test_automatch_opens_one_match_only(monkeypatch):
     assert calls == [0.1], "automatch started a second match after the win"
     assert app._album.state.screen == "WIN", \
         "automatch yanked the result screen back to PLAY"
+
+
+def test_automatch_photo_env_loads_photo_before_matching(monkeypatch, tmp_path):
+    """TASK_automatch_regress_1121: ``HCPD_AUTOMATCH_PHOTO`` picks the
+    test photo a baseline/evidence run opens, instead of whatever
+    ``content.game.json`` happens to point at."""
+    monkeypatch.setenv("HCPD_ALBUM_AUTOMATCH", "1")
+    photo = tmp_path / "t21.png"
+    monkeypatch.setenv("HCPD_AUTOMATCH_PHOTO", str(photo))
+    app, calls = _make_app()
+    loaded: list[Path] = []
+    app._try_load_media = lambda path, now: loaded.append(path)
+    devtools = DevTools(app)
+
+    devtools._tick_album_automatch(0.0)       # cold MENU -> jump to PLAY
+    devtools._tick_album_automatch(0.1)       # loads the photo, not the match
+    assert loaded == [photo]
+    assert calls == []
+
+    # The real _try_load_media triggers a fresh layer build; simulate it
+    # finishing before the next tick.
+    app._renderer.waiting_for_depth = False
+    devtools._tick_album_automatch(0.2)
+    assert calls == [0.2]
+    devtools._tick_album_automatch(0.3)
+    assert calls == [0.2], "loading the photo again on the next tick"

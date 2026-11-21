@@ -454,6 +454,17 @@ class DevTools:
             # itself instead of just waiting for it.
             app._album.state.go(F.PLAY)
             return
+        photo = self.env("HCPD_AUTOMATCH_PHOTO").strip()
+        if photo and not getattr(self, "_automatch_photo_loaded", False):
+            # TASK_automatch_regress_1121: lets a baseline/evidence run
+            # pick ITS OWN test photo (one that hides every bug the
+            # level asks for) instead of whatever ``content.game.json``
+            # happens to point at -- ``_try_load_media`` never writes
+            # that file for ``--album`` (see its own PB-055/1121 guard),
+            # so this is as config-safe as the hook it modifies.
+            self._automatch_photo_loaded = True
+            app._try_load_media(Path(photo), now)
+            return
         self._automatch_fired = True
         app._album.state.weapon = 0
         if self.env("HCPD_ALBUM_AUTOMATCH") == "2":
