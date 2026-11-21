@@ -15,11 +15,12 @@ from types import SimpleNamespace
 import numpy as np
 
 from src.content.prop_game import GameState
+from src.devtools import DevTools
 from src.engine.app import HcpdApplication
 from src.net import protocol as proto
-from src.ui_album import hit as H
+from src.game import hit as H
 from src.ui_album import v3_flow as F
-from src.ui_album.game_bridge import AlbumMatch
+from src.game.match import AlbumMatch
 
 
 class _Renderer:
@@ -98,6 +99,7 @@ def _app(**extra) -> HcpdApplication:
     app._pvp_ready_sent = False
     app._pvp_last_eye_sent_s = 0.0
     app._pvp_active = False
+    app._devtools = DevTools(app)
     for key, value in extra.items():
         setattr(app, key, value)
     return app
@@ -569,20 +571,20 @@ class PvpAutoHookTest(unittest.TestCase):
         os.environ.pop("HCPD_PVP_AUTO", None)
         app = _app()
         app._album.state.screen = F.SIGN_IN
-        app._tick_pvp_auto(0.0)
+        app._devtools._tick_pvp_auto(0.0)
         self.assertEqual(app._album.state.screen, F.SIGN_IN)  # untouched
 
     def test_walks_sign_in_to_menu_to_pvp_mode_to_queueing(self) -> None:
         app = _app()
         app._album.state.screen = F.SIGN_IN
-        app._tick_pvp_auto(0.0)
+        app._devtools._tick_pvp_auto(0.0)
         self.assertEqual(app._album.state.screen, F.MENU)
         self.assertEqual(app._album.state.player, "guest")
 
-        app._tick_pvp_auto(0.0)
+        app._devtools._tick_pvp_auto(0.0)
         self.assertEqual(app._album.state.screen, F.PVP_MODE)
 
-        app._tick_pvp_auto(0.0)
+        app._devtools._tick_pvp_auto(0.0)
         # ACT_PVP_FIND's F.start_search() moves it to PVP_SEARCH.
         self.assertEqual(app._album.state.screen, F.PVP_SEARCH)
         self.assertEqual(app._pvp.sent, [{"t": proto.QUEUE,
@@ -595,21 +597,21 @@ class PvpAutoHookTest(unittest.TestCase):
         back — not an instant same-frame bounce."""
         app = _app()
         app._album.state.screen = F.PVP_RESULT
-        app._tick_pvp_auto(0.0)
+        app._devtools._tick_pvp_auto(0.0)
         self.assertEqual(app._album.state.screen, F.PVP_RESULT)  # not yet
-        app._tick_pvp_auto(1.0)
+        app._devtools._tick_pvp_auto(1.0)
         self.assertEqual(app._album.state.screen, F.PVP_RESULT)  # still not
-        app._tick_pvp_auto(2.1)
+        app._devtools._tick_pvp_auto(2.1)
         self.assertEqual(app._album.state.screen, F.PVP_MODE)
 
     def test_result_dwell_timer_resets_if_left_by_another_path(self) -> None:
         app = _app()
         app._album.state.screen = F.PVP_RESULT
-        app._tick_pvp_auto(0.0)
+        app._devtools._tick_pvp_auto(0.0)
         app._album.state.screen = F.OFFLINE   # left via disconnect, not the loop
-        app._tick_pvp_auto(0.1)
+        app._devtools._tick_pvp_auto(0.1)
         app._album.state.screen = F.PVP_RESULT  # back again, later
-        app._tick_pvp_auto(100.0)
+        app._devtools._tick_pvp_auto(100.0)
         self.assertEqual(app._album.state.screen, F.PVP_RESULT)  # fresh timer
 
 

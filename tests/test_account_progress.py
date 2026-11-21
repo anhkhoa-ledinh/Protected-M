@@ -277,7 +277,8 @@ def test_board_you_row_name_is_fitted(manifest_and_painter):
 
 @pytest.fixture
 def manifest_and_painter(gl_context):
-    from src.ui_album.v3 import V3Manifest, V3Painter
+    from src.ui_album.v3 import V3Manifest
+    from src.ui_album.v3_painter import V3Painter
 
     manifest = V3Manifest(ROOT)
     painter = V3Painter(manifest, ROOT / "assets" / "shaders")

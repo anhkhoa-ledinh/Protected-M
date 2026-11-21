@@ -84,7 +84,7 @@ Then check these assets:
 | Depth Anything model (`LiheYoung/depth-anything-small-hf`) | no | Downloaded automatically by `transformers` on the first photo. You need internet the first time. |
 | `assets/models/lama_fp32.onnx` (208 MB) | no | Optional. Download `lama_fp32.onnx` from [Carve/LaMa-ONNX](https://huggingface.co/Carve/LaMa-ONNX) and put it in `assets/models/`. Without it, holes are filled with Telea, which looks blurrier. |
 | `assets/ui_v3/` (game UI) | yes | Nothing. |
-| `assets/ui_album/` (bug sprites + legacy UI) | yes | Nothing. The v3 UI still takes its bug sprites from here. |
+| `assets/ui_album/` (bug sprites + unused v2 UI leftovers) | yes | Nothing. The v3 UI only reads `sprites/` and `manifest.json` from here. |
 
 ### Screen size, for correct parallax
 
@@ -126,13 +126,17 @@ never committed.
 run_game.bat
 ```
 
-This runs `python main.py --demo --album` with the `.venv` in this folder and
+This runs `python main.py --album` with the `.venv` in this folder and
 writes a log to `logs\game_<date>_<time>.log`. If `.venv` does not exist yet,
 the script tells you how to create it.
 
 A round goes like this:
 
-1. **Sign in.** Accounts are local and simulated.
+1. **Sign in.** Accounts are real and local — stored only on this computer
+   (`assets/config/accounts.json`), with a scrypt-hashed password, **Remember
+   me** (keeps you signed in next launch) and a recovery code if you forget
+   your password. Playing as guest skips sign-in but does not save your
+   progress.
 2. **Choose a level.**
 3. **Choose a photo.** You can:
    - pick one from your computer;
@@ -148,35 +152,44 @@ A round goes like this:
 
 ### Levels
 
-| Level | Bugs | Time | Item slots | Bugs fight back |
-|---|---|---|---|---|
-| 1 · Easy | 6 | 180 s | 2 | no |
-| 2 · Normal | 8 | 150 s | 3 | no |
-| 3 · Hard | 10 | 150 s | 3 | yes |
-| 4 · Infestation | 12 | 120 s | 4 | yes |
-| 5 · Asian Mode | 12 | 120 s | 4 | yes; stamina and overtime count |
+| Level | Bugs | Time | Item slots | Bugs fight back | Bug HP |
+|---|---|---|---|---|---|
+| 1 · Easy | 6 | 180 s | 2 | no | 100 |
+| 2 · Normal | 8 | 150 s | 3 | no | 100 |
+| 3 · Hard | 10 | 150 s | 3 | yes | 150 |
+| 4 · Infestation | 12 | 120 s | 4 | yes | 200 |
+| 5 · Asian Mode | 12 | 120 s | 4 | yes; stamina and overtime count | 200 |
 
 ### Guns
 
-| Gun | Magazine | Time between shots | Reload |
-|---|---|---|---|
-| Precision gun | 12 | 0.50 s | 1.1 s |
-| Spread gun | 8 | 0.38 s | 0.9 s |
-| Heavy-mag gun | 24 | 0.18 s | 1.3 s |
+| Gun | Magazine | Time between shots | Reload | Damage |
+|---|---|---|---|---|
+| Sniper rifle | 12 | 0.50 s | 1.1 s | 100 per hit (×2 on a headshot) |
+| Shotgun | 8 | 0.38 s | 0.9 s | 5 pellets × 25 per shot (no headshot bonus) |
+| Heavy-mag gun | 50 | 0.18 s | 2.5 s | 34 per hit (×1.5 on a headshot) |
+
+Hold right mouse to scope in with the Sniper rifle. Hold left click with the
+Heavy-mag gun for full-auto; the other two guns fire once per click.
 
 ### Controls
 
 | Input | Action |
 |---|---|
 | Mouse | Aim, and click buttons |
-| Left click | Shoot (during a match) |
+| Left click | Shoot (during a match); hold for full-auto with the Heavy-mag gun |
+| Right mouse (hold) | Scope in with the Sniper rifle |
 | `1` `2` `3` | Select an item slot |
+| `H` | Hide/show the HUD (in a match only) |
 | `C` | Recentre to where you are sitting now |
 | `R` | Play again (result screen) · random photo from the shared album (photo screen) |
 | `U` | Share the chosen photo to the shared album (photo screen) |
 | `Enter` | Main button of the current screen |
 | `↑` / `↓` | Move focus on the main menu |
-| `Tab` / `Backspace` | Text fields |
+| Click a text field | Place the caret |
+| `←` `→` `Home` `End` `Backspace` `Delete` | Edit and move the caret inside a text field |
+| `Tab` | Next text field |
+| Eye icon (sign-in) | Show/hide the typed password |
+| Remember me (sign-in) | Keep you signed in on the next launch |
 | `F11` | Switch between fullscreen and window mode (remembered in `assets/config/user_prefs.json`) |
 | `F12` | Screenshot to `results/ui_v3_1107/live/` |
 | `Esc` | Back one screen |
@@ -284,15 +297,18 @@ automatically.
 
 This is a demo build. Known problems so far:
 
-- **The Spread gun hits only one bug.** Its description says one shot hits
-  several bugs standing close together. Right now every shot resolves to a
-  single bug.
-- **Bugs have no health.** One hit kills a bug, whichever gun you use.
-- **PvP is real on a LAN; accounts and the leaderboard are still
-  simulated.** Competitive and Hunt & Hide play over the network against
-  another player (see [PvP on a local network](#pvp-on-a-local-network)
-  above). Accounts live in memory only, and the leaderboard shows sample
-  entries.
+- **The player health bar never changes.** There is no way to damage the
+  player yet, in solo play or PvP — a level is lost only by running out of
+  time, never by taking a hit.
+- **Loadout items have no effect yet.** Picking one into a slot and using it
+  (PvP only — solo play has no way to use an item at all) only costs points
+  via its weight and shows up in the match result; none of the 8 items
+  (Flare, Antidote, Acid shield, Filter lens, Compass, Thermal scan, Energy
+  drink, Smoke bomb) heals, reveals or helps in any other way.
+- **The leaderboard still shows sample entries.** Accounts and match history
+  are real and local now (see [Play](#play) above); only the leaderboard
+  itself is not wired to real player data yet — your own row is computed
+  from your real history, the rest are fixed sample rows.
 - **Hunt & Hide bug placement is automatic, not click-to-place.** The
   hider's bugs are placed by the same algorithm solo matches use (hidden
   from the design rest eye), not by clicking the photo. Relocating one bug
@@ -317,9 +333,8 @@ report a bug.
 
 - Click-to-place bug hiding for Hunt & Hide's hider, and bug relocation
   during the hunt.
-- Bug health and per-gun damage, and make the Spread gun hit several bugs.
-- A scope for the Precision gun, and a key to hide the in-match HUD.
-- Real accounts and a real leaderboard instead of in-memory/sample data.
+- A real leaderboard instead of sample data.
+- Sound.
 
 ---
 
@@ -328,9 +343,13 @@ report a bug.
 To run the engine on its own, without the game UI:
 
 ```bat
-python main.py            :: sandbox: all research keys
-python main.py --demo     :: presentation mode: only G, T, F4, F6, Esc
+tools\launch\run.bat        :: sandbox: all research keys (main.py, no flags)
+tools\launch\run_demo.bat   :: presentation mode: only G, T, F4, F6, Esc (main.py --demo)
 ```
+
+`--album` is the game (`run_game.bat` in the repo root); `--demo` is this
+research presentation mode. They are independent — the game no longer needs
+`--demo`, and running both together behaves exactly like `--album` alone.
 
 | Key | Action (sandbox) |
 |---|---|
@@ -357,6 +376,10 @@ HUD instead.
 .venv\Scripts\python.exe -m pytest -q
 ```
 
+Tests that need a real OpenGL context skip automatically, with a clear
+reason, on a machine without a real OpenGL 3.3 driver — this is what
+happens on CI's runners.
+
 ---
 
 ## Configuration
@@ -372,28 +395,62 @@ HUD instead.
 | `assets/config/user_prefs.json` | Display mode and window position | no |
 | `assets/config/shared_album.json` | Cloudinary settings | no |
 | `assets/config/pvp.json` | PvP server `IP:port` override (skips discovery) | no |
+| `assets/config/accounts.json` | Local accounts: display name, scrypt-hashed password, recovery-code hash, play history and best score | no |
+| `assets/config/accounts.json.bak` | Previous good copy of `accounts.json`, used to recover from an interrupted write | no |
+| `assets/config/session.json` | "Remember me" session token, for auto sign-in on the next launch | no |
+
+---
+
+## Architecture
+
+Dependencies only point down:
+
+```
+app (thin shell: window, loop, wiring)
+  -> ui, game, net        ui and net read game; game imports none of them
+  -> renderer, tracking, content
+```
+
+`game/` is plain Python — match rules, weapons, firing, hit resolution,
+scoring — with no import of `src.engine`, `src.renderer`, `src.ui_album`,
+`src.fx`, `src.net`, OpenGL, glfw or PIL. `net/` depends on `game` for match
+constants, not on the UI. `devtools/` (bench/evidence/automatch test hooks)
+plugs into `app` through one entry point and is only imported when an
+`HCPD_*` flag is set. `tests/test_architecture.py` parses every import with
+`ast` and fails if any of this is broken.
 
 ---
 
 ## Project layout
 
 ```
-main.py                 Entry point (--album = game, --demo = no config writes)
+main.py                 Entry point (--album = game, --demo = research demo)
 run_game.bat            Launch the game
 run_server.bat          Launch the PvP LAN server
+tools/launch/           Research launchers: run.bat/run.ps1 (sandbox),
+                        run_demo.bat (presentation mode)
 src/
-  engine/               Main loop, worker threads, game wiring (app.py)
-  ui_album/             Game UI (v3), screens and flow, bugs, hit testing, guns
+  engine/               Main loop, worker threads, app wiring (app.py)
+  game/                 Match and weapon rules, plain Python — no engine/
+                        renderer/ui_album/fx/net/OpenGL/glfw/PIL import
+  ui_album/             Game UI (v3): screens and flow, bugs, text fields,
+                        hit-testing/hotspots, the painter
+  devtools/             Bench/evidence/shots/automatch test hooks; loaded
+                        only when an `HCPD_*` env flag is set
+  common/               Small helpers shared by renderer/fx/ui_album
+                        (stage timing, texture bleed) — depend on neither
   content/              Depth, layer splitting, hole filling, bake cache, shared album
   renderer/             OpenGL window, shaders, content plane, Kooima camera
   tracking/ pose/       MediaPipe landmarks, solvePnP, eye position, calibration
   filters/              One Euro, Kalman, EMA, motion prediction
   math/                 Projection, matrices, quaternions
-  camera/ scene/ gui/   Webcam capture, scene graph, calibration wizard
+  camera/ scene/ gui/   Webcam capture, scene graph (meshes), calibration wizard
   net/                  PvP wire protocol, LAN server, UDP discovery, client
+                        (depends on game, not on ui_album)
 assets/
   ui_v3/                Game UI pack exported from Penpot (in git)
-  ui_album/             Legacy UI pack + bug sprites used by the game (in git)
+  ui_album/             Bug sprites (sprites/) + manifest.json (sprite
+                        registry); the rest is unused v2 UI art (in git)
   models/               face_landmarker.task (+ optional lama_fp32.onnx)
   config/ shaders/
 scripts/                Measurement and report tools used for the thesis

@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from src.engine.app import HcpdApplication
 from src.ui_album import v3_flow as F
-from src.ui_album.game_bridge import AlbumMatch
+from src.game.match import AlbumMatch
 from src.ui_album.options import AlbumOptions
 
 #: The task's own fake spec: (mag, fire_s, reload_s).

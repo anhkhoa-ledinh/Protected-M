@@ -1,6 +1,5 @@
 @echo off
 rem Protected M - chay game (giao dien v3 "v2 - Redesign").
-rem Bo giao dien cu chay bang:  run_game.bat --ui album
 rem Log UTF-8 vao logs\game_<ngay>_<gio>.log (logs\ da gitignore).
 cd /d "%~dp0"
 set "PY=.venv\Scripts\python.exe"
@@ -16,5 +15,5 @@ for /f %%i in ('powershell -NoProfile -Command "Get-Date -Format yyyyMMdd_HHmmss
 set "LOG=logs\game_%TS%.log"
 echo Protected M - log: %LOG%
 set "PYTHONIOENCODING=utf-8"
-"%PY%" main.py --demo --album %* > "%LOG%" 2>&1
+"%PY%" main.py --album %* > "%LOG%" 2>&1
 echo Da thoat (ma %ERRORLEVEL%). Log: %LOG%

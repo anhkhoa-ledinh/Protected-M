@@ -24,7 +24,7 @@ import cv2
 import numpy as np
 
 from src.content.hidden_props import ALPHA_BLOCK, _blocked, _nearer
-from src.ui_album.viewport_filter import DESIGN_SIZE, project_to_design
+from src.game.viewport_filter import DESIGN_SIZE, project_to_design
 
 #: Alpha tối thiểu của sprite để coi là "có thân ở đây" (kịch bản F1).
 SPRITE_ALPHA_MIN = 0.25

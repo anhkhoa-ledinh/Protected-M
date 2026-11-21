@@ -18,7 +18,7 @@ import numpy as np
 
 from pathlib import Path
 
-from src.ui_album import hit as H
+from src.game import hit as H
 from src.ui_album.bugs import (BUG_CAMO_STRENGTH, BUG_SIZE_MAX, BUG_SIZE_MIN,
                                SIZE_FACTOR, assign_bug_camo, assign_bug_sizes)
 
@@ -69,7 +69,7 @@ class HitUsesThePerBugSizeTest(unittest.TestCase):
     """Bắn phải đọc đúng ``size_k`` đã gán — không phải ``SIZE_FACTOR`` cũ."""
 
     def test_a_point_inside_full_size_but_outside_shrunk_size_is_a_miss(self) -> None:
-        from src.ui_album.hit import SpriteMask
+        from src.game.hit import SpriteMask
 
         mask = SpriteMask.from_rgba(np.full((64, 64, 4), 255, np.uint8))
         full_quad = H.sprite_quad(PROP_MM, RADIUS_MM, SIZE_FACTOR, EYE, GLASS)

@@ -53,7 +53,7 @@ def main(argv=None):
     from src.content.prop_game import start_game
     from src.content.prop_rest_eye import z_rest_mm
     from src.engine.app import HcpdApplication
-    from src.ui_album.viewport_filter import VIEWPORT_RECT, filter_props
+    from src.game.viewport_filter import VIEWPORT_RECT, filter_props
 
     config = merge_user_config(ROOT / "assets/config/default.json")
     holder = type("ConfigHolder", (), {"_config": config})()

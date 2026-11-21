@@ -15,7 +15,8 @@ import pytest
 from src.fx.player import FxPlayer
 from src.fx.spec import load_spec
 from src.ui_album.scope import VIGNETTE_RADIUS_PX, screen_scope_transform
-from src.ui_album.v3 import V3State, _draw_hit_markers, _draw_shots
+from src.ui_album.v3 import V3State
+from src.ui_album.v3_screen_draw import _draw_hit_markers, _draw_shots
 
 
 # ---- pure transform ------------------------------------------------------

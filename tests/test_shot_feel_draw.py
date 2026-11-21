@@ -15,8 +15,10 @@ from __future__ import annotations
 import pytest
 
 from src.ui_album.shot_feel import CRIT_IMPACT_ALPHA, HITMARK_CRIT_COL, HITMARK_OUTLINE_COL
-from src.ui_album.v3 import (DESIGN_SIZE, V3State, _draw_crit_impact,
-                             _draw_hit_markers, _draw_photos, rgba)
+from src.ui_album.v3 import DESIGN_SIZE, V3State
+from src.ui_album.v3_painter import rgba
+from src.ui_album.v3_screen_draw import (_draw_crit_impact,
+                             _draw_hit_markers, _draw_photos)
 
 
 class FakeWhiteCache:

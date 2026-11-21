@@ -20,7 +20,7 @@ import time
 from src.account import crypto as account_crypto
 from src.content import shared_album
 from src.ui_album import v3_flow as F
-from src.ui_album.game_bridge import WEAPON_LABEL
+from src.game.match import WEAPON_LABEL
 from src.ui_album.v3 import V3State
 
 #: Bảng xếp hạng mẫu (U2: "The data stays the sample").

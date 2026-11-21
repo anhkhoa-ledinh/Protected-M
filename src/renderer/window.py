@@ -481,7 +481,9 @@ class GlfwWindow:
         move_x = move_y = move_z = 0.0
 
         # Demo (PB-055): không dịch pose bằng tay — bỏ qua WASD/QE.
-        if not self._demo:
+        # TASK_account_persist_1121: album cũng bỏ qua, dù demo có bật hay
+        # không — ván chơi không được để WASD/QE giả lập đầu dịch chỗ.
+        if not self._demo and not self._album:
             if glfw.get_key(self._window, glfw.KEY_A) == glfw.PRESS:
                 move_x -= 1.0
             if glfw.get_key(self._window, glfw.KEY_D) == glfw.PRESS:
@@ -901,7 +903,7 @@ class GlfwWindow:
         glfw.focus_window(self._window)
 
     def request_close(self) -> None:
-        """Yêu cầu đóng cửa sổ (--album-shots dùng khi chụp xong)."""
+        """Yêu cầu đóng cửa sổ (--ui-shots dùng khi chụp xong)."""
         if self._window is not None:
             glfw.set_window_should_close(self._window, True)
 

@@ -12,7 +12,7 @@ import numpy as np
 from src.engine.app import HcpdApplication
 from src.renderer.camera import VirtualCamera
 from src.ui_album import v3_flow as F
-from src.ui_album.game_bridge import AlbumMatch
+from src.game.match import AlbumMatch
 from src.ui_album.options import AlbumOptions
 from src.ui_album.scope import ScopeState
 

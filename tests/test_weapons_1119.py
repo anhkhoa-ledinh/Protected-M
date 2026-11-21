@@ -15,7 +15,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from src.ui_album import v3_flow as F
-from src.ui_album.game_bridge import (BUG_HP_BY_LEVEL, HP_BAR_FADE_S,
+from src.game.match import (BUG_HP_BY_LEVEL, HP_BAR_FADE_S,
                                       PELLET_COUNT, PELLET_RADIUS_PX,
                                       WEAPON_DAMAGE, WEAPON_LABEL,
                                       WEAPONS_SPEC, AimContext, AlbumMatch,

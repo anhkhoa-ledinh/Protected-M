@@ -49,7 +49,7 @@ import time
 from src import VERSION
 from src.net import protocol as proto
 from src.net.discovery import Beacon
-from src.ui_album.v3_flow import ITEM_WEIGHT, LEVEL_TABLE, PVP_MODES
+from src.game.pvp import ITEM_WEIGHT, LEVEL_TABLE, PVP_MODES
 
 logger = logging.getLogger(__name__)
 

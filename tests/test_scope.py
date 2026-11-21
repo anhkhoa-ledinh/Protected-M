@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 
 from src.renderer.camera import VirtualCamera
-from src.ui_album.hit import SpriteMask, pick_target, sprite_quad
+from src.game.hit import SpriteMask, pick_target, sprite_quad
 from src.ui_album.scope import (DESIGN_SIZE, ScopeState, design_to_glass_m,
                                 steadied_eye)
 

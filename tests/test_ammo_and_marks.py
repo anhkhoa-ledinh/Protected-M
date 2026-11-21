@@ -15,7 +15,7 @@ import time
 
 import pytest
 
-from src.ui_album.game_bridge import (DEFAULT_MAG, RELOAD_S, SHOT_MARKS,
+from src.game.match import (DEFAULT_MAG, RELOAD_S, SHOT_MARKS,
                                       WEAPON_MAG, WEAPONS_SPEC, AimContext,
                                       AlbumMatch, fire)
 

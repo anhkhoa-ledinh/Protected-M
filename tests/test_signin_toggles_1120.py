@@ -3,7 +3,7 @@ the sign-in/sign-up/sign-in-error screens.
 
 Root causes (see the task report for the one-sentence version):
 - the eye: ``field_pass``'s hotspot fully contains ``icon_show_password``'s
-  and was listed first in the manifest, so ``v3.hit_test`` always resolved
+  and was listed first in the manifest, so ``v3_hit.hit_test`` always resolved
   a click on the icon to the field underneath it;
 - the switch: nothing ever painted an OFF look — ``base.png`` only drew it
   ON, and ``state_for``/``_sign_in`` never even copied ``flow.remember``
@@ -19,7 +19,7 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
-from src.ui_album import v3, v3_values, v3_routes
+from src.ui_album import v3_hit, v3_screen_draw, v3_values, v3_routes
 from src.ui_album import v3_flow as F
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -50,10 +50,10 @@ class EyeHitTestTest(unittest.TestCase):
         for screen in self.SCREENS:
             with self.subTest(screen=screen):
                 hotspots = {h["n"]: h for h in manifest.screens[screen]["hotspots"]}
-                icon_rect = v3.hotspot_rect(screen, hotspots["icon_show_password"])
+                icon_rect = v3_hit.hotspot_rect(screen, hotspots["icon_show_password"])
                 cx = icon_rect[0] + icon_rect[2] / 2.0
                 cy = icon_rect[1] + icon_rect[3] / 2.0
-                self.assertEqual(v3.hit_test(manifest, screen, cx, cy),
+                self.assertEqual(v3_hit.hit_test(manifest, screen, cx, cy),
                                  "icon_show_password")
 
     def test_password_field_still_catches_clicks_outside_the_icon(self) -> None:
@@ -61,9 +61,9 @@ class EyeHitTestTest(unittest.TestCase):
         the icon's own small rect should be carved out of it."""
         manifest = FakeManifest()
         hotspots = {h["n"]: h for h in manifest.screens["v3_01a_sign_in"]["hotspots"]}
-        field_rect = v3.hotspot_rect("v3_01a_sign_in", hotspots["field_pass"])
+        field_rect = v3_hit.hotspot_rect("v3_01a_sign_in", hotspots["field_pass"])
         point = (field_rect[0] + 5.0, field_rect[1] + 5.0)   # top-left corner
-        self.assertEqual(v3.hit_test(manifest, "v3_01a_sign_in", *point),
+        self.assertEqual(v3_hit.hit_test(manifest, "v3_01a_sign_in", *point),
                          "field_pass")
 
 
@@ -155,17 +155,17 @@ class RememberSwitchPaintTest(unittest.TestCase):
     def test_on_draws_nothing_extra(self) -> None:
         painter = _FakePainter()
         state = SimpleNamespace(remember=True)
-        v3._draw_remember_switch(painter, "v3_01a_sign_in", self._record(), state)
+        v3_screen_draw._draw_remember_switch(painter, "v3_01a_sign_in", self._record(), state)
         self.assertEqual(painter.calls, [])
 
     def test_off_draws_a_grey_track_and_a_left_knob(self) -> None:
         painter = _FakePainter()
         state = SimpleNamespace(remember=False)
-        v3._draw_remember_switch(painter, "v3_01a_sign_in", self._record(), state)
+        v3_screen_draw._draw_remember_switch(painter, "v3_01a_sign_in", self._record(), state)
         kinds = [call[0] for call in painter.calls]
         self.assertEqual(kinds, ["rounded", "disc"])
         hotspots = {h["n"]: h for h in self._record()["hotspots"]}
-        track_x, track_y, track_w, track_h = v3.hotspot_rect(
+        track_x, track_y, track_w, track_h = v3_hit.hotspot_rect(
             "v3_01a_sign_in", hotspots["switch_remember"])
         _kind, knob_rect, _colour = painter.calls[1]
         knob_x = knob_rect[0]

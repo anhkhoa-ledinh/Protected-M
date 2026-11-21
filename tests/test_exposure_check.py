@@ -138,7 +138,7 @@ def test_a_photo_with_no_valid_spot_does_not_start(monkeypatch):
     prop = {"pos_mm": (0.0, 0.0, -300.0), "radius_mm": 12.0}
     app = _make_app(prop)
     monkeypatch.setattr(
-        "src.ui_album.viewport_filter.filter_props",
+        "src.game.viewport_filter.filter_props",
         lambda props, *a, **k: (list(props), 0))
     monkeypatch.setattr(
         "src.content.hidden_props_search.exposure_count", lambda *a, **k: 0)
@@ -164,13 +164,13 @@ def test_a_photo_with_one_winnable_spot_keeps_it(monkeypatch):
 
     app._start_prop_game = _stub_start_prop_game
     monkeypatch.setattr(
-        "src.ui_album.viewport_filter.filter_props",
+        "src.game.viewport_filter.filter_props",
         lambda props, *a, **k: (list(props), 0))
     monkeypatch.setattr(
         "src.content.hidden_props_search.exposure_count",
         lambda planes, pos_mm, *a, **k: 0 if pos_mm is unwinnable["pos_mm"] else 3)
     monkeypatch.setattr(
-        "src.ui_album.game_bridge.start_match",
+        "src.game.match.start_match",
         lambda level, game, weapon, items, item_weight: type(
             "Match", (), {"layer_total": 0, "ammo_enabled": False})())
 

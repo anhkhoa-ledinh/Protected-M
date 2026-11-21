@@ -19,7 +19,7 @@ import unittest
 import numpy as np
 
 from src.content.hidden_props import LayerPlane
-from src.ui_album import hit as H
+from src.game import hit as H
 
 #: Mắt nghỉ của kịch bản L0/F1 và tấm kính toàn màn.
 EYE = (0.0, 0.0, 600.0)
@@ -281,7 +281,7 @@ class AimRayTest(unittest.TestCase):
     """Nghịch đảo của ``project_to_design`` phải khớp từng phần nghìn mm."""
 
     def test_aim_point_round_trips_through_the_projection(self) -> None:
-        from src.ui_album.viewport_filter import project_to_design
+        from src.game.viewport_filter import project_to_design
 
         for point in ((640.0, 360.0), (200.0, 120.0), (1100.0, 640.0)):
             for z_mm in (-50.0, -180.0, -600.0):

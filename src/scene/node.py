@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from src.math.homogeneous import Mat4, multiply, translation_matrix
-from src.renderer.mesh import Mesh
+from src.scene.mesh import Mesh
 
 
 @dataclass

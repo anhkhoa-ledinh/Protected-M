@@ -37,7 +37,7 @@ from src.content.layer_clustering import assign_layer_z  # noqa: E402
 from src.renderer.content_plane import (SCREEN_Z_MM,  # noqa: E402
                                         ContentPlaneRenderer, layer_geometry,
                                         pad_content_scale)
-from src.ui_album.viewport_filter import project_to_design  # noqa: E402
+from src.game.viewport_filter import project_to_design  # noqa: E402
 
 N_POINTS = 20
 SEED = 0

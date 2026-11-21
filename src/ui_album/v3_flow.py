@@ -20,6 +20,8 @@ import random
 import time
 from dataclasses import dataclass, field
 
+from src.game.pvp import ITEM_WEIGHT, LEVEL_TABLE, PVP_MODES
+
 logger = logging.getLogger(__name__)
 
 SIGN_IN, SIGN_UP = "v3_01a_sign_in", "v3_01b_sign_up"
@@ -55,21 +57,7 @@ TABS = {"tab_Solo": LEVELS, "tab_PvP": PVP_MODE,
 #: Màn không được rời bằng tab (chưa đăng nhập thì chưa có gì để xem).
 LOCKED = (SIGN_IN, SIGN_UP, SIGN_IN_ERR)
 
-#: Bảng cấp: (tên, số bọ, giây, ô vật phẩm, phản công). Con số giữ nguyên của
-#: ``flow.py``; chỉ cái tên đổi sang tiếng Anh theo U2.
-LEVEL_TABLE = {
-    1: ("Easy", 6, 180, 2, False), 2: ("Normal", 8, 150, 3, False),
-    3: ("Hard", 10, 150, 3, True), 4: ("Infestation", 12, 120, 4, True),
-    5: ("Asian Mode", 12, 120, 4, True),
-}
-
-ITEM_WEIGHT = {"Flare": 3, "Antidote": 5, "Acid shield": 4, "Filter lens": 4,
-               "Compass": 2, "Thermal scan": 8, "Energy drink": 3,
-               "Smoke bomb": 6}
-
 WEAPONS = ("Precision gun", "Spread gun", "Heavy-mag gun")
-
-PVP_MODES = ("Competitive", "Hunt & Hide")
 
 #: Mô tả cấp trên màn chọn cấp.
 LEVEL_DESC = {

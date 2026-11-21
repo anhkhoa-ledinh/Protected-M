@@ -18,7 +18,19 @@ module does not need to reserve room for them.
 
 from __future__ import annotations
 
-from src.ui_album import v3_flow as F
+#: Screen names (``src.ui_album.v3_flow``'s own values) duplicated here,
+#: not imported (TASK_arch_refactor_1120 R2: ``fx`` must not depend on
+#: ``ui_album``) — a plain string, changes only if the Penpot screen
+#: itself is renamed, same risk as any other literal in this table.
+_PLAY = "v3_08_gameplay_hud"
+_PVP_HUNT = "v3_12a_pvp_hunter_hud"
+_PVP_HIDE = "v3_12b_pvp_bug_hud"
+_LOADING = "v3_07_loading"
+_LOADING_READY = "v3_07_loading_ready"
+_TILT = "v3_06_head_tilt_check"
+_LOADOUT = "v3_05_loadout"
+_WIN = "v3_09a_result_win"
+_PVP_RESULT = "v3_13_pvp_result"
 
 #: Effects available on every screen that isn't special-cased below.
 MENU_SET = frozenset({"ui_confirm", "ui_tap", "toast_in"})
@@ -37,10 +49,10 @@ MATCH_SET = frozenset({"hit_kill", "hit_crit", "hit_block", "star_pop"})
 #: reaching WIN well before the low-priority tier finished).
 RESULT_SET = frozenset({"star_five"})
 
-_MATCH_SCREENS = (F.PLAY, F.PVP_HUNT, F.PVP_HIDE)
-_LOADING_SCREENS = (F.LOADING, F.LOADING_READY)
-_TILT_LOADOUT_SCREENS = (F.TILT, F.LOADOUT)
-_WIN_RESULT_SCREENS = (F.WIN, F.PVP_RESULT)
+_MATCH_SCREENS = (_PLAY, _PVP_HUNT, _PVP_HIDE)
+_LOADING_SCREENS = (_LOADING, _LOADING_READY)
+_TILT_LOADOUT_SCREENS = (_TILT, _LOADOUT)
+_WIN_RESULT_SCREENS = (_WIN, _PVP_RESULT)
 
 _SCREEN_SETS = {}
 for _screen in _MATCH_SCREENS:

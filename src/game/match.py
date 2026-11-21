@@ -15,9 +15,22 @@ import time
 from dataclasses import dataclass, field
 from typing import NamedTuple
 
-from src.ui_album.flow import ITEM_WEIGHT, LEVEL_TABLE
-
 logger = logging.getLogger(__name__)
+
+#: Bảng cấp: (tên, số bọ, giây, ô vật phẩm, phản công). Moved from
+#: ``src.ui_album.flow`` (TASK_arch_refactor_1120 R5) — the v2 UI's own
+#: (Vietnamese-named) table; that module was deleted as dead code in
+#: TASK_cleanup_readme_1121, leaving this one with no importer either
+#: (not removed here — out of that task's own scope, noted in its report).
+LEVEL_TABLE = {
+    1: ("Dễ", 6, 180, 2, False), 2: ("Cơ bản", 8, 150, 3, False),
+    3: ("Khó", 10, 150, 3, True), 4: ("Xâm thực", 12, 120, 4, True),
+    5: ("Châu Á", 12, 120, 4, True),
+}
+
+ITEM_WEIGHT = {"Pháo sáng": 3, "Thuốc giải": 5, "Khiên axit": 4,
+              "Kính lọc": 4, "La bàn": 2, "Máy quét nhiệt": 8,
+              "Nước tăng lực": 3, "Bom khói": 6}
 
 #: Quá giờ ở cấp Châu Á: −5 điểm mỗi giây, thua sau ngần này giây.
 OVERTIME_MAX_S = 30.0
@@ -396,7 +409,7 @@ class AimContext:
 
     def resolve(self, point) -> tuple:
         """``(chỉ số, chí mạng)`` của con bọ mà tâm ngắm ``point`` găm vào."""
-        from src.ui_album.hit import pick_target
+        from src.game.hit import pick_target
 
         return pick_target(self.bugs, point, self.eye_mm, self.planes,
                            self.glass_mm, self.centre_mm,
@@ -433,7 +446,7 @@ def fire(match: AlbumMatch, crosshair, aim: AimContext, *,
         logger.info("Bam co dan: %s",
                     "dang nap" if match.reloading(now) else "chua toi nhip")
         return None
-    from src.ui_album.hit import shot_diagnostic
+    from src.game.hit import shot_diagnostic
 
     logger.info("Ban chan doan: %s", shot_diagnostic(
         aim.bugs, crosshair, aim.eye_mm, aim.planes, aim.glass_mm,

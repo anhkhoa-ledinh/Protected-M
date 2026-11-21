@@ -252,7 +252,7 @@ def test_sign_in_error_screen_shows_the_dynamic_error_text(manifest, painter_stu
 
 @pytest.fixture
 def real_painter(gl_context, manifest):
-    from src.ui_album.v3 import V3Painter
+    from src.ui_album.v3_painter import V3Painter
 
     painter = V3Painter(manifest, ROOT / "assets" / "shaders")
     painter.initialize()

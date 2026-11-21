@@ -14,7 +14,7 @@ import numpy.typing as npt
 from OpenGL import GL
 
 from src.config.schema import ContentSettings
-from src.engine.stage_profile import stage
+from src.common.stage_profile import stage
 from src.content.bake import BakeWorker
 from src.content.depth_worker import DepthWorker
 from src.content.formats import detect_content_type
@@ -27,9 +27,9 @@ from src.content.layer_shadow import (resample_to, shadow_geometry,
 from src.content.layer_clustering import LayerGradeReport, assign_layer_z, inter_layer_gap_m
 from src.math.homogeneous import to_column_major_flat, translation_matrix
 from src.renderer.shader import ShaderProgram
-from src.renderer.textured_mesh import TexturedMesh
+from src.scene.textured_mesh import TexturedMesh
 from src.renderer.video_player import VideoPlayer
-from src.ui_album.textures import bleed_transparent
+from src.common.textures import bleed_transparent
 from src.scene.primitives import (
     RELIEF_CLAMP_GAP_FRACTION,
     create_displaced_vertical_plane_uv,

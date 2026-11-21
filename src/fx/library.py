@@ -46,10 +46,15 @@ from PIL import Image
 from src.fx import screens as fx_screens
 from src.fx.player import FxPlayer
 from src.fx.spec import FxSpec
-from src.ui_album.textures import bleed_transparent
-from src.ui_album.v3 import DESIGN_SIZE
+from src.common.textures import bleed_transparent
 
 logger = logging.getLogger(__name__)
+
+#: Design-space canvas size (``src.ui_album.v3``'s own value, duplicated
+#: here — TASK_arch_refactor_1120 R2: ``fx`` must not depend on
+#: ``ui_album``; same already-duplicated constant as ``scope.py``/
+#: ``viewport_filter.py``).
+DESIGN_SIZE = (1280.0, 720.0)
 
 #: TASK_game_feel_1118 P2: atlas khung cách nhau 2px — bậc mip cao hơn sẽ
 #: loang màu SANG khung bên cạnh, nên chặn ở bậc 1 (vẫn đủ AA cho viền,

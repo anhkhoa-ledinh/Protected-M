@@ -11,7 +11,7 @@ Số liệu dưới đây là **vị trí bọ thật** của phiên ấy, chép
 
 from __future__ import annotations
 
-from src.ui_album.viewport_filter import filter_props, project_to_design
+from src.game.viewport_filter import filter_props, project_to_design
 
 #: Tám con bọ của phiên 07/11, mm trong hệ HCPD.
 PROPS = [{"pos_mm": p} for p in [

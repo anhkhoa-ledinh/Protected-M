@@ -11,11 +11,12 @@
 """
 from __future__ import annotations
 
-from src.ui_album.v3 import (FORGOT_CANCEL_RECT, FORGOT_CARD_RECT,
+from src.ui_album.v3 import V3State
+from src.ui_album.v3_screen_draw import (FORGOT_CANCEL_RECT, FORGOT_CARD_RECT,
                              FORGOT_ERROR_FONT, FORGOT_ERROR_RECT,
                              FORGOT_SUBMIT_RECT, RECOVERY_CARD_RECT,
                              RECOVERY_COPY_RECT, RECOVERY_SAVED_RECT,
-                             V3State, _FIELD_LABEL_FONT, _draw_forgot_dialog,
+                             _FIELD_LABEL_FONT, _draw_forgot_dialog,
                              _draw_recovery_dialog)
 
 #: Generous but real -- a gap bigger than this between the last content
