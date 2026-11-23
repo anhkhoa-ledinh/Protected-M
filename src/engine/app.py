@@ -129,6 +129,8 @@ class HcpdApplication:
 
     #: Seed of the match being placed; ``_start_prop_game`` sets it each match.
     _bug_seed = 0
+    #: Seed drawn on the loading screen, used by the next match (or None).
+    _pending_bug_seed = None
 
     #: Mặc định ở mức class để bản dựng bằng ``__new__`` (test) vẫn là sandbox.
     _demo = False
@@ -1276,6 +1278,7 @@ class HcpdApplication:
             else:
                 state.pipeline_pct = 100.0
                 state.go(F.PIPE100)
+                self._refresh_bug_capacity()
         match = self._album.game
         if match is None or state.screen != F.PLAY:
             return
@@ -2024,6 +2027,35 @@ class HcpdApplication:
             return AUTOMATCH_BUG_SEED
         return secrets.randbits(32)
 
+    def _refresh_bug_capacity(self) -> None:
+        """Loading screen: how many bugs this photo can really hold at this
+        level. Runs once per (photo, level, layer set); the seed it uses is
+        kept for the match, so the match places the same bugs (same rest eye)."""
+        from src.content.hidden_props import layer_planes
+        from src.game.bug_capacity import placeable_bugs
+
+        state = self._album.state
+        key = (str(state.photo), state.level, self._renderer.layers_revision)
+        if getattr(self, "_bug_hold_key", None) == key:
+            return
+        planes = layer_planes(self._renderer.layer_records())
+        if len(planes) < 2:
+            return
+        self._bug_hold_key = key
+        F = self._album.flow
+        count = F.LEVEL_TABLE[state.level][1]
+        rest = self._rest_eye or (
+            float(self._content.overscan_design_eye_mm[0]),
+            float(self._content.overscan_design_eye_mm[1]), 450.0)
+        glass, centre = self._glass_mm()
+        self._pending_bug_seed = self._new_bug_seed()
+        kept, _outside, _dropped = placeable_bugs(
+            planes, count, bug_radius_mm(self._content), rest, glass,
+            self._viewport_rect(), centre, self._pending_bug_seed)
+        state.bug_hold = len(kept)
+        logger.info("Album bo: anh chua duoc %d / %d (seed=%d, man tai xong)",
+                    len(kept), count, self._pending_bug_seed)
+
     def _start_prop_game(self, count: int = PROP_COUNT) -> None:
         """
         Đặt vật ẩn từ hình học lớp THẬT của renderer, tại mắt nghỉ đo được.
@@ -2042,7 +2074,11 @@ class HcpdApplication:
             float(self._content.overscan_design_eye_mm[1]), 450.0,
         )
         t0 = time.perf_counter()
-        self._bug_seed = self._new_bug_seed()
+        self._bug_seed = self._pending_bug_seed
+        if self._bug_seed is None:
+            self._bug_seed = self._new_bug_seed()
+        self._pending_bug_seed = None
+        self._bug_hold_key = None        # next loading screen recomputes
         logger.info("Album bo: seed=%d", self._bug_seed)
         probe = self._devtools.env("HCPD_PROP_PROBE")
         if probe == "1":
