@@ -1699,9 +1699,8 @@ class HcpdApplication:
 
     def _pvp_handle_start(self, msg: dict, now: float) -> None:
         from src.ui_album import pvp_sync
-        from src.game.match import (
-            DEFAULT_SPEC, WEAPONS_SPEC, start_match,
-        )
+        from src.game.levels import PVP_WEAPONS_SPEC as WEAPONS_SPEC
+        from src.game.match import DEFAULT_SPEC, start_match
 
         F = self._album.flow
         state = self._album.state

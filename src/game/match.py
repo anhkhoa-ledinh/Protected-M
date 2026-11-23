@@ -15,7 +15,7 @@ import time
 from dataclasses import dataclass, field
 
 from src.game.levels import (LEVELS, WEAPON_DAMAGE, WEAPONS_SPEC, DamageSpec,
-                             WeaponSpec)
+                             WeaponSpec, hit_damage)
 
 logger = logging.getLogger(__name__)
 
@@ -76,10 +76,12 @@ WEAPON_LABEL = {
 DEFAULT_DAMAGE = DamageSpec(9999.0, 1.0)
 
 
-def weapon_damage(weapon_name: str, crit: bool) -> float:
-    """Sát thương một viên của ``weapon_name`` đã găm trúng, ``crit`` hay không."""
-    spec = WEAPON_DAMAGE.get(weapon_name, DEFAULT_DAMAGE)
-    return spec.damage * (spec.headshot_mult if crit else 1.0)
+def weapon_damage(weapon_name: str, crit: bool, level: int = 1) -> float:
+    """Sát thương một viên của ``weapon_name`` đã găm trúng một con bọ ở cấp
+    ``level`` — công thức ở ``levels.hit_damage``; khẩu không tra được thì
+    ``DEFAULT_DAMAGE`` (đủ lớn để hạ một phát)."""
+    got = hit_damage(weapon_name, crit, level)
+    return DEFAULT_DAMAGE.damage if got is None else got
 
 
 #: Máu một con bọ theo cấp, đọc từ ``levels.LEVELS``.
@@ -436,7 +438,7 @@ def fire(match: AlbumMatch, crosshair, aim: AimContext, *,
         if pvp:
             killed = True
         else:
-            damage = weapon_damage(match.weapon_name, crit)
+            damage = weapon_damage(match.weapon_name, crit, match.level)
             killed = match.apply_damage(index, damage, point, now)
         if killed:
             match.state.found[index] = True
