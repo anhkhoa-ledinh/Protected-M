@@ -1846,15 +1846,25 @@ class HcpdApplication:
         # Xin NHIỀU hơn rồi lọc: màn chơi chỉ hở ô viewport, con bọ chiếu ra
         # ngoài ô thì không bao giờ thấy được nên ván không thể thắng (F3.3).
         rule = level_rules(state.level)
+        rest = self._rest_eye or (
+            float(self._content.overscan_design_eye_mm[0]),
+            float(self._content.overscan_design_eye_mm[1]), 450.0)
+        glass, centre = self._glass_mm()
+        planes = layer_planes(self._renderer.layer_records())
+        chosen = None
+        if len(planes) >= 2:
+            # Fullest of LAYOUT_TRIES layouts (cached from the loading screen
+            # when nothing changed since).
+            chosen = self._album_layout(planes, count, rule, rest, glass,
+                                        centre).layout
         self._start_prop_game(count=count * 3,
-                              prefer=(rule.prefer_lo, rule.prefer_hi))
+                              prefer=(rule.prefer_lo, rule.prefer_hi),
+                              props=chosen.kept if chosen else None)
         if self._game is not None and self._game.props:
-            rest = self._rest_eye or (
-                float(self._content.overscan_design_eye_mm[0]),
-                float(self._content.overscan_design_eye_mm[1]), 450.0)
-            glass, centre = self._glass_mm()
             kept, outside = filter_props(self._game.props, rest, count, glass,
                                          self._viewport_rect(), centre)
+            if chosen is not None:
+                outside = chosen.outside
             # TASK_hud_fix_1119 Fix 3: ``kept`` is only "inside the
             # viewport" — place_props' own reveal scan (hidden_props_search
             # ._candidate) only walked ONE axis at a time, so a spot that
@@ -2042,8 +2052,6 @@ class HcpdApplication:
         would disagree with the match). The seed is drawn once and kept for
         the match, so the match places the same bugs."""
         from src.content.hidden_props import layer_planes
-        from src.game.bug_capacity import placeable_bugs
-
         state = self._album.state
         rest = self._rest_eye or (
             float(self._content.overscan_design_eye_mm[0]),
@@ -2066,18 +2074,41 @@ class HcpdApplication:
         F = self._album.flow
         count = F.LEVEL_TABLE[state.level][1]
         rule = level_rules(state.level)
+        choice = self._album_layout(planes, count, rule, rest, glass, centre)
+        state.bug_hold = len(choice.layout.kept)
+        logger.info("Album bo: anh chua duoc %d / %d (seed=%d, man tai xong)",
+                    state.bug_hold, count, self._pending_bug_seed)
+
+    def _album_layout(self, planes, count, rule, rest, glass, centre):
+        """The kept layout for this match (``bug_capacity.choose_layout``).
+
+        One seed per match (``_pending_bug_seed``), so the loading screen and
+        the match share one answer: the result is cached on everything it
+        depends on and recomputed only when one of those changes."""
+        from src.game.bug_capacity import choose_layout
+
         if self._pending_bug_seed is None:
             self._pending_bug_seed = self._new_bug_seed()
-        kept, _outside, _dropped = placeable_bugs(
-            planes, count, bug_radius_mm(self._content), rest, glass,
-            self._viewport_rect(), centre, self._pending_bug_seed,
-            prefer=(rule.prefer_lo, rule.prefer_hi))
-        state.bug_hold = len(kept)
-        logger.info("Album bo: anh chua duoc %d / %d (seed=%d, man tai xong)",
-                    len(kept), count, self._pending_bug_seed)
+        seed = self._pending_bug_seed
+        prefer = (rule.prefer_lo, rule.prefer_hi)
+        key = (seed, count, prefer, self._renderer.layers_revision,
+               tuple(round(v, 1) for v in (*glass, *centre, *rest)))
+        cached = getattr(self, "_layout_cache", None)
+        if cached is not None and cached[0] == key:
+            return cached[1]
+        t0 = time.perf_counter()
+        choice = choose_layout(planes, count, bug_radius_mm(self._content),
+                               rest, glass, self._viewport_rect(), centre,
+                               seed, prefer)
+        logger.info("Album bo: %d bo cuc %s · giu #%d (%d con)",
+                    len(choice.counts), choice.counts, choice.index,
+                    len(choice.layout.kept))
+        logger.info("Chon bo cuc mat %.0f ms", (time.perf_counter() - t0) * 1000)
+        self._layout_cache = (key, choice)
+        return choice
 
     def _start_prop_game(self, count: int = PROP_COUNT,
-                         prefer=LEGACY_PREFER) -> None:
+                         prefer=LEGACY_PREFER, props=None) -> None:
         """
         Đặt vật ẩn từ hình học lớp THẬT của renderer, tại mắt nghỉ đo được.
 
@@ -2102,7 +2133,12 @@ class HcpdApplication:
         self._bug_hold_key = None        # next loading screen recomputes
         logger.info("Album bo: seed=%d", self._bug_seed)
         probe = self._devtools.env("HCPD_PROP_PROBE")
-        if probe == "1":
+        if props is not None:
+            # Already placed (the fullest layout, ``_album_layout``).
+            self._game = GameState(image=name, props=list(props),
+                                   tracking_on=not self._tracking_off,
+                                   started_at_s=t0)
+        elif probe == "1":
             # Chẩn đoán thứ tự vẽ (C2): bỏ qua tìm chỗ, đặt ở độ sâu biết trước.
             self._game = GameState(image=name, props=probe_props(planes),
                                    tracking_on=True, started_at_s=t0)
