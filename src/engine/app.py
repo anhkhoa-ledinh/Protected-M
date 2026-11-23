@@ -9,6 +9,7 @@ import json
 import logging
 import math
 import os
+import secrets
 import time
 from dataclasses import asdict
 from pathlib import Path
@@ -70,8 +71,12 @@ HOOK_ENV_VARS = (
     "HCPD_UI_SHOTS_1117", "HCPD_AA_BASELINE_1118", "HCPD_V3_LIVE",
     "HCPD_PERF_PROFILE", "HCPD_PVP_AUTO", "HCPD_PVP_SHOTS",
     "HCPD_PROP_PROBE", "HCPD_VIDEO_STATS", "HCPD_HUD_FIX_1119_SHOTS",
-    "HCPD_ALBUM_AUTOWIN",
+    "HCPD_ALBUM_AUTOWIN", "HCPD_BUG_SEED",
 )
+
+#: Bug-placement seed an automatch run uses unless ``HCPD_BUG_SEED`` says
+#: otherwise, so scripted runs stay repeatable. Real play draws a fresh seed.
+AUTOMATCH_BUG_SEED = 1123
 
 
 def is_scripted_run(*, shots: bool, ui_shots: bool) -> bool:
@@ -121,6 +126,9 @@ class HcpdApplication:
 
     The only visible window is the virtual 3D room.
     """
+
+    #: Seed of the match being placed; ``_start_prop_game`` sets it each match.
+    _bug_seed = 0
 
     #: Mặc định ở mức class để bản dựng bằng ``__new__`` (test) vẫn là sandbox.
     _demo = False
@@ -1671,8 +1679,7 @@ class HcpdApplication:
         self._game.props = kept
         self._game.found = [False] * len(kept)
         self._game.visible_since_s = [None] * len(kept)
-        seed_key = Path(self._content.content_path).name or "unknown"
-        assign_bug_sizes(self._game.props, seed_key)
+        assign_bug_sizes(self._game.props, self._bug_seed)
         photo_rgb = self._photo_rgb_for_camo()
         if photo_rgb is not None:
             assign_bug_camo(self._game.props, photo_rgb, rest, glass, centre)
@@ -1889,8 +1896,7 @@ class HcpdApplication:
             # (_aim_context) sau đó đọc lại đúng cùng giá trị này.
             from src.ui_album.bugs import assign_bug_camo, assign_bug_sizes
 
-            seed_key = Path(self._content.content_path).name or "unknown"
-            assign_bug_sizes(self._game.props, seed_key)
+            assign_bug_sizes(self._game.props, self._bug_seed)
             photo_rgb = self._photo_rgb_for_camo()
             if photo_rgb is not None:
                 assign_bug_camo(self._game.props, photo_rgb, rest, glass,
@@ -2005,6 +2011,19 @@ class HcpdApplication:
         )
         self._start_prop_game()
 
+    def _new_bug_seed(self) -> int:
+        """One seed per match: ``HCPD_BUG_SEED`` if set, the fixed automatch
+        default for scripted automatch runs, else a real random source."""
+        raw = self._devtools.env("HCPD_BUG_SEED").strip()
+        if raw:
+            try:
+                return int(raw)
+            except ValueError:
+                logger.warning("HCPD_BUG_SEED=%r is not an integer — ignored", raw)
+        if self._devtools.env("HCPD_ALBUM_AUTOMATCH") in ("1", "2"):
+            return AUTOMATCH_BUG_SEED
+        return secrets.randbits(32)
+
     def _start_prop_game(self, count: int = PROP_COUNT) -> None:
         """
         Đặt vật ẩn từ hình học lớp THẬT của renderer, tại mắt nghỉ đo được.
@@ -2023,6 +2042,8 @@ class HcpdApplication:
             float(self._content.overscan_design_eye_mm[1]), 450.0,
         )
         t0 = time.perf_counter()
+        self._bug_seed = self._new_bug_seed()
+        logger.info("Album bo: seed=%d", self._bug_seed)
         probe = self._devtools.env("HCPD_PROP_PROBE")
         if probe == "1":
             # Chẩn đoán thứ tự vẽ (C2): bỏ qua tìm chỗ, đặt ở độ sâu biết trước.
@@ -2032,6 +2053,7 @@ class HcpdApplication:
             self._game = start_game(
                 planes, radius_mm, rest[:2], z_rest_mm(rest[2]), t0, name,
                 tracking_on=not self._tracking_off, count=count,
+                seed=self._bug_seed,
             )
             if probe == "2":
                 # Vật thật, chỉ tô màu khác nhau để biết quả nào hiện.

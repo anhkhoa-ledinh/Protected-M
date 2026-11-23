@@ -63,7 +63,9 @@ def assign_bug_sizes(props, seed_key) -> None:
     Gán ``size_k`` (= ``SIZE_FACTOR × u``, ``u`` đều trong
     ``[BUG_SIZE_MIN, BUG_SIZE_MAX]``) cho mỗi con, MỘT LẦN khi ván mở.
 
-    Seed = ``(seed_key, chỉ số con)`` nên chơi lại đúng ảnh ra đúng size cũ.
+    Seed = ``(seed_key, chỉ số con)``. ``seed_key`` is the per-match bug seed
+    (``app._bug_seed``), so one match keeps its sizes and a new match gets new
+    ones; it used to be the photo name.
     Ghi thẳng vào ``prop["size_k"]`` — ``BugPainter.draw`` và
     ``app._aim_context`` đọc chung đúng một giá trị này, không có nguồn thứ
     hai. Chỉ đổi kích thước VẼ; ``radius_mm`` (đặt chỗ, ``is_exposed``) không

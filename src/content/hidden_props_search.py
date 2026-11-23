@@ -15,6 +15,8 @@ Ba thay đổi so với C1, đều từ số đo:
 
 from __future__ import annotations
 
+import random
+
 import numpy as np
 
 from src.content.hidden_props import _clearance_ok, _nearer, is_visible
@@ -26,6 +28,8 @@ REST_BOX_Y_MM = 15.0
 MIN_REVEAL_MM = 40.0
 #: Khoảng lộ dễ chịu và điểm ngắm khi phải chọn ngoài khoảng đó.
 PREFER_LO, PREFER_HI, PREFER_MID = 50.0, 120.0, 85.0
+#: Seeded runs shift each depth fraction by up to this much of the layer gap.
+FRAC_JITTER = 0.06
 
 
 def _rest_eyes(x0, y0, z):
@@ -80,12 +84,20 @@ def _candidate(planes, prop, radius_mm, rest_xy, z_rest, z_near, spans):
             "reveal_450_mm": r450, "reveal_330_mm": r330}
 
 
-def _rank(cands, n, radius_mm):
-    """Ưu tiên lộ trong [50, 120] mm, rồi gần 85 mm nhất; giữ giãn cách 3 × r."""
+def _rank(cands, n, radius_mm, rng=None):
+    """Ưu tiên lộ trong [50, 120] mm, rồi gần 85 mm nhất; giữ giãn cách 3 × r.
+
+    ``rng`` (a ``random.Random``) shuffles BEFORE the stable sort, so only
+    candidates with an equal preference key change order; the preference
+    order itself never does. ``None`` = the old deterministic order.
+    """
     def key(c):
         r = abs(c["reveal_450_mm"])
         return (0 if PREFER_LO <= r <= PREFER_HI else 1, abs(r - PREFER_MID))
 
+    cands = list(cands)
+    if rng is not None:
+        rng.shuffle(cands)
     out = []
     for c in sorted(cands, key=key):
         x, y = c["pos_mm"][0], c["pos_mm"][1]
@@ -128,27 +140,44 @@ def exposure_count(planes, prop_mm, radius_mm, rest_xy, z,
 
 
 def place_props(planes, n, radius_mm, rest_eye_mm, screen_mm=(344.0, 194.0),
-                grid=9, z_rest=450.0, z_near=330.0, span_x=120.0, span_y=60.0):
+                grid=9, z_rest=450.0, z_near=330.0, span_x=120.0, span_y=60.0,
+                seed=None):
     """
     Tối đa ``n`` vật: ẩn trong cả hộp nghỉ, lộ khi nghiêng đầu thật sự. Trả ít
     hơn ``n`` (có thể rỗng) với ảnh không giấu được — không bao giờ lỗi.
+
+    ``seed`` (any hashable, e.g. the per-match int) jitters every grid point
+    by up to half a cell and the depth fraction slightly, and breaks ties in
+    ``_rank`` at random. Every jittered point still goes through the same
+    ``_candidate`` test (hidden in the rest box, revealed on a lean), so no
+    rule is loosened. Same seed, same result; ``None`` = fixed grid, as before.
     """
+    rng = None if seed is None else random.Random(f"place:{seed}")
     x0, y0 = rest_eye_mm
     sw, sh = screen_mm
+    cell_x = sw * 0.8 / max(grid - 1, 1)
+    cell_y = sh * 0.8 / max(grid - 1, 1)
     cands = []
     for i in range(len(planes) - 1):
         lo, hi = planes[i].z_max_m, planes[i + 1].z_min_m
         if hi - lo < 2.0 * radius_mm / 1000.0:
             continue
         for frac in (1.0 / 3.0, 0.5, 2.0 / 3.0):
+            if rng is not None:
+                frac += rng.uniform(-FRAC_JITTER, FRAC_JITTER)
             z = lo + (hi - lo) * frac
             if not _clearance_ok(planes, z, radius_mm):
                 continue
             for gx in np.linspace(-sw / 2 * 0.8, sw / 2 * 0.8, grid):
                 for gy in np.linspace(-sh / 2 * 0.8, sh / 2 * 0.8, grid):
+                    if rng is not None:
+                        gx_j = gx + rng.uniform(-0.5, 0.5) * cell_x
+                        gy_j = gy + rng.uniform(-0.5, 0.5) * cell_y
+                    else:
+                        gx_j, gy_j = gx, gy
                     got = _candidate(
-                        planes, (float(gx), float(gy), z * 1000.0), radius_mm,
+                        planes, (float(gx_j), float(gy_j), z * 1000.0), radius_mm,
                         (x0, y0), z_rest, z_near, (span_x, span_y))
                     if got is not None:
                         cands.append(got)
-    return _rank(cands, n, radius_mm)
+    return _rank(cands, n, radius_mm, rng)
