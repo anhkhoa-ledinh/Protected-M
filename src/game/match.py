@@ -13,20 +13,15 @@ import math
 import random
 import time
 from dataclasses import dataclass, field
-from typing import NamedTuple
+
+from src.game.levels import (LEVELS, WEAPON_DAMAGE, WEAPONS_SPEC, DamageSpec,
+                             WeaponSpec)
 
 logger = logging.getLogger(__name__)
 
-#: Bảng cấp: (tên, số bọ, giây, ô vật phẩm, phản công). Moved from
-#: ``src.ui_album.flow`` (TASK_arch_refactor_1120 R5) — the v2 UI's own
-#: (Vietnamese-named) table; that module was deleted as dead code in
-#: TASK_cleanup_readme_1121, leaving this one with no importer either
-#: (not removed here — out of that task's own scope, noted in its report).
-LEVEL_TABLE = {
-    1: ("Dễ", 6, 180, 2, False), 2: ("Cơ bản", 8, 150, 3, False),
-    3: ("Khó", 10, 150, 3, True), 4: ("Xâm thực", 12, 120, 4, True),
-    5: ("Châu Á", 12, 120, 4, True),
-}
+#: Bảng cấp: (tên, số bọ, giây, ô vật phẩm, phản công), đọc từ ``levels.LEVELS``.
+LEVEL_TABLE = {lv: (r.name_vi, r.bugs, r.seconds, r.slots, r.counter)
+               for lv, r in LEVELS.items()}
 
 ITEM_WEIGHT = {"Pháo sáng": 3, "Thuốc giải": 5, "Khiên axit": 4,
               "Kính lọc": 4, "La bàn": 2, "Máy quét nhiệt": 8,
@@ -35,14 +30,6 @@ ITEM_WEIGHT = {"Pháo sáng": 3, "Thuốc giải": 5, "Khiên axit": 4,
 #: Quá giờ ở cấp Châu Á: −5 điểm mỗi giây, thua sau ngần này giây.
 OVERTIME_MAX_S = 30.0
 OVERTIME_PENALTY = 5.0
-
-
-class WeaponSpec(NamedTuple):
-    """Băng đạn, nhịp bắn và thời gian nạp của một khẩu."""
-
-    mag: int
-    fire_s: float        # giây tối thiểu giữa hai phát
-    reload_s: float
 
 
 #: Ba khẩu khác nhau ở cả ba con số, đúng lời mô tả in trên màn trang bị:
@@ -59,11 +46,7 @@ class WeaponSpec(NamedTuple):
 #: TASK_weapons_1119: Heavy-mag gun's magazine goes 24 → 50 (reload 1.3 s
 #: → 2.5 s); fire interval (0.18 s) is unchanged — the user's own call,
 #: not re-derived from the downtime-ratio formula above.
-WEAPONS_SPEC = {
-    "Precision gun": WeaponSpec(12, 0.50, 1.1),
-    "Spread gun": WeaponSpec(8, 0.38, 0.9),
-    "Heavy-mag gun": WeaponSpec(50, 0.18, 2.5),
-}
+#: The gun numbers themselves live in ``levels.WEAPONS_SPEC``.
 DEFAULT_SPEC = WeaponSpec(12, 0.45, 1.1)
 
 #: Giữ hai tên cũ cho chỗ nào còn tra băng đạn một mình.
@@ -84,21 +67,9 @@ WEAPON_LABEL = {
 }
 
 
-class DamageSpec(NamedTuple):
-    """Sát thương một viên/đạn ghém, và hệ số khi trúng đầu."""
-
-    damage: float
-    headshot_mult: float
-
-
 #: TASK_weapons_1119 — bảng sát thương theo id nội bộ. Shotgun không có
 #: thưởng trúng đầu (``headshot_mult=1.0``): 5 viên ghém, 25 sát thương
 #: mỗi viên, không viên nào ăn thêm dù rơi vào vùng đầu.
-WEAPON_DAMAGE = {
-    "Precision gun": DamageSpec(100.0, 2.0),
-    "Spread gun": DamageSpec(25.0, 1.0),
-    "Heavy-mag gun": DamageSpec(34.0, 1.5),
-}
 #: Khẩu không tra được (bộ album cũ dùng id "Sung"/"Sung N", hoặc
 #: ``AlbumMatch.weapon_name`` mặc định) — sát thương đủ lớn để vẫn hạ một
 #: phát, giữ ĐÚNG hành vi trước TASK_weapons_1119 cho đường lùi cũ.
@@ -111,8 +82,8 @@ def weapon_damage(weapon_name: str, crit: bool) -> float:
     return spec.damage * (spec.headshot_mult if crit else 1.0)
 
 
-#: Máu một con bọ theo cấp (bảng cố định của TASK_weapons_1119).
-BUG_HP_BY_LEVEL = {1: 100.0, 2: 100.0, 3: 150.0, 4: 200.0, 5: 200.0}
+#: Máu một con bọ theo cấp, đọc từ ``levels.LEVELS``.
+BUG_HP_BY_LEVEL = {lv: r.hp for lv, r in LEVELS.items()}
 
 #: Shotgun: số viên ghém và bán kính rải quanh tâm ngắm, px thiết kế.
 PELLET_COUNT = 5

@@ -19,6 +19,8 @@ import numpy as np
 from src.content.formats import detect_content_type, is_supported_media
 from src.content.hidden_props import layer_planes
 from src.content.persistence import media_path_for_config, save_content_settings
+from src.game.levels import LEGACY_PREFER
+from src.game.levels import rules as level_rules
 from src.content.prop_game import (
     PROP_COUNT,
     bug_radius_mm,
@@ -1843,7 +1845,9 @@ class HcpdApplication:
         count = F.LEVEL_TABLE[state.level][1]
         # Xin NHIỀU hơn rồi lọc: màn chơi chỉ hở ô viewport, con bọ chiếu ra
         # ngoài ô thì không bao giờ thấy được nên ván không thể thắng (F3.3).
-        self._start_prop_game(count=count * 3)
+        rule = level_rules(state.level)
+        self._start_prop_game(count=count * 3,
+                              prefer=(rule.prefer_lo, rule.prefer_hi))
         if self._game is not None and self._game.props:
             rest = self._rest_eye or (
                 float(self._content.overscan_design_eye_mm[0]),
@@ -1903,11 +1907,11 @@ class HcpdApplication:
             # (_aim_context) sau đó đọc lại đúng cùng giá trị này.
             from src.ui_album.bugs import assign_bug_camo, assign_bug_sizes
 
-            assign_bug_sizes(self._game.props, self._bug_seed)
+            assign_bug_sizes(self._game.props, self._bug_seed, rule.size)
             photo_rgb = self._photo_rgb_for_camo()
             if photo_rgb is not None:
                 assign_bug_camo(self._game.props, photo_rgb, rest, glass,
-                               centre)
+                               centre, strength=rule.camo)
             # Bỏ quả cầu đánh dấu cũ: nó chỉ là lưới an toàn đặt lúc 01:00
             # ngày 07/11, khi tôi chưa chứng minh được sprite có hiện lên.
             # Người dùng xác nhận 01:17 là bọ đã hiện, nên quả cầu thành thừa.
@@ -2061,16 +2065,19 @@ class HcpdApplication:
         self._bug_hold_key, self._bug_hold_t = key, now
         F = self._album.flow
         count = F.LEVEL_TABLE[state.level][1]
+        rule = level_rules(state.level)
         if self._pending_bug_seed is None:
             self._pending_bug_seed = self._new_bug_seed()
         kept, _outside, _dropped = placeable_bugs(
             planes, count, bug_radius_mm(self._content), rest, glass,
-            self._viewport_rect(), centre, self._pending_bug_seed)
+            self._viewport_rect(), centre, self._pending_bug_seed,
+            prefer=(rule.prefer_lo, rule.prefer_hi))
         state.bug_hold = len(kept)
         logger.info("Album bo: anh chua duoc %d / %d (seed=%d, man tai xong)",
                     len(kept), count, self._pending_bug_seed)
 
-    def _start_prop_game(self, count: int = PROP_COUNT) -> None:
+    def _start_prop_game(self, count: int = PROP_COUNT,
+                         prefer=LEGACY_PREFER) -> None:
         """
         Đặt vật ẩn từ hình học lớp THẬT của renderer, tại mắt nghỉ đo được.
 
@@ -2103,7 +2110,7 @@ class HcpdApplication:
             self._game = start_game(
                 planes, radius_mm, rest[:2], z_rest_mm(rest[2]), t0, name,
                 tracking_on=not self._tracking_off, count=count,
-                seed=self._bug_seed,
+                seed=self._bug_seed, prefer=prefer,
             )
             if probe == "2":
                 # Vật thật, chỉ tô màu khác nhau để biết quả nào hiện.

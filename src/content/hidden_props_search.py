@@ -20,14 +20,15 @@ import random
 import numpy as np
 
 from src.content.hidden_props import _clearance_ok, _nearer, is_visible
+from src.game.levels import LEGACY_PREFER
 
 #: Nửa bề rộng hộp nghỉ, mm — biên đưa võng đo được khi ngồi yên.
 REST_BOX_X_MM = 20.0
 REST_BOX_Y_MM = 15.0
 #: Lộ sớm hơn mức này thì vật tự hiện, không tính là trò chơi.
 MIN_REVEAL_MM = 40.0
-#: Khoảng lộ dễ chịu và điểm ngắm khi phải chọn ngoài khoảng đó.
-PREFER_LO, PREFER_HI, PREFER_MID = 50.0, 120.0, 85.0
+#: Khoảng lộ dễ chịu mặc định (PvP); solo truyền khoảng của cấp (levels.py).
+PREFER_LO, PREFER_HI = LEGACY_PREFER
 #: Seeded runs shift each depth fraction by up to this much of the layer gap.
 FRAC_JITTER = 0.06
 
@@ -84,16 +85,22 @@ def _candidate(planes, prop, radius_mm, rest_xy, z_rest, z_near, spans):
             "reveal_450_mm": r450, "reveal_330_mm": r330}
 
 
-def _rank(cands, n, radius_mm, rng=None):
-    """Ưu tiên lộ trong [50, 120] mm, rồi gần 85 mm nhất; giữ giãn cách 3 × r.
+def _rank(cands, n, radius_mm, rng=None, prefer=LEGACY_PREFER):
+    """Ưu tiên lộ trong ``prefer`` (mm), rồi gần giữa khoảng nhất; giữ giãn cách 3 × r.
+
+    ``prefer`` is a preference only: a candidate outside it is still kept
+    when the preferred ones run out, so it never lowers the count.
 
     ``rng`` (a ``random.Random``) shuffles BEFORE the stable sort, so only
     candidates with an equal preference key change order; the preference
     order itself never does. ``None`` = the old deterministic order.
     """
+    lo, hi = prefer
+    mid = (lo + hi) / 2.0
+
     def key(c):
         r = abs(c["reveal_450_mm"])
-        return (0 if PREFER_LO <= r <= PREFER_HI else 1, abs(r - PREFER_MID))
+        return (0 if lo <= r <= hi else 1, abs(r - mid))
 
     cands = list(cands)
     if rng is not None:
@@ -141,7 +148,7 @@ def exposure_count(planes, prop_mm, radius_mm, rest_xy, z,
 
 def place_props(planes, n, radius_mm, rest_eye_mm, screen_mm=(344.0, 194.0),
                 grid=9, z_rest=450.0, z_near=330.0, span_x=120.0, span_y=60.0,
-                seed=None):
+                seed=None, prefer=LEGACY_PREFER):
     """
     Tối đa ``n`` vật: ẩn trong cả hộp nghỉ, lộ khi nghiêng đầu thật sự. Trả ít
     hơn ``n`` (có thể rỗng) với ảnh không giấu được — không bao giờ lỗi.
@@ -180,4 +187,4 @@ def place_props(planes, n, radius_mm, rest_eye_mm, screen_mm=(344.0, 194.0),
                         (x0, y0), z_rest, z_near, (span_x, span_y))
                     if got is not None:
                         cands.append(got)
-    return _rank(cands, n, radius_mm, rng)
+    return _rank(cands, n, radius_mm, rng, prefer)

@@ -10,15 +10,17 @@ from __future__ import annotations
 
 from src.content.hidden_props_search import exposure_count, place_props
 from src.content.prop_rest_eye import z_rest_mm
+from src.game.levels import LEGACY_PREFER
 from src.game.viewport_filter import filter_props
 
 
 def placeable_bugs(planes, count, radius_mm, rest_eye_mm, glass_mm, rect,
-                   centre_mm, seed):
+                   centre_mm, seed, prefer=LEGACY_PREFER):
     """``(winnable props, outside the viewport, dropped as unwinnable)``."""
     placed = place_props(planes, int(count) * 3, float(radius_mm),
                          tuple(rest_eye_mm[:2]),
-                         z_rest=float(z_rest_mm(rest_eye_mm[2])), seed=seed)
+                         z_rest=float(z_rest_mm(rest_eye_mm[2])), seed=seed,
+                         prefer=prefer)
     if not placed:
         return [], 0, 0
     kept, outside = filter_props(placed, rest_eye_mm, int(count), glass_mm,

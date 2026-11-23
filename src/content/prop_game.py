@@ -18,6 +18,7 @@ from pathlib import Path
 
 from src.content.hidden_props import _nearer, is_visible
 from src.content.hidden_props_search import place_props
+from src.game.levels import LEGACY_PREFER
 
 #: Số vật mỗi ván. Giữ là hằng module, chưa thành khoá config (ngoài phạm vi C2).
 PROP_COUNT = 3
@@ -68,7 +69,8 @@ class GameState:
 
 
 def start_game(planes, radius_mm, rest_eye_mm, z_rest_mm, now_s, image,
-               *, tracking_on=True, count=PROP_COUNT, seed=None):
+               *, tracking_on=True, count=PROP_COUNT, seed=None,
+               prefer=LEGACY_PREFER):
     """
     Đặt vật rồi mở một ván. Trả state với ``k ≤ count`` vật, có thể rỗng.
 
@@ -79,7 +81,7 @@ def start_game(planes, radius_mm, rest_eye_mm, z_rest_mm, now_s, image,
     giao diện album truyền số bọ của từng cấp (TASK_album_ui_1106).
     """
     props = place_props(planes, int(count), float(radius_mm), tuple(rest_eye_mm),
-                        z_rest=float(z_rest_mm), seed=seed)
+                        z_rest=float(z_rest_mm), seed=seed, prefer=prefer)
     return GameState(image=str(image), props=list(props),
                      tracking_on=bool(tracking_on), started_at_s=float(now_s))
 
