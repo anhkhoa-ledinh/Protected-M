@@ -1874,6 +1874,10 @@ class HcpdApplication:
             kept = winnable
             logger.info("Album bo: xin %d · dat %d · ngoai o %d · khong the lo %d",
                         count, len(kept), outside, dropped_unwinnable)
+            if state.bug_hold is not None and state.bug_hold != len(kept):
+                logger.warning("Album bo: man tai xong bao %d con nhung van dat %d "
+                               "(cua so hoac mat nghi doi sau do)",
+                               state.bug_hold, len(kept))
             if not kept:
                 # Không còn chỗ nào THẬT SỰ lộ được — đừng mở ván không thể
                 # thắng (F3.3's own gap). Ở lại màn chọn ảnh, nói thẳng tại
@@ -2029,26 +2033,36 @@ class HcpdApplication:
 
     def _refresh_bug_capacity(self) -> None:
         """Loading screen: how many bugs this photo can really hold at this
-        level. Runs once per (photo, level, layer set); the seed it uses is
-        kept for the match, so the match places the same bugs (same rest eye)."""
+        level. Recomputed when the photo, level, layer set, window glass or
+        rest eye changes (the count depends on all of them; a stale number
+        would disagree with the match). The seed is drawn once and kept for
+        the match, so the match places the same bugs."""
         from src.content.hidden_props import layer_planes
         from src.game.bug_capacity import placeable_bugs
 
         state = self._album.state
-        key = (str(state.photo), state.level, self._renderer.layers_revision)
-        if getattr(self, "_bug_hold_key", None) == key:
-            return
-        planes = layer_planes(self._renderer.layer_records())
-        if len(planes) < 2:
-            return
-        self._bug_hold_key = key
-        F = self._album.flow
-        count = F.LEVEL_TABLE[state.level][1]
         rest = self._rest_eye or (
             float(self._content.overscan_design_eye_mm[0]),
             float(self._content.overscan_design_eye_mm[1]), 450.0)
         glass, centre = self._glass_mm()
-        self._pending_bug_seed = self._new_bug_seed()
+        key = (str(state.photo), state.level, self._renderer.layers_revision,
+               tuple(round(v) for v in (*glass, *centre, *rest)))
+        if getattr(self, "_bug_hold_key", None) == key:
+            return
+        if key[:3] != getattr(self, "_bug_hold_base", None):
+            self._bug_hold_base = key[:3]
+            state.bug_hold = None    # another photo/level: never show the old count
+        now = time.perf_counter()
+        if now - getattr(self, "_bug_hold_t", -1.0) < 0.25:
+            return                   # window being dragged: wait for it to settle
+        planes = layer_planes(self._renderer.layer_records())
+        if len(planes) < 2:
+            return
+        self._bug_hold_key, self._bug_hold_t = key, now
+        F = self._album.flow
+        count = F.LEVEL_TABLE[state.level][1]
+        if self._pending_bug_seed is None:
+            self._pending_bug_seed = self._new_bug_seed()
         kept, _outside, _dropped = placeable_bugs(
             planes, count, bug_radius_mm(self._content), rest, glass,
             self._viewport_rect(), centre, self._pending_bug_seed)
