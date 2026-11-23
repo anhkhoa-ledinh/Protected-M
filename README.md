@@ -59,6 +59,20 @@ Everything runs on the CPU. A dedicated GPU is not required.
 
 ---
 
+## Linux
+
+The game also runs on Linux (developed on CachyOS + Hyprland).
+
+1. Create a Python 3.13 venv at `~/.venvs/protected-m` and install
+   `requirements-lock.txt` into it. Use another interpreter by setting
+   `PM_PYTHON=/path/to/python`.
+2. For the "open photo" dialog install the system package for Tk
+   (`tk` on Arch, `python3-tk` on Debian/Ubuntu).
+3. Run `bash run_game.sh` (log in `logs/`) and `bash run_server.sh` for the
+   PvP server. The scripts need no exec bit, so they work on any drive.
+
+---
+
 ## Install
 
 ```bat
