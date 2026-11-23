@@ -844,7 +844,11 @@ class ContentPlaneRenderer:
             return False, "Unsupported file type"
 
         if not path.exists():
-            logger.error("Media file not found: %s", path.resolve())
+            # strict=False is the start-up default photo, which may be a path
+            # from another machine (e.g. a Windows drive letter): the caller
+            # falls back, so this is a warning there, not an error.
+            (logger.error if strict else logger.warning)(
+                "Media file not found: %s", path.resolve())
             return False, f"File not found: {path.name}"
 
         try:
