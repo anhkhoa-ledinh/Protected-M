@@ -910,7 +910,9 @@ def _result(state, flow, manifest, win: bool) -> None:
     # Số 0 không mang dấu: "+0" đọc như một khoản cộng, mà hết giờ thì không
     # cộng được gì cả.
     left = int(result.get("time_left", 0))
-    rows.append(("Time left", f"+{left}" if left > 0 else str(left), False))
+    points = left * level
+    rows.append((f"Time left {left} s × level {level}",
+                 f"+{points}" if points > 0 else str(points), False))
     for item, count in (result.get("used") or {}).items():
         weight = F.ITEM_WEIGHT.get(item, 0) * int(count)
         rows.append((f"{item} ×{count} · weight {F.ITEM_WEIGHT.get(item, 0)}",

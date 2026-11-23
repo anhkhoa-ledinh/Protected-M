@@ -317,14 +317,20 @@ class AlbumMatch:
         return 100.0 * left * min(1.0, self.elapsed_s / max(1.0, self.seconds))
 
     def score(self) -> int:
-        """Điểm = giây còn lại − Σ(trọng số vật phẩm × số lần dùng)."""
+        """Match score: ``max(0, seconds left x level - sum(weight x uses))``.
+
+        A lost match scores 0. Level 5 keeps its overtime penalty inside the
+        same ``max(0, ...)``.
+        """
+        if self.ended == "lose":
+            return 0
         table = self.weights or ITEM_WEIGHT
         spent = sum(table.get(name, 0) * count
                     for name, count in self.used.items())
-        base = max(0.0, self.time_left_s) - spent
+        base = max(0.0, self.time_left_s) * self.level - spent
         if self.level == 5:
             base -= OVERTIME_PENALTY * self.overtime_s
-        return int(round(base))
+        return max(0, int(round(base)))
 
     def tick(self, head_ok: bool, layer_label: str = "") -> str:
         """Nhịp mỗi khung; trả ``""``/``"win"``/``"lose"``."""
