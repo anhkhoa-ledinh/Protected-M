@@ -15,13 +15,11 @@ numbers, different display/item-name strings.
 
 from __future__ import annotations
 
-#: Bảng cấp: (tên, số bọ, giây, ô vật phẩm, phản công). Con số giữ nguyên của
-#: ``flow.py``; chỉ cái tên đổi sang tiếng Anh theo U2.
-LEVEL_TABLE = {
-    1: ("Easy", 6, 180, 2, False), 2: ("Normal", 8, 150, 3, False),
-    3: ("Hard", 10, 150, 3, True), 4: ("Infestation", 12, 120, 4, True),
-    5: ("Asian Mode", 12, 120, 4, True),
-}
+from src.game.levels import LEVELS
+
+#: Bảng cấp: (tên, số bọ, giây, ô vật phẩm, phản công), đọc từ ``levels.LEVELS``.
+LEVEL_TABLE = {lv: (r.name_en, r.bugs, r.seconds, r.slots, r.counter)
+               for lv, r in LEVELS.items()}
 
 ITEM_WEIGHT = {"Flare": 3, "Antidote": 5, "Acid shield": 4, "Filter lens": 4,
               "Compass": 2, "Thermal scan": 8, "Energy drink": 3,

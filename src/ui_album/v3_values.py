@@ -737,10 +737,21 @@ def _hud_weapon(state, flow, game, manifest, screen) -> None:
     state.hidden.add("weapon_icon:Precision gun")
 
 
+def _bug_note(state, holds, promised, wide: bool = False) -> None:
+    """Say it when the photo holds fewer bugs than the level promises.
+    ``wide`` = the loading screen, which has room for a full sentence; the
+    HUD card only fits the short form."""
+    if holds is not None and holds < promised:
+        state.texts["bug_note"] = (
+            f"This photo only holds {holds} of the {promised} bugs this "
+            f"level asks for" if wide else f"photo holds {holds} of {promised}")
+
+
 def _hud_kills(state, flow, game) -> None:
     total = flow.bugs() if game is None else game.bugs_total
     found = 0 if game is None else game.bugs_found
     state.texts["kills"] = [str(found), f"/{total}"]
+    _bug_note(state, total, flow.bugs())
 
 
 def _hud_pvp_hunter(state, flow, game) -> None:
@@ -1111,6 +1122,8 @@ def state_for(manifest, painter, flow, game=None, aim=None, accounts=None) -> V3
     elif screen == F.LOADING:
         _loading(state, flow)
         state.photo = flow.photo
+    elif screen == F.LOADING_READY:
+        _bug_note(state, flow.bug_hold, flow.bugs(), wide=True)
     elif screen == F.LOADOUT:
         _loadout(state, flow, manifest, painter)
     elif screen == F.TILT:

@@ -120,7 +120,7 @@ def _make_app(prop):
     })()
     app._game_planes = ()
 
-    def _stub_start_prop_game(count=0):
+    def _stub_start_prop_game(count=0, **_kw):
         app._game = GameState(image="unknown.png", props=[dict(prop)],
                               tracking_on=True, started_at_s=0.0)
         app._game_planes = (
@@ -155,7 +155,7 @@ def test_a_photo_with_one_winnable_spot_keeps_it(monkeypatch):
     unwinnable = {"pos_mm": (50.0, 0.0, -300.0), "radius_mm": 12.0}
     app = _make_app(prop)
 
-    def _stub_start_prop_game(count=0):
+    def _stub_start_prop_game(count=0, **_kw):
         from src.content.prop_game import GameState
 
         app._game = GameState(image="unknown.png", props=[prop, unwinnable],

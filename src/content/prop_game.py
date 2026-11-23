@@ -18,9 +18,22 @@ from pathlib import Path
 
 from src.content.hidden_props import _nearer, is_visible
 from src.content.hidden_props_search import place_props
+from src.game.levels import LEGACY_PREFER
 
 #: Số vật mỗi ván. Giữ là hằng module, chưa thành khoá config (ngoài phạm vi C2).
 PROP_COUNT = 3
+
+#: One knob for how big a bug is, 23/11: 40 % of the old size. It scales the
+#: radius that placement, exposure, drawing (``radius_mm × size_k``) and the
+#: hit test all read, so a bug that fits behind a layer is drawn inside it and
+#: the hit area is what is drawn. Change this number to resize bugs.
+BUG_SCALE = 0.4
+
+
+def bug_radius_mm(content) -> float:
+    """Bug radius in mm for this config: ``game_prop_radius_mm × BUG_SCALE``."""
+    return float(content.game_prop_radius_mm) * BUG_SCALE
+
 
 #: Thấy liên tục ngần này giây thì tính là tìm ra.
 FOUND_HOLD_S = 0.5
@@ -56,7 +69,8 @@ class GameState:
 
 
 def start_game(planes, radius_mm, rest_eye_mm, z_rest_mm, now_s, image,
-               *, tracking_on=True, count=PROP_COUNT):
+               *, tracking_on=True, count=PROP_COUNT, seed=None,
+               prefer=LEGACY_PREFER):
     """
     Đặt vật rồi mở một ván. Trả state với ``k ≤ count`` vật, có thể rỗng.
 
@@ -67,7 +81,7 @@ def start_game(planes, radius_mm, rest_eye_mm, z_rest_mm, now_s, image,
     giao diện album truyền số bọ của từng cấp (TASK_album_ui_1106).
     """
     props = place_props(planes, int(count), float(radius_mm), tuple(rest_eye_mm),
-                        z_rest=float(z_rest_mm))
+                        z_rest=float(z_rest_mm), seed=seed, prefer=prefer)
     return GameState(image=str(image), props=list(props),
                      tracking_on=bool(tracking_on), started_at_s=float(now_s))
 

@@ -100,12 +100,16 @@ def test_pellets_spread_is_seeded_and_reproducible():
 # ---- bảng sát thương / máu bọ -------------------------------------------
 
 def test_damage_table_matches_the_spec():
+    # Level 1 (divisor 1): base damage x armour pierce (1.00 / 0.85 / 0.70).
     assert weapon_damage("Precision gun", False) == 100.0
     assert weapon_damage("Precision gun", True) == 200.0
-    assert weapon_damage("Spread gun", False) == 25.0
-    assert weapon_damage("Spread gun", True) == 25.0      # khong thuong dau
-    assert weapon_damage("Heavy-mag gun", False) == 34.0
-    assert weapon_damage("Heavy-mag gun", True) == 51.0
+    assert weapon_damage("Spread gun", False) == 25.0 * 0.85
+    assert weapon_damage("Spread gun", True) == 25.0 * 0.85   # khong thuong dau
+    assert weapon_damage("Heavy-mag gun", False) == 34.0 * 0.70
+    assert weapon_damage("Heavy-mag gun", True) == 34.0 * 1.5 * 0.70
+    # ...and divided by the level.
+    assert weapon_damage("Precision gun", False, 5) == 20.0
+    assert weapon_damage("Precision gun", True, 5) == 40.0
 
 
 def test_every_weapon_has_a_damage_entry():
@@ -113,7 +117,7 @@ def test_every_weapon_has_a_damage_entry():
 
 
 def test_bug_hp_by_level():
-    assert BUG_HP_BY_LEVEL == {1: 100.0, 2: 100.0, 3: 150.0, 4: 200.0, 5: 200.0}
+    assert BUG_HP_BY_LEVEL == {1: 100.0, 2: 200.0, 3: 300.0, 4: 400.0, 5: 500.0}
 
 
 # ---- ngưỡng giết (qua fire() thật) --------------------------------------
@@ -129,21 +133,26 @@ def test_sniper_body_shot_kills_at_level_1_not_at_level_3():
     assert three.state.found[0] is False
 
 
-def test_sniper_headshot_kills_at_level_5():
-    headshot = _FixedAim(0, True)
+def test_sniper_headshot_needs_13_hits_at_level_5():
+    headshot = _FixedAim(0, True)          # 200 / 5 = 40 a hit, 500 health
     five = _match(5, "Precision gun")
+    for _ in range(12):
+        fire(five, (10.0, 10.0), headshot)
+        five.next_shot_s = 0.0
+    assert five.state.found[0] is False
     fire(five, (10.0, 10.0), headshot)
     assert five.state.found[0] is True
 
 
-def test_heavy_mag_three_body_hits_kill_at_level_1():
-    hit = _FixedAim(0, False)
+def test_heavy_mag_five_body_hits_kill_at_level_1():
+    hit = _FixedAim(0, False)              # 34 x 0.70 = 23.8 a hit, 100 health
     one = _match(1, "Heavy-mag gun")
+    for _ in range(4):
+        fire(one, (10.0, 10.0), hit)
+        one.next_shot_s = 0.0
+    assert one.state.found[0] is False      # 4 phat chua ha
     fire(one, (10.0, 10.0), hit)
-    fire(one, (10.0, 10.0), hit)
-    assert one.state.found[0] is False      # 2 phat chua ha
-    fire(one, (10.0, 10.0), hit)
-    assert one.state.found[0] is True       # phat thu 3 ha
+    assert one.state.found[0] is True       # phat thu 5 ha
 
 
 def test_shotgun_five_pellets_on_one_bug_kill_at_level_1():
@@ -197,11 +206,18 @@ def test_solo_does_not_one_hit_kill_the_same_setup():
 
 # ---- Heavy-mag 50/2.5s ---------------------------------------------------
 
-def test_heavy_mag_spec_is_50_rounds_2_5s_reload_same_cadence():
+def test_heavy_mag_spec_is_100_rounds_5s_reload_same_cadence():
     spec = WEAPONS_SPEC["Heavy-mag gun"]
-    assert spec.mag == 50
-    assert spec.reload_s == 2.5
+    assert spec.mag == 100
+    assert spec.reload_s == 5.0
     assert spec.fire_s == 0.18
+
+
+def test_pvp_keeps_the_old_heavy_magazine():
+    from src.game.levels import PVP_WEAPONS_SPEC
+
+    assert PVP_WEAPONS_SPEC["Heavy-mag gun"] == (50, 0.18, 2.5)
+    assert PVP_WEAPONS_SPEC["Precision gun"] == WEAPONS_SPEC["Precision gun"]
 
 
 def test_heavy_mag_fires_50_rounds_then_reloads_for_2_5s():

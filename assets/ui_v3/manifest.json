@@ -3358,7 +3358,31 @@
    "top": null,
    "source_board": "v3_07b_loading_100",
    "photos": [],
-   "texts": [],
+   "texts": [
+    {
+     "key": "bug_note",
+     "rect": [
+      340,
+      600,
+      600,
+      20
+     ],
+     "al": "center",
+     "runs": [
+      {
+       "c": "",
+       "ff": "Patrick Hand",
+       "fw": 400,
+       "fs": 17.0,
+       "col": "#B8650A",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "",
+     "lines": 1
+    }
+   ],
    "bars": [],
    "pips": [],
    "pills": [],
@@ -3847,6 +3871,29 @@
       }
      ],
      "sample": "7/12",
+     "lines": 1
+    },
+    {
+     "key": "bug_note",
+     "rect": [
+      469,
+      104,
+      100,
+      14
+     ],
+     "al": "left",
+     "runs": [
+      {
+       "c": "",
+       "ff": "Nunito",
+       "fw": 700,
+       "fs": 10.5,
+       "col": "#B8650A",
+       "ls": 0.0,
+       "upper": false
+      }
+     ],
+     "sample": "",
      "lines": 1
     },
     {

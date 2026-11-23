@@ -19,6 +19,7 @@ import numpy as np
 from OpenGL import GL
 
 from src.renderer.shader import ShaderProgram
+from src.game.levels import LEGACY_CAMO
 from src.ui_album.textures import load_rgba, upload_rgba
 
 logger = logging.getLogger(__name__)
@@ -45,7 +46,7 @@ BUG_SIZE_MAX = 0.45
 #: TASK_bug_art_0530: 0.55 -> 0.75 — công thức mới nhân theo độ sáng riêng
 #: của pixel (xem sprite.frag) nên tăng độ mạnh không còn biến bọ thành một
 #: khối màu phẳng như công thức ``mix`` thẳng cũ.
-BUG_CAMO_STRENGTH = 0.75
+BUG_CAMO_STRENGTH = LEGACY_CAMO
 #: Cạnh ô vuông lấy mẫu màu nền quanh vị trí chiếu của con bọ, px thiết kế.
 CAMO_PATCH_PX = 48
 
@@ -58,12 +59,14 @@ def sprite_for(manifest, level: int) -> str | None:
     return None
 
 
-def assign_bug_sizes(props, seed_key) -> None:
+def assign_bug_sizes(props, seed_key, scale: float = 1.0) -> None:
     """
     Gán ``size_k`` (= ``SIZE_FACTOR × u``, ``u`` đều trong
     ``[BUG_SIZE_MIN, BUG_SIZE_MAX]``) cho mỗi con, MỘT LẦN khi ván mở.
 
-    Seed = ``(seed_key, chỉ số con)`` nên chơi lại đúng ảnh ra đúng size cũ.
+    Seed = ``(seed_key, chỉ số con)``. ``seed_key`` is the per-match bug seed
+    (``app._bug_seed``), so one match keeps its sizes and a new match gets new
+    ones; it used to be the photo name.
     Ghi thẳng vào ``prop["size_k"]`` — ``BugPainter.draw`` và
     ``app._aim_context`` đọc chung đúng một giá trị này, không có nguồn thứ
     hai. Chỉ đổi kích thước VẼ; ``radius_mm`` (đặt chỗ, ``is_exposed``) không
@@ -71,11 +74,13 @@ def assign_bug_sizes(props, seed_key) -> None:
     """
     for index, prop in enumerate(props):
         rng = random.Random(f"{seed_key}:{index}")
-        prop["size_k"] = rng.uniform(BUG_SIZE_MIN, BUG_SIZE_MAX) * SIZE_FACTOR
+        prop["size_k"] = (rng.uniform(BUG_SIZE_MIN, BUG_SIZE_MAX)
+                          * SIZE_FACTOR * float(scale))
 
 
 def assign_bug_camo(props, rgb_image, rest_eye_mm, screen_mm=(344.0, 194.0),
-                    centre_mm=(0.0, 0.0), patch_px: int = CAMO_PATCH_PX) -> None:
+                    centre_mm=(0.0, 0.0), patch_px: int = CAMO_PATCH_PX,
+                    strength: float = BUG_CAMO_STRENGTH) -> None:
     """
     Gán ``camo_rgb`` (0–1) = màu trung bình một ô ``patch_px`` quanh vị trí
     chiếu của con bọ ở MẮT NGHỈ, đọc từ ảnh gốc (CPU, không đọc lại GL).
@@ -90,6 +95,7 @@ def assign_bug_camo(props, rgb_image, rest_eye_mm, screen_mm=(344.0, 194.0),
     height, width = rgb_image.shape[:2]
     half = max(1, int(patch_px) // 2)
     for prop in props:
+        prop["camo_strength"] = float(strength)
         point = project_to_design(tuple(prop["pos_mm"]), rest_eye_mm,
                                   screen_mm, centre_mm)
         if point is None:
@@ -235,7 +241,8 @@ class BugPainter:
             size_k = float(prop.get("size_k", SIZE_FACTOR))
             size = float(prop["radius_mm"]) / 1000.0 * size_k
             camo_rgb = prop.get("camo_rgb")
-            camo = (*camo_rgb, BUG_CAMO_STRENGTH) if camo_rgb else (0.0, 0.0, 0.0, 0.0)
+            strength = float(prop.get("camo_strength", BUG_CAMO_STRENGTH))
+            camo = (*camo_rgb, strength) if camo_rgb else (0.0, 0.0, 0.0, 0.0)
             if index not in self.found_at:
                 self._draw_quad(view, projection, centre, size,
                                 (1.0, 1.0, 1.0, 1.0), texture, camo)

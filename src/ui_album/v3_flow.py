@@ -150,6 +150,9 @@ class V3Flow:
     #: ``PVP_RESULT``.
     pvp_lobby_message: str = ""
     pipeline_pct: float = 0.0
+    #: Bugs the loaded photo can really hold for this level, set once the
+    #: layers are ready; ``None`` until then (23/11: honest count).
+    bug_hold: int | None = None
     #: Số lớp THẬT của ảnh đang mở; bản vẽ in cứng 4, app phải nói số thật.
     layer_count: int = 0
     #: Số lớp app NHẮM tới (``content.layer_count``, adaptive K 2–4). Chỉ dùng

@@ -9,6 +9,7 @@ import json
 import logging
 import math
 import os
+import secrets
 import time
 from dataclasses import asdict
 from pathlib import Path
@@ -18,8 +19,11 @@ import numpy as np
 from src.content.formats import detect_content_type, is_supported_media
 from src.content.hidden_props import layer_planes
 from src.content.persistence import media_path_for_config, save_content_settings
+from src.game.levels import LEGACY_PREFER
+from src.game.levels import rules as level_rules
 from src.content.prop_game import (
     PROP_COUNT,
+    bug_radius_mm,
     GameState,
     is_exposed,
     append_csv,
@@ -69,8 +73,12 @@ HOOK_ENV_VARS = (
     "HCPD_UI_SHOTS_1117", "HCPD_AA_BASELINE_1118", "HCPD_V3_LIVE",
     "HCPD_PERF_PROFILE", "HCPD_PVP_AUTO", "HCPD_PVP_SHOTS",
     "HCPD_PROP_PROBE", "HCPD_VIDEO_STATS", "HCPD_HUD_FIX_1119_SHOTS",
-    "HCPD_ALBUM_AUTOWIN",
+    "HCPD_ALBUM_AUTOWIN", "HCPD_BUG_SEED",
 )
+
+#: Bug-placement seed an automatch run uses unless ``HCPD_BUG_SEED`` says
+#: otherwise, so scripted runs stay repeatable. Real play draws a fresh seed.
+AUTOMATCH_BUG_SEED = 1123
 
 
 def is_scripted_run(*, shots: bool, ui_shots: bool) -> bool:
@@ -120,6 +128,12 @@ class HcpdApplication:
 
     The only visible window is the virtual 3D room.
     """
+
+    #: Seed of the match being placed; ``_start_prop_game`` sets it each match.
+    _bug_seed = 0
+    _bug_mover = None
+    #: Seed drawn on the loading screen, used by the next match (or None).
+    _pending_bug_seed = None
 
     #: Mặc định ở mức class để bản dựng bằng ``__new__`` (test) vẫn là sandbox.
     _demo = False
@@ -994,7 +1008,7 @@ class HcpdApplication:
         # so a shot never hits something different from what's on screen.
         eye = self._virtual_camera.effective_eye_position_mm
         glass, centre = self._glass_mm()
-        radius = float(self._content.game_prop_radius_mm)
+        radius = bug_radius_mm(self._content)
         bugs = {
             # TASK_bugs_look_0130: đọc ĐÚNG size_k đã ghi lúc mở ván — cùng
             # giá trị mà BugPainter.draw dùng để vẽ, không tính lại.
@@ -1267,6 +1281,7 @@ class HcpdApplication:
             else:
                 state.pipeline_pct = 100.0
                 state.go(F.PIPE100)
+                self._refresh_bug_capacity()
         match = self._album.game
         if match is None or state.screen != F.PLAY:
             return
@@ -1670,8 +1685,7 @@ class HcpdApplication:
         self._game.props = kept
         self._game.found = [False] * len(kept)
         self._game.visible_since_s = [None] * len(kept)
-        seed_key = Path(self._content.content_path).name or "unknown"
-        assign_bug_sizes(self._game.props, seed_key)
+        assign_bug_sizes(self._game.props, self._bug_seed)
         photo_rgb = self._photo_rgb_for_camo()
         if photo_rgb is not None:
             assign_bug_camo(self._game.props, photo_rgb, rest, glass, centre)
@@ -1686,9 +1700,8 @@ class HcpdApplication:
 
     def _pvp_handle_start(self, msg: dict, now: float) -> None:
         from src.ui_album import pvp_sync
-        from src.game.match import (
-            DEFAULT_SPEC, WEAPONS_SPEC, start_match,
-        )
+        from src.game.levels import PVP_WEAPONS_SPEC as WEAPONS_SPEC
+        from src.game.match import DEFAULT_SPEC, start_match
 
         F = self._album.flow
         state = self._album.state
@@ -1704,7 +1717,7 @@ class HcpdApplication:
                     self._pvp_bugs_attempted = True
                     self._pvp_bugs_sent = self._pvp_place_bugs_or_bail(now)
             return
-        radius = float(self._content.game_prop_radius_mm)
+        radius = bug_radius_mm(self._content)
         props = pvp_sync.bugs_from_wire(bugs, self._game_planes, radius)
         found = [False] * len(props)
         for index, prop in enumerate(props):
@@ -1806,7 +1819,7 @@ class HcpdApplication:
         from src.content.hidden_props import _nearer, is_visible
 
         eye = (float(x), float(y), float(z))
-        radius = float(self._content.game_prop_radius_mm)
+        radius = bug_radius_mm(self._content)
         alive = [i for i in range(len(self._game.props))
                 if not self._game.found[i] and self._game.props[i] is not None]
         if not alive:
@@ -1832,14 +1845,27 @@ class HcpdApplication:
         count = F.LEVEL_TABLE[state.level][1]
         # Xin NHIỀU hơn rồi lọc: màn chơi chỉ hở ô viewport, con bọ chiếu ra
         # ngoài ô thì không bao giờ thấy được nên ván không thể thắng (F3.3).
-        self._start_prop_game(count=count * 3)
+        rule = level_rules(state.level)
+        rest = self._rest_eye or (
+            float(self._content.overscan_design_eye_mm[0]),
+            float(self._content.overscan_design_eye_mm[1]), 450.0)
+        glass, centre = self._glass_mm()
+        planes = layer_planes(self._renderer.layer_records())
+        chosen = None
+        if len(planes) >= 2:
+            # Fullest of LAYOUT_TRIES layouts (cached from the loading screen
+            # when nothing changed since).
+            chosen = self._album_layout(planes, count, rule, rest, glass,
+                                        centre).layout
+        self._bug_mover = None
+        self._start_prop_game(count=count * 3,
+                              prefer=(rule.prefer_lo, rule.prefer_hi),
+                              props=chosen.kept if chosen else None)
         if self._game is not None and self._game.props:
-            rest = self._rest_eye or (
-                float(self._content.overscan_design_eye_mm[0]),
-                float(self._content.overscan_design_eye_mm[1]), 450.0)
-            glass, centre = self._glass_mm()
             kept, outside = filter_props(self._game.props, rest, count, glass,
                                          self._viewport_rect(), centre)
+            if chosen is not None:
+                outside = chosen.outside
             # TASK_hud_fix_1119 Fix 3: ``kept`` is only "inside the
             # viewport" — place_props' own reveal scan (hidden_props_search
             # ._candidate) only walked ONE axis at a time, so a spot that
@@ -1863,6 +1889,10 @@ class HcpdApplication:
             kept = winnable
             logger.info("Album bo: xin %d · dat %d · ngoai o %d · khong the lo %d",
                         count, len(kept), outside, dropped_unwinnable)
+            if state.bug_hold is not None and state.bug_hold != len(kept):
+                logger.warning("Album bo: man tai xong bao %d con nhung van dat %d "
+                               "(cua so hoac mat nghi doi sau do)",
+                               state.bug_hold, len(kept))
             if not kept:
                 # Không còn chỗ nào THẬT SỰ lộ được — đừng mở ván không thể
                 # thắng (F3.3's own gap). Ở lại màn chọn ảnh, nói thẳng tại
@@ -1888,12 +1918,11 @@ class HcpdApplication:
             # (_aim_context) sau đó đọc lại đúng cùng giá trị này.
             from src.ui_album.bugs import assign_bug_camo, assign_bug_sizes
 
-            seed_key = Path(self._content.content_path).name or "unknown"
-            assign_bug_sizes(self._game.props, seed_key)
+            assign_bug_sizes(self._game.props, self._bug_seed, rule.size)
             photo_rgb = self._photo_rgb_for_camo()
             if photo_rgb is not None:
                 assign_bug_camo(self._game.props, photo_rgb, rest, glass,
-                               centre)
+                               centre, strength=rule.camo)
             # Bỏ quả cầu đánh dấu cũ: nó chỉ là lưới an toàn đặt lúc 01:00
             # ngày 07/11, khi tôi chưa chứng minh được sprite có hiện lên.
             # Người dùng xác nhận 01:17 là bọ đã hiện, nên quả cầu thành thừa.
@@ -1933,6 +1962,17 @@ class HcpdApplication:
             logger.info("Sung %s: bang %d vien, nhip %.2f s, nap %.1f s",
                         weapon, spec.mag, spec.fire_s, spec.reload_s)
         self._album.game = match
+        if chosen is not None and rule.move_after_s is not None:
+            from src.game.bug_capacity import spare_spots
+            from src.game.bug_move import BugMover
+
+            spares = spare_spots(self._game_planes, chosen, rest,
+                                 self._viewport_rect(), glass, centre)
+            self._bug_mover = BugMover(self._game, spares, rule.move_after_s,
+                                       bug_radius_mm(self._content),
+                                       self._bug_seed)
+            logger.info("Album bo: %d cho du phong, bo doi cho sau %.1f s",
+                        len(spares), rule.move_after_s)
         state.go(F.PLAY)
 
     def _save_album_shot(self, stem: str | None = None) -> Path:
@@ -2004,7 +2044,83 @@ class HcpdApplication:
         )
         self._start_prop_game()
 
-    def _start_prop_game(self, count: int = PROP_COUNT) -> None:
+    def _new_bug_seed(self) -> int:
+        """One seed per match: ``HCPD_BUG_SEED`` if set, the fixed automatch
+        default for scripted automatch runs, else a real random source."""
+        raw = self._devtools.env("HCPD_BUG_SEED").strip()
+        if raw:
+            try:
+                return int(raw)
+            except ValueError:
+                logger.warning("HCPD_BUG_SEED=%r is not an integer — ignored", raw)
+        if self._devtools.env("HCPD_ALBUM_AUTOMATCH") in ("1", "2"):
+            return AUTOMATCH_BUG_SEED
+        return secrets.randbits(32)
+
+    def _refresh_bug_capacity(self) -> None:
+        """Loading screen: how many bugs this photo can really hold at this
+        level. Recomputed when the photo, level, layer set, window glass or
+        rest eye changes (the count depends on all of them; a stale number
+        would disagree with the match). The seed is drawn once and kept for
+        the match, so the match places the same bugs."""
+        from src.content.hidden_props import layer_planes
+        state = self._album.state
+        rest = self._rest_eye or (
+            float(self._content.overscan_design_eye_mm[0]),
+            float(self._content.overscan_design_eye_mm[1]), 450.0)
+        glass, centre = self._glass_mm()
+        key = (str(state.photo), state.level, self._renderer.layers_revision,
+               tuple(round(v) for v in (*glass, *centre, *rest)))
+        if getattr(self, "_bug_hold_key", None) == key:
+            return
+        if key[:3] != getattr(self, "_bug_hold_base", None):
+            self._bug_hold_base = key[:3]
+            state.bug_hold = None    # another photo/level: never show the old count
+        now = time.perf_counter()
+        if now - getattr(self, "_bug_hold_t", -1.0) < 0.25:
+            return                   # window being dragged: wait for it to settle
+        planes = layer_planes(self._renderer.layer_records())
+        if len(planes) < 2:
+            return
+        self._bug_hold_key, self._bug_hold_t = key, now
+        F = self._album.flow
+        count = F.LEVEL_TABLE[state.level][1]
+        rule = level_rules(state.level)
+        choice = self._album_layout(planes, count, rule, rest, glass, centre)
+        state.bug_hold = len(choice.layout.kept)
+        logger.info("Album bo: anh chua duoc %d / %d (seed=%d, man tai xong)",
+                    state.bug_hold, count, self._pending_bug_seed)
+
+    def _album_layout(self, planes, count, rule, rest, glass, centre):
+        """The kept layout for this match (``bug_capacity.choose_layout``).
+
+        One seed per match (``_pending_bug_seed``), so the loading screen and
+        the match share one answer: the result is cached on everything it
+        depends on and recomputed only when one of those changes."""
+        from src.game.bug_capacity import choose_layout
+
+        if self._pending_bug_seed is None:
+            self._pending_bug_seed = self._new_bug_seed()
+        seed = self._pending_bug_seed
+        prefer = (rule.prefer_lo, rule.prefer_hi)
+        key = (seed, count, prefer, self._renderer.layers_revision,
+               tuple(round(v, 1) for v in (*glass, *centre, *rest)))
+        cached = getattr(self, "_layout_cache", None)
+        if cached is not None and cached[0] == key:
+            return cached[1]
+        t0 = time.perf_counter()
+        choice = choose_layout(planes, count, bug_radius_mm(self._content),
+                               rest, glass, self._viewport_rect(), centre,
+                               seed, prefer)
+        logger.info("Album bo: %d bo cuc %s · giu #%d (%d con)",
+                    len(choice.counts), choice.counts, choice.index,
+                    len(choice.layout.kept))
+        logger.info("Chon bo cuc mat %.0f ms", (time.perf_counter() - t0) * 1000)
+        self._layout_cache = (key, choice)
+        return choice
+
+    def _start_prop_game(self, count: int = PROP_COUNT,
+                         prefer=LEGACY_PREFER, props=None) -> None:
         """
         Đặt vật ẩn từ hình học lớp THẬT của renderer, tại mắt nghỉ đo được.
 
@@ -2015,15 +2131,26 @@ class HcpdApplication:
         if len(planes) < 2:
             self._renderer.show_toast("Chua co lop — nap anh truoc", is_error=True)
             return
-        radius_mm = float(self._content.game_prop_radius_mm)
+        radius_mm = bug_radius_mm(self._content)
         name = Path(self._content.content_path).name or "unknown"
         rest = self._rest_eye or (
             float(self._content.overscan_design_eye_mm[0]),
             float(self._content.overscan_design_eye_mm[1]), 450.0,
         )
         t0 = time.perf_counter()
+        self._bug_seed = self._pending_bug_seed
+        if self._bug_seed is None:
+            self._bug_seed = self._new_bug_seed()
+        self._pending_bug_seed = None
+        self._bug_hold_key = None        # next loading screen recomputes
+        logger.info("Album bo: seed=%d", self._bug_seed)
         probe = self._devtools.env("HCPD_PROP_PROBE")
-        if probe == "1":
+        if props is not None:
+            # Already placed (the fullest layout, ``_album_layout``).
+            self._game = GameState(image=name, props=list(props),
+                                   tracking_on=not self._tracking_off,
+                                   started_at_s=t0)
+        elif probe == "1":
             # Chẩn đoán thứ tự vẽ (C2): bỏ qua tìm chỗ, đặt ở độ sâu biết trước.
             self._game = GameState(image=name, props=probe_props(planes),
                                    tracking_on=True, started_at_s=t0)
@@ -2031,6 +2158,7 @@ class HcpdApplication:
             self._game = start_game(
                 planes, radius_mm, rest[:2], z_rest_mm(rest[2]), t0, name,
                 tracking_on=not self._tracking_off, count=count,
+                seed=self._bug_seed, prefer=prefer,
             )
             if probe == "2":
                 # Vật thật, chỉ tô màu khác nhau để biết quả nào hiện.
@@ -2170,7 +2298,7 @@ class HcpdApplication:
         if self._game is None or not self._game.props:
             return
         was_done = self._game.finished_at_s is not None
-        radius_mm = float(self._content.game_prop_radius_mm)
+        radius_mm = bug_radius_mm(self._content)
         eye = (float(eye_mm[0]), float(eye_mm[1]), float(eye_mm[2]))
         auto = self._album is None          # album: phải BẮN mới diệt được
         for index in game_update(self._game, eye, self._game_planes, now,
@@ -2186,9 +2314,40 @@ class HcpdApplication:
             self._renderer.show_toast(
                 f"Found {sum(self._game.found)}/{len(self._game.props)}"
             )
+        self._tick_bug_moves(now, eye)
         self._tick_watch_window(now)
         if not was_done and self._game.finished_at_s is not None:
             self._write_game_csv(now, "finished")
+
+    def _tick_bug_moves(self, now: float, eye) -> None:
+        """Levels 4-5: a bug seen for long enough moves to a spare spot."""
+        mover = getattr(self, "_bug_mover", None)
+        match = self._album.game if self._album is not None else None
+        if (mover is None or mover.game is not self._game or match is None
+                or match.ended or self._pvp_active):
+            return
+        for index, old, new, seen_s in mover.tick(self._game_planes, eye, now):
+            prop = self._game.props[index]
+            photo_rgb = self._photo_rgb_for_camo()
+            if photo_rgb is not None:
+                from src.ui_album.bugs import assign_bug_camo
+
+                rest = self._rest_eye or (
+                    float(self._content.overscan_design_eye_mm[0]),
+                    float(self._content.overscan_design_eye_mm[1]), 450.0)
+                glass, centre = self._glass_mm()
+                assign_bug_camo([prop], photo_rgb, rest, glass, centre,
+                                strength=prop.get("camo_strength", 0.75))
+            match.bug_last_hit.pop(index, None)      # its HP bar was at the old spot
+            logger.info("Album bo #%d doi cho: (%.0f, %.0f, %.0f) -> (%.0f, %.0f, %.0f)",
+                        index, *old, *new)
+            from src.game.match import BUG_HP_BY_LEVEL
+
+            full = BUG_HP_BY_LEVEL[match.level]
+            logger.info("Album bo #%d thay lien tuc %.2f s · mau giu nguyen %.0f / %.0f"
+                        " · con %d cho du phong",
+                        index, seen_s, match.bug_hp.get(index, full), full,
+                        len(mover.spares))
 
     def _tick_watch_window(self, now: float) -> None:
         """Đếm khung lộ vật trong 5 giây đầu sau G; in một dòng khi hết."""

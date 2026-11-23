@@ -471,10 +471,10 @@ class DevTools:
             # Bọ đặt TAY ở chỗ biết trước: để kiểm riêng phần VẼ sprite, tách
             # khỏi phần tìm chỗ giấu (place_props có ảnh trả về 0 chỗ).
             from src.content.hidden_props import layer_planes
-            from src.content.prop_game import GameState
+            from src.content.prop_game import GameState, bug_radius_mm
             from src.game.match import start_match
 
-            radius = float(app._content.game_prop_radius_mm)
+            radius = bug_radius_mm(app._content)
             props = [{"pos_mm": (x, 0.0, -180.0), "radius_mm": radius,
                       "reveal_axis": "x", "reveal_450_mm": 0.0,
                       "reveal_330_mm": 0.0} for x in (-70.0, 0.0, 70.0)]
