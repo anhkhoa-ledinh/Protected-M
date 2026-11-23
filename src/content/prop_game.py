@@ -22,6 +22,18 @@ from src.content.hidden_props_search import place_props
 #: Số vật mỗi ván. Giữ là hằng module, chưa thành khoá config (ngoài phạm vi C2).
 PROP_COUNT = 3
 
+#: One knob for how big a bug is, 23/11: 40 % of the old size. It scales the
+#: radius that placement, exposure, drawing (``radius_mm × size_k``) and the
+#: hit test all read, so a bug that fits behind a layer is drawn inside it and
+#: the hit area is what is drawn. Change this number to resize bugs.
+BUG_SCALE = 0.4
+
+
+def bug_radius_mm(content) -> float:
+    """Bug radius in mm for this config: ``game_prop_radius_mm × BUG_SCALE``."""
+    return float(content.game_prop_radius_mm) * BUG_SCALE
+
+
 #: Thấy liên tục ngần này giây thì tính là tìm ra.
 FOUND_HOLD_S = 0.5
 

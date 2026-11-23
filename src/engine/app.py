@@ -20,6 +20,7 @@ from src.content.hidden_props import layer_planes
 from src.content.persistence import media_path_for_config, save_content_settings
 from src.content.prop_game import (
     PROP_COUNT,
+    bug_radius_mm,
     GameState,
     is_exposed,
     append_csv,
@@ -994,7 +995,7 @@ class HcpdApplication:
         # so a shot never hits something different from what's on screen.
         eye = self._virtual_camera.effective_eye_position_mm
         glass, centre = self._glass_mm()
-        radius = float(self._content.game_prop_radius_mm)
+        radius = bug_radius_mm(self._content)
         bugs = {
             # TASK_bugs_look_0130: đọc ĐÚNG size_k đã ghi lúc mở ván — cùng
             # giá trị mà BugPainter.draw dùng để vẽ, không tính lại.
@@ -1704,7 +1705,7 @@ class HcpdApplication:
                     self._pvp_bugs_attempted = True
                     self._pvp_bugs_sent = self._pvp_place_bugs_or_bail(now)
             return
-        radius = float(self._content.game_prop_radius_mm)
+        radius = bug_radius_mm(self._content)
         props = pvp_sync.bugs_from_wire(bugs, self._game_planes, radius)
         found = [False] * len(props)
         for index, prop in enumerate(props):
@@ -1806,7 +1807,7 @@ class HcpdApplication:
         from src.content.hidden_props import _nearer, is_visible
 
         eye = (float(x), float(y), float(z))
-        radius = float(self._content.game_prop_radius_mm)
+        radius = bug_radius_mm(self._content)
         alive = [i for i in range(len(self._game.props))
                 if not self._game.found[i] and self._game.props[i] is not None]
         if not alive:
@@ -2015,7 +2016,7 @@ class HcpdApplication:
         if len(planes) < 2:
             self._renderer.show_toast("Chua co lop — nap anh truoc", is_error=True)
             return
-        radius_mm = float(self._content.game_prop_radius_mm)
+        radius_mm = bug_radius_mm(self._content)
         name = Path(self._content.content_path).name or "unknown"
         rest = self._rest_eye or (
             float(self._content.overscan_design_eye_mm[0]),
@@ -2170,7 +2171,7 @@ class HcpdApplication:
         if self._game is None or not self._game.props:
             return
         was_done = self._game.finished_at_s is not None
-        radius_mm = float(self._content.game_prop_radius_mm)
+        radius_mm = bug_radius_mm(self._content)
         eye = (float(eye_mm[0]), float(eye_mm[1]), float(eye_mm[2]))
         auto = self._album is None          # album: phải BẮN mới diệt được
         for index in game_update(self._game, eye, self._game_planes, now,
