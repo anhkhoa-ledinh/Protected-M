@@ -131,6 +131,7 @@ class HcpdApplication:
 
     #: Seed of the match being placed; ``_start_prop_game`` sets it each match.
     _bug_seed = 0
+    _bug_mover = None
     #: Seed drawn on the loading screen, used by the next match (or None).
     _pending_bug_seed = None
 
@@ -1856,6 +1857,7 @@ class HcpdApplication:
             # when nothing changed since).
             chosen = self._album_layout(planes, count, rule, rest, glass,
                                         centre).layout
+        self._bug_mover = None
         self._start_prop_game(count=count * 3,
                               prefer=(rule.prefer_lo, rule.prefer_hi),
                               props=chosen.kept if chosen else None)
@@ -1960,6 +1962,17 @@ class HcpdApplication:
             logger.info("Sung %s: bang %d vien, nhip %.2f s, nap %.1f s",
                         weapon, spec.mag, spec.fire_s, spec.reload_s)
         self._album.game = match
+        if chosen is not None and rule.move_after_s is not None:
+            from src.game.bug_capacity import spare_spots
+            from src.game.bug_move import BugMover
+
+            spares = spare_spots(self._game_planes, chosen, rest,
+                                 self._viewport_rect(), glass, centre)
+            self._bug_mover = BugMover(self._game, spares, rule.move_after_s,
+                                       bug_radius_mm(self._content),
+                                       self._bug_seed)
+            logger.info("Album bo: %d cho du phong, bo doi cho sau %.1f s",
+                        len(spares), rule.move_after_s)
         state.go(F.PLAY)
 
     def _save_album_shot(self, stem: str | None = None) -> Path:
@@ -2301,9 +2314,40 @@ class HcpdApplication:
             self._renderer.show_toast(
                 f"Found {sum(self._game.found)}/{len(self._game.props)}"
             )
+        self._tick_bug_moves(now, eye)
         self._tick_watch_window(now)
         if not was_done and self._game.finished_at_s is not None:
             self._write_game_csv(now, "finished")
+
+    def _tick_bug_moves(self, now: float, eye) -> None:
+        """Levels 4-5: a bug seen for long enough moves to a spare spot."""
+        mover = getattr(self, "_bug_mover", None)
+        match = self._album.game if self._album is not None else None
+        if (mover is None or mover.game is not self._game or match is None
+                or match.ended or self._pvp_active):
+            return
+        for index, old, new, seen_s in mover.tick(self._game_planes, eye, now):
+            prop = self._game.props[index]
+            photo_rgb = self._photo_rgb_for_camo()
+            if photo_rgb is not None:
+                from src.ui_album.bugs import assign_bug_camo
+
+                rest = self._rest_eye or (
+                    float(self._content.overscan_design_eye_mm[0]),
+                    float(self._content.overscan_design_eye_mm[1]), 450.0)
+                glass, centre = self._glass_mm()
+                assign_bug_camo([prop], photo_rgb, rest, glass, centre,
+                                strength=prop.get("camo_strength", 0.75))
+            match.bug_last_hit.pop(index, None)      # its HP bar was at the old spot
+            logger.info("Album bo #%d doi cho: (%.0f, %.0f, %.0f) -> (%.0f, %.0f, %.0f)",
+                        index, *old, *new)
+            from src.game.match import BUG_HP_BY_LEVEL
+
+            full = BUG_HP_BY_LEVEL[match.level]
+            logger.info("Album bo #%d thay lien tuc %.2f s · mau giu nguyen %.0f / %.0f"
+                        " · con %d cho du phong",
+                        index, seen_s, match.bug_hp.get(index, full), full,
+                        len(mover.spares))
 
     def _tick_watch_window(self, now: float) -> None:
         """Đếm khung lộ vật trong 5 giây đầu sau G; in một dòng khi hết."""

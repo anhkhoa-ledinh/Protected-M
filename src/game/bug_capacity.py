@@ -66,6 +66,20 @@ def placeable_bugs(planes, count, radius_mm, rest_eye_mm, glass_mm, rect,
     return layout.kept, layout.outside, layout.dropped
 
 
+def spare_spots(planes, layout, rest_eye_mm, rect, glass_mm, centre_mm) -> list:
+    """Spots of the SAME placement run that were not kept as bugs: inside the
+    viewport and exposed at some eye position (so a bug moved there can be
+    found). The spacing rule against live bugs is checked at move time."""
+    from src.game.viewport_filter import inside_viewport, project_to_design
+
+    kept = {id(p) for p in layout.kept}
+    rest = tuple(rest_eye_mm)
+    inside = [p for p in layout.placed if id(p) not in kept
+              and inside_viewport(project_to_design(tuple(p["pos_mm"]), rest,
+                                                    glass_mm, centre_mm), rect)]
+    return _winnable(planes, inside, rest)
+
+
 def layout_seeds(seed, tries: int = LAYOUT_TRIES) -> list:
     """The per-try seeds, derived from the match seed."""
     return [f"{seed}:{i}" for i in range(int(tries))]

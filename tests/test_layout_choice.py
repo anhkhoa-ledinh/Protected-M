@@ -64,6 +64,25 @@ class ChooseLayoutTest(unittest.TestCase):
             self.assertEqual([p["pos_mm"] for p in c.layout.kept],
                              [p["pos_mm"] for p in again.layout.kept])
 
+    def test_spares_are_unused_exposed_spots_inside_the_viewport(self):
+        from src.content.hidden_props_search import exposure_count
+        from src.game.viewport_filter import inside_viewport, project_to_design
+        from tests.test_bug_placement_seed import _planes
+
+        planes = _planes()
+        rest, glass = (-20.0, 100.0, 450.0), (344.0, 194.0)
+        rect, centre = (28.0, 28.0, 1224.0, 664.0), (0.0, 0.0)
+        lay = BC.layout_once(planes, 2, 4.8, rest, glass, rect, centre, 5)
+        spares = BC.spare_spots(planes, lay, rest, rect, glass, centre)
+        kept = {id(p) for p in lay.kept}
+        self.assertTrue(spares, "this fixture should leave spare spots")
+        for p in spares:
+            self.assertNotIn(id(p), kept)
+            self.assertTrue(inside_viewport(
+                project_to_design(tuple(p["pos_mm"]), rest, glass, centre), rect))
+            self.assertGreater(exposure_count(planes, p["pos_mm"], p["radius_mm"],
+                                              rest[:2], rest[2]), 0)
+
 
 if __name__ == "__main__":
     unittest.main()
