@@ -14,10 +14,15 @@ import sys
 import threading
 from pathlib import Path
 
-from src.config import merge_user_config
-from src.engine import HcpdApplication
-from src.gui import run_calibration_wizard
-from src.ui_album.options import AlbumOptions
+from src.display_env import prefer_xwayland
+
+# Must run before anything imports glfw or OpenGL.
+prefer_xwayland()
+
+from src.config import merge_user_config  # noqa: E402
+from src.engine import HcpdApplication  # noqa: E402
+from src.gui import run_calibration_wizard  # noqa: E402
+from src.ui_album.options import AlbumOptions  # noqa: E402
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 DEFAULT_CONFIG = PROJECT_ROOT / "assets" / "config" / "default.json"
