@@ -47,6 +47,11 @@ SESSION_LIFETIME_S = 30.0 * 24.0 * 3600.0
 MAX_FAILURES = 5
 COOLDOWN_S = 30.0
 
+#: Points economy. ``wallet`` is spendable; ``earned_total`` only ever grows
+#: (the leaderboard ranks by it); ``levels_cleared`` is the set of solo levels
+#: won at least once (stored as a sorted list).
+STARTING_WALLET = 100
+
 
 def accounts_path(root) -> Path:
     return Path(root) / "assets" / "config" / ACCOUNTS_NAME
@@ -80,6 +85,18 @@ def _valid_store_shape(data: dict | None) -> bool:
     return isinstance(data, dict) and isinstance(data.get("accounts"), dict)
 
 
+def migrate(data: dict) -> dict:
+    """Add the economy fields an older record lacks. Nothing else in a
+    record is touched, and a field already present is never overwritten."""
+    for record in data["accounts"].values():
+        if not isinstance(record, dict):
+            continue
+        record.setdefault("wallet", STARTING_WALLET)
+        record.setdefault("earned_total", 0)
+        record.setdefault("levels_cleared", [])
+    return data
+
+
 # ---- atomic JSON store, with .bak and corrupt-file recovery ----------------
 
 @dataclass
@@ -101,12 +118,12 @@ def load(root) -> LoadResult:
     path = accounts_path(root)
     data = _try_read_json(path)
     if _valid_store_shape(data):
-        return LoadResult(data)
+        return LoadResult(migrate(data))
     bak = _bak_path(path)
     data = _try_read_json(bak)
     if _valid_store_shape(data):
         logger.warning("accounts.json khong doc duoc - dung ban .bak")
-        return LoadResult(data, recovered=True)
+        return LoadResult(migrate(data), recovered=True)
     if path.exists():
         corrupt_path = path.with_name(f"accounts.corrupt-{int(time.time())}.json")
         try:
@@ -152,6 +169,9 @@ def _new_record(display: str, password_hash: str, recovery_hash: str, now: float
         "recent": [],
         "best_score": None,
         "last_signed_in_at": now,
+        "wallet": STARTING_WALLET,
+        "earned_total": 0,
+        "levels_cleared": [],
     }
 
 
@@ -369,3 +389,49 @@ def load_progress(data: dict, key: str) -> dict | None:
     return {"history": dict(record.get("history") or {}),
            "recent": list(record.get("recent") or []),
            "best_score": record.get("best_score")}
+
+
+# ---- points economy -------------------------------------------------------------
+
+def get_economy(data: dict, key: str) -> dict | None:
+    """``{"wallet", "earned_total", "levels_cleared"}`` of an account, or
+    ``None`` for a guest / unknown key (a guest has no wallet)."""
+    record = data["accounts"].get(key)
+    if key == GUEST_KEY or record is None:
+        return None
+    return {"wallet": int(record.get("wallet", STARTING_WALLET)),
+            "earned_total": int(record.get("earned_total", 0)),
+            "levels_cleared": sorted(int(n) for n in
+                                     record.get("levels_cleared") or ())}
+
+
+def spend(data: dict, key: str, points: int) -> bool:
+    """Take ``points`` from the wallet. ``False`` (nothing changes) when
+    the account is unknown or cannot afford it. Never touches
+    ``earned_total``. Caller saves."""
+    record = data["accounts"].get(key)
+    points = int(points)
+    if key == GUEST_KEY or record is None or points < 0:
+        return False
+    if int(record.get("wallet", STARTING_WALLET)) < points:
+        return False
+    record["wallet"] = int(record.get("wallet", STARTING_WALLET)) - points
+    logger.info("Vi diem: tru %d (con %d)", points, record["wallet"])
+    return True
+
+
+def record_win(data: dict, key: str, level: int, score: int) -> None:
+    """A won solo match: ``score`` goes to both ``wallet`` and
+    ``earned_total``, and ``level`` joins ``levels_cleared``. Guests and
+    unknown keys are ignored. Caller saves."""
+    record = data["accounts"].get(key)
+    if key == GUEST_KEY or record is None:
+        return
+    score = max(0, int(score))
+    record["wallet"] = int(record.get("wallet", STARTING_WALLET)) + score
+    record["earned_total"] = int(record.get("earned_total", 0)) + score
+    cleared = {int(n) for n in record.get("levels_cleared") or ()}
+    cleared.add(int(level))
+    record["levels_cleared"] = sorted(cleared)
+    logger.info("Vi diem: thang cap %d, +%d (vi %d, tong kiem %d)", level, score,
+                record["wallet"], record["earned_total"])
