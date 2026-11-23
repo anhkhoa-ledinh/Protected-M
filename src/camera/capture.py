@@ -114,13 +114,19 @@ class CameraCapture:
                 f"Failed to open camera device {self._config.device_id}"
             )
 
+        fourcc = cv2.VideoWriter_fourcc(*self._config.fourcc)
+        if sys.platform != "win32":
+            # V4L2: size and fps are matched against the pixel format that is
+            # active when they are set. Setting the format last leaves the
+            # camera on raw YUYV, which tops out near 10 fps at 1280x720.
+            cap.set(cv2.CAP_PROP_FOURCC, fourcc)
         cap.set(cv2.CAP_PROP_BUFFERSIZE, float(self._config.buffer_size))
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, float(self._config.width))
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, float(self._config.height))
         cap.set(cv2.CAP_PROP_FPS, float(self._config.fps))
 
-        fourcc = cv2.VideoWriter_fourcc(*self._config.fourcc)
-        cap.set(cv2.CAP_PROP_FOURCC, fourcc)
+        if sys.platform == "win32":
+            cap.set(cv2.CAP_PROP_FOURCC, fourcc)
 
         self._cap = cap
         self._is_open = True
