@@ -70,6 +70,22 @@ The game also runs on Linux (developed on CachyOS + Hyprland).
    (`tk` on Arch, `python3-tk` on Debian/Ubuntu).
 3. Run `bash run_game.sh` (log in `logs/`) and `bash run_server.sh` for the
    PvP server. The scripts need no exec bit, so they work on any drive.
+4. **Hyprland (tiling): float the game window.** The number of bugs that
+   fit on screen depends on the window size, so a tiled window changes the
+   game. `hyprctl clients -j` shows the window as class and title
+   `HCPD — Virtual Room` (it runs under XWayland). Rules tried on
+   Hyprland 0.57 (Lua config), loaded with `hyprctl eval`. `float`, `size`
+   (tested with 1091x613) and `move` (tested with 107,100) all took effect
+   on the game window; 1280x720 below is the same syntax, not re-measured:
+
+   ```lua
+   hl.window_rule({ name = "pm-float", match = { class = "^HCPD.*" }, float = true })
+   hl.window_rule({ name = "pm-size",  match = { class = "^HCPD.*" }, size = {1280, 720} })
+   ```
+
+   Add `move = {107, 100}` to place it. The window opens at the size the
+   game asks for and the rule resizes it right after, so the game sees a
+   resize event, as when you drag an edge.
 
 ---
 
