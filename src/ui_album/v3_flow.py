@@ -20,7 +20,8 @@ import random
 import time
 from dataclasses import dataclass, field
 
-from src.game.pvp import ITEM_WEIGHT, LEVEL_TABLE, PVP_MODES
+from src.game.pvp import (ITEM_WEIGHT, ITEMS_HAVE_EFFECT, LEVEL_TABLE,
+                          PVP_MODES, item_price)
 
 logger = logging.getLogger(__name__)
 
@@ -196,6 +197,12 @@ class V3Flow:
     #: chưa đăng nhập, ``"guest"`` = chơi khách. Khác ``player`` (tên hiển
     #: thị, cũng là nội dung ô "Username" trên màn đăng nhập/đăng ký).
     account_key: str = ""
+    #: Spendable points of the signed-in account; ``None`` for a guest or
+    #: nobody signed in (no wallet, items are free). Kept in step with the
+    #: account store by ``V3UI.sync_economy``.
+    wallet: int | None = None
+    earned_total: int = 0
+    levels_cleared: tuple = ()
     #: Ô nào trên màn đăng ký người dùng đã GÕ VÀO rồi — gợi ý lỗi chỉ hiện
     #: cho ô đã động tới (không doạ người mới vào màn với lỗi ngay lập tức).
     touched: set = field(default_factory=set)
@@ -247,6 +254,11 @@ class V3Flow:
 
     def weight_total(self) -> int:
         return sum(ITEM_WEIGHT.get(name, 0) for name in self.items)
+
+    def price_total(self, items=None) -> int:
+        """Points the equipped items (or ``items``) cost at match start."""
+        return sum(item_price(name)
+                   for name in (self.items if items is None else items))
 
     def go(self, screen: str) -> None:
         if screen != self.screen:
@@ -527,13 +539,19 @@ def start_search(flow: V3Flow, now: float) -> None:
 
 
 def toggle_item(flow: V3Flow, item: str) -> None:
-    """Gắn/bỏ một vật phẩm. Hết ô thì báo, không im lặng bỏ qua."""
+    """Gắn/bỏ một vật phẩm. Hết ô hoặc hết điểm thì báo, không im lặng bỏ qua."""
     if item in flow.items:
         flow.items.remove(item)
         return
     if len(flow.items) >= flow.slots():
         say(flow, f"All {flow.slots()} item slots are full.")
         return
+    if flow.wallet is not None:
+        need = flow.price_total(flow.items + [item])
+        if need > flow.wallet:
+            say(flow, f"Not enough points: {item} costs {item_price(item)}, "
+                      f"you have {flow.wallet - flow.price_total()} left to spend.")
+            return
     flow.items.append(item)
 
 

@@ -25,4 +25,17 @@ ITEM_WEIGHT = {"Flare": 3, "Antidote": 5, "Acid shield": 4, "Filter lens": 4,
               "Compass": 2, "Thermal scan": 8, "Energy drink": 3,
               "Smoke bomb": 6}
 
+#: An item costs ``weight x ITEM_PRICE_PER_WEIGHT`` points, paid from the
+#: account wallet when a match starts with it equipped.
+ITEM_PRICE_PER_WEIGHT = 10
+
+
+def item_price(item: str) -> int:
+    return ITEM_WEIGHT.get(item, 0) * ITEM_PRICE_PER_WEIGHT
+
+
+#: No item changes a match yet (nothing consumes ``used``); the loadout says
+#: so instead of hiding the fact.
+ITEMS_HAVE_EFFECT = False
+
 PVP_MODES = ("Competitive", "Hunt & Hide")

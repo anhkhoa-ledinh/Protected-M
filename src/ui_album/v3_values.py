@@ -277,6 +277,16 @@ def _sign_in(state, flow, accounts: dict | None = None) -> None:
 
 
 # ---- màn chính ---------------------------------------------------------
+def _wallet_line(state, manifest, screen, rect, template_key, text) -> None:
+    """A text the art has no slot for (wallet, price): draw it with the
+    style of an existing text ``template_key`` of the same screen."""
+    template = _spec(manifest, screen, template_key) if manifest else None
+    if template is None:
+        return
+    state.extra.append((list(rect), template["runs"], [text],
+                        template.get("al", "left")))
+
+
 def _menu(state, flow, manifest=None, painter=None) -> None:
     name = flow.player or "guest"
     state.texts["player_name"] = _fit_name(manifest, painter, F.MENU, "player_name", name)
@@ -292,6 +302,9 @@ def _menu(state, flow, manifest=None, painter=None) -> None:
     else:
         state.texts["photo_damage"] = "not played yet"
     state.focus = flow.focus if flow.focus in F.MENU_BUTTONS else None
+    if flow.wallet is not None:
+        _wallet_line(state, manifest, F.MENU, (144, 612, 360, 24),
+                     "photo_caption", f"Points  {flow.wallet}")
 
 
 # ---- màn cài đặt -------------------------------------------------------
@@ -424,6 +437,11 @@ def _loadout(state, flow, manifest, painter) -> None:
     level, items = flow.level, flow.items
     state.texts["note"] = F.LEVEL_NOTE[level]
     state.texts["weight_total"] = str(flow.weight_total())
+    if flow.wallet is not None:
+        left = flow.wallet - flow.price_total()
+        _wallet_line(state, manifest, screen, (912, 540, 304, 24), "weight_total",
+                     f"Points {flow.wallet} · items {flow.price_total()}"
+                     f" · left {left}")
     used, total = len(items), flow.slots()
     state.texts["slots_label"] = f"ITEM SLOTS · {used} / {total}"
     state.colours["slots_label"] = MUTED if used == 0 else SLOT_WARM
@@ -517,7 +535,9 @@ def _loadout_slots(state, flow, manifest, painter) -> None:
         _slot_line(state, manifest, screen, "slot_name", slot_rect,
                    layout.get("name"), item)
         _slot_line(state, manifest, screen, "slot_sub", slot_rect,
-                   layout.get("sub"), f"key {number} · weight {weight}")
+                   layout.get("sub"),
+                   f"key {number} · {F.item_price(item)} pts"
+                   + ("" if F.ITEMS_HAVE_EFFECT else " · no effect yet"))
     _ = painter
 
 

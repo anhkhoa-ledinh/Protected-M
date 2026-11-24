@@ -827,6 +827,7 @@ class V3UI:
         self.state.player = self._account_data["accounts"][key]["display"]
         self.state.password = self.state.password2 = ""
         self.state.focus = None
+        self.sync_economy()
         self.state.go(F.MENU)
         # TASK_accounts_1119 Phase 6: shown exactly once, right now — the
         # recovery dialog overlays whatever screen is current (MENU,
@@ -912,12 +913,53 @@ class V3UI:
             logger.error("Khong luu duoc tien trinh tai khoan", exc_info=True)
             F.say(self.state, "Couldn't save your progress.")
 
-    def note_match_finished(self) -> None:
+    def sync_economy(self) -> None:
+        """Copy the signed-in account's points into the flow (guest or
+        nobody signed in: no wallet)."""
+        eco = account_store.get_economy(self._account_data,
+                                        self.state.account_key)
+        if eco is None:
+            self.state.wallet = None
+            self.state.earned_total = 0
+            self.state.levels_cleared = ()
+            return
+        self.state.wallet = eco["wallet"]
+        self.state.earned_total = eco["earned_total"]
+        self.state.levels_cleared = tuple(eco["levels_cleared"])
+
+    def charge_items(self, items) -> bool:
+        """Pay for ``items`` when a match starts. ``True`` = go on (paid,
+        or a guest, or nothing to pay); ``False`` = cannot afford, nothing
+        taken (the caller keeps the player on the loadout)."""
+        cost = self.state.price_total(items)
+        key = self.state.account_key
+        if cost <= 0 or account_store.get_economy(self._account_data, key) is None:
+            return True
+        if not account_store.spend(self._account_data, key, cost):
+            self.sync_economy()
+            return False
+        self._save_accounts()
+        self.sync_economy()
+        return True
+
+    def _save_accounts(self) -> None:
+        try:
+            account_store.save(self._account_root, self._account_data)
+        except Exception:
+            logger.error("Khong luu duoc tai khoan", exc_info=True)
+            F.say(self.state, "Couldn't save your points.")
+
+    def note_match_finished(self, won: bool = False, level: int = 0,
+                            score: int = 0) -> None:
         """TASK_accounts_1119 Phase 5: call once right after a match
         result is written into ``state.history`` (``app.py``'s
         ``_tick_album_match``). A signed-in account saves immediately;
         a guest instead gets a ONE-TIME toast (never saved — this IS the
         explanation why)."""
+        if won:
+            account_store.record_win(self._account_data, self.state.account_key,
+                                     level, score)
+            self.sync_economy()
         if self.state.account_key == account_crypto.GUEST_KEY:
             if not self._guest_toast_shown:
                 self._guest_toast_shown = True
@@ -936,6 +978,7 @@ class V3UI:
             return
         self.state.history = progress["history"]
         self.state.recent = [Path(p) for p in progress["recent"]]
+        self.sync_economy()
 
     def sign_out(self) -> None:
         """TASK_accounts_1119 Phase 4: a deliberate sign-out must not

@@ -1235,6 +1235,8 @@ class HcpdApplication:
                 self._album.sign_out()
             state.player = state.password = state.password2 = ""
             state.account_key = ""
+            if self._album_options.is_v3:
+                self._album.sync_economy()
             state.focus = None
             state.go(F.SIGN_IN if hasattr(F, "SIGN_IN") else F.LOGIN)
         elif action == "copy_code":
@@ -1321,7 +1323,9 @@ class HcpdApplication:
                 # TASK_accounts_1119 Phase 5: save right after a match
                 # result (a signed-in account) or the one-time guest
                 # toast (never saved) — see V3UI.note_match_finished.
-                self._album.note_match_finished()
+                self._album.note_match_finished(
+                    won=(ended == "win"), level=match.level,
+                    score=match.score())
             state.go(F.WIN if ended == "win" else F.LOSE)
             self._album.game = None
 
@@ -1739,7 +1743,11 @@ class HcpdApplication:
         if self._bugs is not None:
             self._bugs.reset()
         weapon = state.weapon_name() or F.WEAPONS[0]
-        match = start_match(state.level, self._game, weapon, list(state.items),
+        items = list(state.items)
+        if not self._album.charge_items(items):
+            F.say(state, "Not enough points for these items — going in without.")
+            items = []
+        match = start_match(state.level, self._game, weapon, items,
                             F.ITEM_WEIGHT)
         match.layer_total = len(self._renderer.layer_records())
         spec = WEAPONS_SPEC.get(weapon, DEFAULT_SPEC)
@@ -1940,6 +1948,11 @@ class HcpdApplication:
             # nếu không ``score()`` tra bảng tiếng Việt và ra 0 cho mọi món.
             weapon = state.weapon_name() or F.WEAPONS[0]
             items = list(state.items)
+            # Items are paid for when the match starts (points economy).
+            if not self._album.charge_items(items):
+                F.say(state, "Not enough points for these items.")
+                state.go(F.LOADOUT)
+                return
         else:
             weapon = (f"Sung {state.weapon}" if state.weapon is not None
                       else "Sung")
