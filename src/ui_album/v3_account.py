@@ -296,8 +296,10 @@ class AccountMixin:
         explanation why)."""
         key = self.state.account_key
         if self._accounts.economy(key) is not None:
+        self.match_verdict = None
             score = self._accounts.end_match(key, level, won, dict(used or {}), score)
             self.sync_economy()
+            self.match_verdict = self._accounts.take_verdict()
         if key == account_rules.GUEST_KEY:
             if not self._guest_toast_shown:
                 self._guest_toast_shown = True

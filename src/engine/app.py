@@ -1395,6 +1395,8 @@ class HcpdApplication:
                 final = self._album.note_match_finished(
                     won=(ended == "win"), level=match.level,
                     score=match.score(), used=dict(match.used))
+                if self._album.match_verdict:
+                    state.last_result["rejected"] = self._album.match_verdict
                 if final != state.last_result["score"]:
                     # The central server scores with its own clock.
                     state.last_result["score"] = final

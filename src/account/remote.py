@@ -33,7 +33,7 @@ BOARD_TTL_S = 60.0
 
 
 def load_config(path: Path) -> dict | None:
-    """``{"host","port","cert"}`` when the file asks for ``remote`` and is
+    """``{"host","port","cert","name"}`` when the file asks for ``remote`` and is
     valid; ``None`` means play locally (also for a missing/broken file)."""
     try:
         raw = json.loads(Path(path).read_text(encoding="utf-8"))
@@ -56,7 +56,9 @@ def load_config(path: Path) -> dict | None:
     if not cert_path.is_file():
         logger.warning("central.json: pinned certificate not found - playing locally")
         return None
-    return {"host": host, "port": port, "cert": cert_path}
+    name = raw.get("name")
+    return {"host": host, "port": port, "cert": cert_path,
+            "name": name if isinstance(name, str) else ""}
 
 
 def build_account_service(root, config_path: Path) -> AccountService:
@@ -67,7 +69,8 @@ def build_account_service(root, config_path: Path) -> AccountService:
     if cfg is None:
         return LocalAccountService(root)
     logger.info("Accounts on the central server %s:%d", cfg["host"], cfg["port"])
-    return RemoteAccountService(root, CentralClient(cfg["host"], cfg["port"], cfg["cert"]))
+    return RemoteAccountService(root, CentralClient(cfg["host"], cfg["port"], cfg["cert"]),
+                                server_name=cfg["name"])
 
 
 def _write_private(path: Path, data: dict) -> None:
@@ -82,8 +85,11 @@ def _write_private(path: Path, data: dict) -> None:
 class RemoteAccountService(AccountService):
     wants_ticket = True
 
-    def __init__(self, root, client: CentralClient, clock=time.monotonic) -> None:
+    def __init__(self, root, client: CentralClient, clock=time.monotonic,
+                  server_name: str | None = None) -> None:
         self._root = Path(root)
+        self._server_name = (server_name or "").strip() or client.host
+        self._verdict: str | None = None
         self._client = client
         self._clock = clock
         self._lock = threading.RLock()
@@ -167,7 +173,7 @@ class RemoteAccountService(AccountService):
             for key, eco in self._eco.items():
                 if key in self._display:
                     accounts[key] = {"display": self._display[key], **eco}
-        return {"accounts": accounts}
+        return {"accounts": accounts, "server": self._server_name}
 
     def _refresh_board(self) -> None:
         try:
@@ -301,16 +307,26 @@ class RemoteAccountService(AccountService):
             self._eco.setdefault(key, {})["wallet"] = reply["wallet"]
         return "ok"
 
+    def take_verdict(self) -> str | None:
+        verdict, self._verdict = self._verdict, None
+        return verdict
+
     def end_match(self, key, level, won, used, score) -> int:
         held, self._ticket = self._ticket, None
+        self._verdict = None
         if held is None or held[0] != key:
             return score
         reply = self._call({"t": "finish_match", "ticket": held[1], "won": bool(won),
                             "items_used": dict(used)})
         if not reply or reply.get("t") != "ok":
-            logger.warning("finish_match was not accepted: %s",
-                           (reply or {}).get("code", "offline"))
+            code = (reply or {}).get("code", "offline")
+            logger.warning("finish_match was not accepted: %s", code)
+            if won:        # the server never credited it: do not show the client's score
+                self._verdict = "offline" if reply is None else "refused"
+                return 0
             return score
+        if won and not reply.get("won"):
+            self._verdict = str(reply.get("reason") or "refused")
         with self._lock:
             self._eco[key] = {"wallet": reply["wallet"],
                               "earned_total": reply["earned_total"],

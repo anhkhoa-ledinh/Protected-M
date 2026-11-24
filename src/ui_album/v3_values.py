@@ -937,6 +937,7 @@ def _result(state, flow, manifest, win: bool, accounts=None) -> None:
         state.texts["stamp_line"] = (f"LEVEL {level} · {flow.level_name().upper()}"
                                      f" · {time.strftime('%d.%m.%Y')}")
         state.texts["caption"] = f"{found}/{total} bugs turned to dust"
+    rejected = result.get("rejected") if win else None
     rows = []
     if not win:
         rows.append(("Bugs left", f"{total - found} / {total}", False))
@@ -944,13 +945,16 @@ def _result(state, flow, manifest, win: bool, accounts=None) -> None:
     # cộng được gì cả.
     left = int(result.get("time_left", 0))
     points = left * level
-    rows.append((f"Time left {left} s × level {level}",
-                 f"+{points}" if points > 0 else str(points), False))
-    for item, count in (result.get("used") or {}).items():
+    if rejected:
+        _rejected_title(state, rejected)
+    else:
+        rows.append((f"Time left {left} s × level {level}",
+                     f"+{points}" if points > 0 else str(points), False))
+    for item, count in ({} if rejected else (result.get("used") or {})).items():
         weight = F.ITEM_WEIGHT.get(item, 0) * int(count)
         rows.append((f"{item} ×{count} · weight {F.ITEM_WEIGHT.get(item, 0)}",
                      f"-{weight}", True))
-    if level == 5 and result.get("overtime_s"):
+    if level == 5 and result.get("overtime_s") and not rejected:
         penalty = int(round(result["overtime_s"] * 5))
         rows.append((f"Overtime {mmss(result['overtime_s'])} · penalty",
                      f"-{penalty}", True))
@@ -968,11 +972,30 @@ def _result(state, flow, manifest, win: bool, accounts=None) -> None:
     from src.ui_album import board
 
     rank = board.rank_of(accounts, flow.account_key)
-    if win and rank is not None and rank <= 10:
+    if win and not rejected and rank is not None and rank <= 10:
         state.sprites["rank_up"] = True
         state.texts["rank_up_text"] = f"You're now #{rank} on the Solo board"
     else:
         state.hidden |= {"rank_up", "rank_up_text"}
+
+
+#: What the result screen says when the central server did not count a win.
+_REFUSED = {"too_fast": "The server refused it: too fast to be a real match.",
+            "time": "The server refused it: it came after the time limit.",
+            "offline": "Can't reach the server: this win was not recorded."}
+
+
+def _rejected_title(state, reason: str) -> None:
+    """The baked title says "Memory saved"; when the server did not count the
+    win, cover it (flat card colour, art px) and say so in one line."""
+    from src.ui_album import board
+
+    state.covers.append(("rect", board._d(1120, 170, 1640, 250), board.WHITE))
+    title = board._run("Not saved", "Baloo 2", 800, 40.0, DANGER)
+    state.extra.append(([752.0, 118.0, 480.0, 50.0], [title], ["Not saved"], "left"))
+    line = _REFUSED.get(reason, "The server did not accept this result.")
+    note = board._run(line, "Nunito", 700, 14.0, DANGER)
+    state.extra.append(([752.0, 172.0, 480.0, 20.0], [note], [line], "left"))
 
 
 def _hide_spare_rows(state, manifest, screen, prefixes, count) -> None:

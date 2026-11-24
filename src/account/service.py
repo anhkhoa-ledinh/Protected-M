@@ -101,6 +101,14 @@ class AccountService(ABC):
         the ``cost``; on the central server the server prices the items."""
         return "ok" if cost <= 0 or self.spend(key, cost) else "no_funds"
 
+    #: ``True`` while the central server could not be reached.
+    offline_notice = False
+
+    def take_verdict(self) -> str | None:
+        """Why the last ``end_match`` did not count (``None`` = it counted;
+        local play always counts). Read once, then cleared."""
+        return None
+
     def end_match(self, key: str, level: int, won: bool, used: dict,
                   score: int) -> int:
         """The match is over. Returns the score that counts (locally the one

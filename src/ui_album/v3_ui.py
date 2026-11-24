@@ -107,6 +107,9 @@ class V3UI(AccountMixin, FxStepsMixin, ClickGeometryMixin):
         #: per PROCESS (not persisted — guest never persists anything),
         #: the first time a guest match actually finishes.
         self._guest_toast_shown = False
+        #: Why the server refused the last finished match (``None`` = it
+        #: counted, or local play); set by ``note_match_finished``.
+        self.match_verdict: str | None = None
         if options.guest:
             self.state.player = "guest"
             self.state.account_key = account_rules.GUEST_KEY
