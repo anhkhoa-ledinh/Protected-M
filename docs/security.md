@@ -107,8 +107,19 @@ Risk: **low today**, but nothing enforces it. Step 5 of this task adds an archit
 Smaller items: videos go to ffmpeg unchecked (P9); `allow_pickle=False` is not explicit in
 `bake.py:180`; account and wallet data is a plain local file (J3).
 
-## 8. Fixed in this task
+## 8. Status after this task
 
-- Step 4 adds `src/content/media_gate.py` (one gate; `CleanPhoto` result) and an architecture
-  test that no other module decodes user photos.
-- Step 5 adds an architecture test that keeps camera data off the network.
+| Id | Now |
+|---|---|
+| P1-P3, P5, P6, P7 | Every path ends in `media_gate.import_photo`: regular file, size, magic bytes, nothing after the image end, header pixels before decode, one frame, clean PNG in `assets/cache/photos`. A refused file shows "This file is not a photo we can open" on the album screen. |
+| P4 | Start-up photo from `content*.json` goes through the same gate (`ContentPlaneRenderer.load_file`). `content_path` itself is still unrestricted (a user-edited file). |
+| P5 | `verify_photo` runs the gate with the 4096 px rule and `allowed_root` = the shared folder; a refused download is deleted. The format still comes from the remote JSON, but the gate decides by content. |
+| P8, C1, C2, C5 | Open: caches and model files are still trusted by name. |
+| P9 | Open: videos still go to ffmpeg unchecked. |
+| N1-N4, N6-N8 | Open: central server TASK. |
+| N5 | Receiving side is gated; the server relay still has no size cap. |
+| Camera | Enforced by `tests/test_architecture.py`: net, account, shared album and album UI cannot reach `src.camera`/`tracking`/`pose`, and only four known modules write images. |
+
+Known trade-offs of the gate: a JPEG with a `.png` name is accepted (the project's own
+`t21.png` is one; `strict_extension=True` refuses it); a JPEG/PNG with data after its end,
+such as a Samsung motion photo, is refused.
