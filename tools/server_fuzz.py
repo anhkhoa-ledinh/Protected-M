@@ -6,7 +6,12 @@ checks: the process is alive, it still answers a valid ``hello``, every bad
 connection got closed, and its peak RSS (VmHWM) stayed bounded.
 
     python tools/server_fuzz.py [--messages 2000] [--out report.json]
-"""
+
+With ``--container NAME --target-port P --cert CERT`` it attacks a server
+already running in Docker (the image of deploy/) instead of starting one;
+peak memory is read from the container's ``/proc/1/status`` and tracebacks
+from ``docker logs``. Start that container with the per-IP and rate limits
+raised (HCPD_MAX_CONNS_PER_IP etc.), as the local mode does."""
 
 from __future__ import annotations
 
@@ -32,6 +37,12 @@ def vm_hwm_mb(pid: int) -> float:
         if line.startswith("VmHWM:"):
             return int(line.split()[1]) / 1024.0
     return -1.0
+
+
+def container_hwm_mb(name: str) -> float:
+    out = subprocess.run(["docker", "exec", name, "grep", "VmHWM", "/proc/1/status"],
+                         capture_output=True, text=True).stdout.split()
+    return int(out[1]) / 1024.0 if len(out) >= 2 else -1.0
 
 
 def free_port() -> int:
@@ -92,27 +103,36 @@ def main() -> int:
     ap.add_argument("--loris", type=int, default=30)
     ap.add_argument("--seed", type=int, default=1124)
     ap.add_argument("--out", type=Path)
+    ap.add_argument("--container", help="attack this running container instead")
+    ap.add_argument("--target-port", type=int)
+    ap.add_argument("--cert", type=Path, help="pinned cert of the --container server")
     args = ap.parse_args()
 
     work = Path(tempfile.mkdtemp(prefix="hcpd_fuzz_"))
-    subprocess.run(["bash", str(ROOT / "tools" / "make_dev_cert.sh"),
-                    str(work / "pki")], check=True, capture_output=True)
-    cert, key = work / "pki" / "cert.pem", work / "pki" / "key.pem"
-    port = free_port()
-    log = open(work / "server.log", "wb")
-    proc = subprocess.Popen(
-        [sys.executable, "-m", "src.server", "--data-dir", str(work / "data"),
-         "--cert", str(cert), "--key", str(key), "--port", str(port),
-         "--max-conns-per-ip", "500", "--rate-per-s", "100000",
-         "--rate-burst", "100000", "--connects-per-min", "1000000"],
-        cwd=ROOT, stdout=log, stderr=log)
-    for _ in range(100):
-        try:
-            tls_connect(port, cert, 1).close()
-            break
-        except OSError:
-            time.sleep(0.1)
-    rss_start = vm_hwm_mb(proc.pid)
+    if args.container:
+        if not (args.target_port and args.cert):
+            ap.error("--container needs --target-port and --cert")
+        cert, port, proc = args.cert, args.target_port, None
+        rss_start = container_hwm_mb(args.container)
+    else:
+        subprocess.run(["bash", str(ROOT / "tools" / "make_dev_cert.sh"),
+                        str(work / "pki")], check=True, capture_output=True)
+        cert, key = work / "pki" / "cert.pem", work / "pki" / "key.pem"
+        port = free_port()
+        log = open(work / "server.log", "wb")
+        proc = subprocess.Popen(
+            [sys.executable, "-m", "src.server", "--data-dir", str(work / "data"),
+             "--cert", str(cert), "--key", str(key), "--port", str(port),
+             "--max-conns-per-ip", "500", "--rate-per-s", "100000",
+             "--rate-burst", "100000", "--connects-per-min", "1000000"],
+            cwd=ROOT, stdout=log, stderr=log)
+        for _ in range(100):
+            try:
+                tls_connect(port, cert, 1).close()
+                break
+            except OSError:
+                time.sleep(0.1)
+        rss_start = vm_hwm_mb(proc.pid)
 
     rng = random.Random(args.seed)
     stats = {"sent": 0, "must_close": 0, "closed_ok": 0, "not_closed": 0,
@@ -169,7 +189,12 @@ def main() -> int:
     time.sleep(0.2)
     loris_closed = sum(drain_until_closed(s, 14.0) for s in loris)
 
-    alive = proc.poll() is None
+    if args.container:
+        alive = subprocess.run(["docker", "inspect", "-f", "{{.State.Running}}",
+                                args.container], capture_output=True,
+                               text=True).stdout.strip() == "true"
+    else:
+        alive = proc.poll() is None
     answers = False
     if alive:
         s = tls_connect(port, cert)
@@ -177,14 +202,21 @@ def main() -> int:
         s.settimeout(5)
         answers = b'"ok"' in s.recv(4096)
         s.close()
-    rss_end = vm_hwm_mb(proc.pid) if alive else -1.0
-    proc.terminate()
-    try:
-        proc.wait(10)
-    except subprocess.TimeoutExpired:
-        proc.kill()
-    log.close()
-    text = (work / "server.log").read_text(errors="replace")
+    if args.container:
+        rss_end = container_hwm_mb(args.container) if alive else -1.0
+        logs = subprocess.run(["docker", "logs", args.container],
+                              capture_output=True, text=True)
+        text = logs.stdout + logs.stderr
+        (work / "server.log").write_text(text)
+    else:
+        rss_end = vm_hwm_mb(proc.pid) if alive else -1.0
+        proc.terminate()
+        try:
+            proc.wait(10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+        log.close()
+        text = (work / "server.log").read_text(errors="replace")
     tracebacks = text.count("Traceback")
 
     report = {

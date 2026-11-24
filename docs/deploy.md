@@ -46,6 +46,10 @@ Server tự chạy lại khi bị kill hoặc khi máy khởi động lại (`re
 phải tự bật cùng máy: Docker Desktop → "Start Docker Desktop when you sign in"; Docker Engine →
 `systemctl enable docker`).
 
+Lưu ý: Docker coi `docker kill` và `docker stop` là do bạn tự dừng, nên **không** tự bật lại
+(đã đo trên Docker Desktop 29.9.3, cả ba chính sách restart). Dừng bằng tay thì bật lại bằng
+`docker compose up -d`. Khi tiến trình server tự chết, hoặc máy khởi động lại, nó tự lên lại.
+
 Quản trị (xem tài khoản, mở khoá, thu hồi phiên) chạy ngay trong container, không qua mạng:
 
 ```fish
