@@ -19,7 +19,7 @@ import time
 
 from src.shared import account_rules
 from src.ui_album import v3_flow as F
-from src.game.match import WEAPON_LABEL
+from src.game.view import WEAPON_LABEL
 from src.ui_album.v3 import V3State
 from src.ui_album import ids as ID
 
@@ -681,8 +681,8 @@ def _hud(state, flow, game, manifest, now) -> None:
     if game is not None:
         state.shots = [(x, y, now - fired, hit)
                        for x, y, fired, hit in getattr(game, "shots", ())]
-        state.hp_bars = game.hp_bars(now)
-        if game.reloading(now):
+        state.hp_bars = list(game.hp_bars)
+        if game.reloading:
             # Không có ô nào trên bản vẽ dành cho việc nạp đạn, nên nói bằng
             # dòng báo — nếu không, bấm chuột mà súng im là khó hiểu.
             state.message = "Reloading…"
@@ -707,7 +707,7 @@ def _aim_ready(game, now: float) -> float:
     """
     if game is None:
         return 1.0
-    if game.reloading(now):
+    if game.reloading:
         return 0.0
     gap = float(getattr(game, "fire_interval_s", 0.0) or 0.0)
     if gap <= 0.0:

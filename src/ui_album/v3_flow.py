@@ -20,7 +20,7 @@ import random
 import time
 from dataclasses import dataclass, field
 
-from src.game.pvp import (ITEM_WEIGHT, ITEMS_HAVE_EFFECT, LEVEL_TABLE,
+from src.game.view import (ITEM_WEIGHT, ITEMS_HAVE_EFFECT, LEVEL_TABLE,
                           PVP_MODES, item_price)
 from src.ui_album.ids import (BOARD, LEVELS, LOADING, LOADING_READY, LOADOUT,  # noqa: F401
                                 LOSE, MENU, OFFLINE, PHOTOS, PLAY, PVP_FOUND,

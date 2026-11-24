@@ -279,6 +279,12 @@ class AlbumMatch:
             self.reload_until_s = now + self.reload_s
         return True
 
+    def view(self, now: float):
+        """The frozen snapshot the UI reads (``src.game.view.MatchView``)."""
+        from src.game.view import build_match_view
+
+        return build_match_view(self, now)
+
     def tick_reload(self, now: float) -> None:
         if self.reload_until_s and now >= self.reload_until_s:
             self.reload_until_s = 0.0

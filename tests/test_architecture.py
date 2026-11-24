@@ -380,3 +380,16 @@ def test_ui_album_imports_neither_the_shared_album_nor_prefs_modules():
             if imp in banned or any(imp.startswith(b + ".") for b in banned):
                 offenders.append(f"{path.relative_to(ROOT)}: {imp}")
     assert offenders == [], offenders
+
+
+def test_ui_album_imports_only_game_view_from_src_game():
+    """B4: the UI reads a ``MatchView`` snapshot; the one ``src.game`` module
+    it may import is ``src.game.view``."""
+    offenders = []
+    for path in _production_py_files():
+        if "src/ui_album/" not in path.as_posix():
+            continue
+        for imp in import_graph.extract_imports(path):
+            if (imp == "src.game" or imp.startswith("src.game.")) and imp != "src.game.view":
+                offenders.append(f"{path.relative_to(ROOT)}: {imp}")
+    assert offenders == [], offenders

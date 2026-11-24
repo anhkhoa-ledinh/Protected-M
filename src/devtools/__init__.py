@@ -94,7 +94,7 @@ class DevTools:
         """
         from OpenGL import GL
 
-        from src.ui_album import v3_live
+        from src.devtools import v3_live
 
         app = self._app
         if app._window.is_iconified():

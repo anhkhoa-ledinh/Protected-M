@@ -19,7 +19,7 @@ import numpy as np
 from OpenGL import GL
 
 from src.renderer.shader import ShaderProgram
-from src.game.levels import LEGACY_CAMO
+from src.game.view import LEGACY_CAMO
 from src.ui_album.textures import load_rgba, upload_rgba
 
 logger = logging.getLogger(__name__)
@@ -90,7 +90,7 @@ def assign_bug_camo(props, rgb_image, rest_eye_mm, screen_mm=(344.0, 194.0),
     ``BUG_CAMO_STRENGTH`` > 0, nhưng ``draw()`` chỉ dùng giá trị này nếu nó
     tồn tại trên prop.
     """
-    from src.game.viewport_filter import DESIGN_SIZE, project_to_design
+    from src.game.view import DESIGN_SIZE, project_to_design
 
     height, width = rgb_image.shape[:2]
     half = max(1, int(patch_px) // 2)
@@ -162,7 +162,7 @@ class BugPainter:
         và thứ phép bắn ĐO không bao giờ là hai hình khác nhau. ``None`` khi
         thiếu bộ asset: lúc đó không có bọ để vẽ, cũng không có gì để bắn.
         """
-        from src.game.hit import SpriteMask
+        from src.game.view import SpriteMask
 
         relative = sprite_for(self.manifest, level)
         if not relative:

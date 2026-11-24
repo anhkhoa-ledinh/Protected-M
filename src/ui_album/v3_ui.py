@@ -1054,7 +1054,8 @@ class V3UI:
         else:
             self._sync_shared_album_flags()
             state = v3_values.state_for(self.manifest, self.painter, self.state,
-                                        self.game, self.mouse, accounts=self._accounts.accounts_view())
+                                        None if self.game is None
+                                        else self.game.view(time.perf_counter()), self.mouse, accounts=self._accounts.accounts_view())
             state.hover = self.hover()
             state.pressed = self.mouse_down and state.hover is not None
             state.hover_fx = self._hover_fx
