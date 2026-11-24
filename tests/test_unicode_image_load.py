@@ -9,12 +9,12 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from src.content.cv_io import imread_bgr
 from src.content.image_source import ImageSource
+from src.content.media_gate import import_photo
 
 
 class TestUnicodeImageLoad(unittest.TestCase):
-    def test_imread_bgr_unicode_path(self) -> None:
+    def test_gate_and_source_accept_a_unicode_path(self) -> None:
         with tempfile.TemporaryDirectory(prefix="hcpd_img_") as tmp:
             folder = Path(tmp) / "Hình ảnh"
             folder.mkdir()
@@ -25,12 +25,10 @@ class TestUnicodeImageLoad(unittest.TestCase):
             self.assertTrue(ok)
             image_path.write_bytes(encoded.tobytes())
 
-            loaded = imread_bgr(image_path)
-            self.assertIsNotNone(loaded)
-            assert loaded is not None
-            self.assertEqual(loaded.shape[:2], (48, 64))
+            clean = import_photo(image_path, Path(tmp) / "clean")
+            self.assertEqual((clean.height, clean.width), (48, 64))
 
-            source = ImageSource(image_path)
+            source = ImageSource(clean)
             self.assertEqual(source.width, 64)
             self.assertEqual(source.height, 48)
 

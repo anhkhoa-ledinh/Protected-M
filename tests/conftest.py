@@ -27,6 +27,14 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 
+
+@pytest.fixture(autouse=True)
+def _photo_cache_in_tmp(tmp_path_factory, monkeypatch):
+    """The photo gate writes its clean copies to ``HCPD_PHOTO_CACHE``: keep
+    them out of the real ``assets/cache`` while the tests run."""
+    monkeypatch.setenv("HCPD_PHOTO_CACHE",
+                       str(tmp_path_factory.getbasetemp() / "photo_cache"))
+
 #: Same path src/content/lama_fill.py:MODEL_PATH uses — gitignored, 208 MB,
 #: never committed (see .gitignore's own comment on this file).
 LAMA_ONNX_PATH = ROOT / "assets" / "models" / "lama_fp32.onnx"

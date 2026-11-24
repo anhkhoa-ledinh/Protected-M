@@ -125,3 +125,62 @@ def test_net_package_does_not_depend_on_ui_or_engine():
             if any(imp == p or imp.startswith(p + ".") for p in _NET_FORBIDDEN_PREFIXES):
                 offenders.append((str(path.relative_to(ROOT)), imp))
     assert offenders == [], f"src/net imports ui_album/engine/renderer: {offenders}"
+
+
+# ---- TASK_hardening_1124: one door for user photos ---------------------------
+
+#: Modules that open an image file but never a user's photo: shipped art
+#: (UI atlas, fx packs) or files this app wrote itself (bake and fill caches).
+#: Anything else must get its pixels from ``media_gate``.
+_OWN_FILE_IMAGE_READERS = {
+    "src/ui_album/hud_cards.py", "src/ui_album/textures.py",
+    "src/ui_album/board.py", "src/ui_album/v3_hover.py",
+    "src/fx/spec.py", "src/fx/library.py", "src/fx/player.py",
+    "src/content/bake.py", "src/content/lama_fill.py",
+}
+_GATE = "src/content/media_gate.py"
+_IMAGE_DECODERS = {"cv2.imread", "cv2.imdecode", "Image.open", "Image.frombytes",
+                   "PILImage.open"}
+
+
+def _dotted(node) -> str:
+    import ast as _ast
+
+    parts = []
+    while isinstance(node, _ast.Attribute):
+        parts.append(node.attr)
+        node = node.value
+    if isinstance(node, _ast.Name):
+        parts.append(node.id)
+    return ".".join(reversed(parts))
+
+
+def _decoder_calls() -> dict[str, set[str]]:
+    import ast as _ast
+
+    found: dict[str, set[str]] = {}
+    for path in _production_py_files():
+        tree = _ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in _ast.walk(tree):
+            if isinstance(node, _ast.Call) and _dotted(node.func) in _IMAGE_DECODERS:
+                found.setdefault(str(path.relative_to(ROOT)).replace("\\", "/"),
+                                 set()).add(_dotted(node.func))
+    return found
+
+
+def test_only_the_media_gate_decodes_user_photos():
+    offenders = {mod: calls for mod, calls in _decoder_calls().items()
+                 if mod != _GATE and mod not in _OWN_FILE_IMAGE_READERS}
+    assert offenders == {}, (
+        f"decode a user photo through src.content.media_gate, not directly: {offenders}")
+
+
+def test_cv2_imdecode_exists_only_in_the_media_gate():
+    uses = {mod for mod, calls in _decoder_calls().items() if "cv2.imdecode" in calls}
+    assert uses <= {_GATE}, f"cv2.imdecode used outside the gate: {uses}"
+
+
+def test_the_own_file_reader_list_has_no_stale_entries():
+    calls = _decoder_calls()
+    stale = sorted(m for m in _OWN_FILE_IMAGE_READERS if m not in calls)
+    assert stale == [], f"remove from _OWN_FILE_IMAGE_READERS (no decoder call): {stale}"

@@ -216,9 +216,9 @@ def main(argv=None):
         cv2.imwrite(str(out_dir / f"{args.name}_{args.profile}_{tag}.png"),
                     cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
 
-    from src.content.cv_io import imread_bgr
+    from src.content.media_gate import import_photo, load_rgb
 
-    original = cv2.cvtColor(imread_bgr(Path(args.image)), cv2.COLOR_BGR2RGB)
+    original = load_rgb(import_photo(Path(args.image)))
     centre = plain["x+0"]
     row = {
         "image": args.name, "profile": args.profile, "K": k,

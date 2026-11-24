@@ -56,7 +56,7 @@ class TestNoticeReachesTheToast(unittest.TestCase):
         self.toasts: list[str] = []
         app._content = SimpleNamespace(content_path="", content_type="", mode="")
         app._renderer = SimpleNamespace(
-            load_content_file=lambda p: (True, f"Loaded: {p.name}"),
+            load_content_file=lambda p, label=None: (True, f"Loaded: {label}"),
             show_toast=lambda m, **k: self.toasts.append(m),
             set_props=lambda items: None,
             take_content_notice=lambda: notice)

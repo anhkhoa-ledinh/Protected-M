@@ -18,7 +18,9 @@ from src.common.stage_profile import stage
 from src.content.bake import BakeWorker
 from src.content.depth_worker import DepthWorker
 from src.content.formats import detect_content_type
+from src.content import media_gate
 from src.content.image_source import ImageSource
+from src.content.media_gate import CleanPhoto, PhotoRejected
 from src.content.adaptive_k import AdaptiveKReport
 from src.content.debug_marks import paint_border, pad_colour
 from src.scene.window_box import box_layer_scale
@@ -273,6 +275,8 @@ class ContentPlaneRenderer:
         screen_height_mm: float = 194.0,
     ) -> None:
         self._content = content
+        # Photo that passed ``media_gate`` (None while a video is loaded).
+        self._clean: CleanPhoto | None = None
         # Kích thước màn hình vật lý, cần để tính overscan lúc dựng mesh.
         # Truyền từ SceneRenderer (nó có VirtualCamera) thay vì tự đọc
         # screen.json — một nguồn sự thật, và ContentPlane không phải biết
@@ -344,6 +348,11 @@ class ContentPlaneRenderer:
     @property
     def current_path(self) -> Path | None:
         return self._current_path
+
+    @property
+    def clean_photo(self) -> CleanPhoto | None:
+        """The checked copy of the photo on screen (``None`` for a video)."""
+        return self._clean
 
     @property
     def atmospheric_enabled(self) -> bool:
@@ -823,22 +832,33 @@ class ContentPlaneRenderer:
         Không chặn: đi đúng đường của một lượt nạp ảnh mới, nên toast chờ và
         cờ ``waiting_for_depth`` vẫn như cũ. Không có ảnh thì không làm gì.
         """
-        if self._bake_worker is None or self._current_path is None:
+        if (self._bake_worker is None or self._current_path is None
+                or self._clean is None):
             self.refresh_layers()
             return
         logger.info("Nuong lai bo lop (%s): khoa cua buoc nuong vua doi", reason)
         self._depth_mesh_key = None
         self._deferred_layers = None
         self._bake_worker.submit(DepthWorker.media_key(self._current_path),
-                                 self._current_path, self._content)
+                                 self._clean, self._content)
 
-    def load_file(self, path: Path, *, strict: bool = True) -> tuple[bool, str]:
+    def load_file(self, path: Path | CleanPhoto, *, strict: bool = True,
+                  label: str | None = None) -> tuple[bool, str]:
         """
         Replace current media with a new image or video file.
 
+        An image goes through ``media_gate`` first (unless the caller already
+        did and passes the ``CleanPhoto``); ``label`` is the name shown to
+        the user when ``path`` is a clean copy.
+
         Returns (success, user-facing message).
         """
-        kind = detect_content_type(path)
+        clean: CleanPhoto | None = None
+        if isinstance(path, CleanPhoto):
+            clean, path, kind = path, path.path, "image"
+        else:
+            kind = detect_content_type(path)
+        shown = label or path.name
         if kind is None:
             logger.error("Unsupported media type: %s", path)
             return False, "Unsupported file type"
@@ -851,9 +871,16 @@ class ContentPlaneRenderer:
                 "Media file not found: %s", path.resolve())
             return False, f"File not found: {path.name}"
 
+        if kind == "image" and clean is None:
+            try:
+                clean = media_gate.import_photo(path)
+            except PhotoRejected as exc:
+                return False, str(exc)
+
         try:
-            self._swap_source(path, kind)
-            self._current_path = path.resolve()
+            self._swap_source(clean if kind == "image" else path, kind)
+            self._clean = clean if kind == "image" else None
+            self._current_path = (clean.path if clean is not None else path).resolve()
             self._depth_mesh_key = None
             self._using_displaced_mesh = False
             self._mist_runtime_enabled = bool(self._content.mist_enabled)
@@ -862,10 +889,10 @@ class ContentPlaneRenderer:
             self._invalidate_texture()
             if self._ready:
                 if not self._prime_and_upload("load_file"):
-                    raise ValueError(f"Texture upload failed for {path.name}")
+                    raise ValueError(f"Texture upload failed for {shown}")
             logger.info(
                 "Content plane loaded: %s (%s, %dx%d)",
-                path.name,
+                shown,
                 kind,
                 self._tex_width,
                 self._tex_height,
@@ -876,7 +903,7 @@ class ContentPlaneRenderer:
             if notice is not None:
                 logger.info("%s", notice)
                 self._pending_notice = notice
-            return True, f"Loaded: {path.name}"
+            return True, f"Loaded: {shown}"
         except (FileNotFoundError, ValueError, OSError) as exc:
             logger.error("Failed to load media %s: %s", path.resolve(), exc)
             return False, str(exc)
@@ -1041,8 +1068,8 @@ class ContentPlaneRenderer:
             return
         self._last_depth_rgb = rgb.copy()
         if self._bake_worker is not None:
-            if not self._bake_worker.failed:
-                self._bake_worker.submit(key, self._current_path, self._content)
+            if not self._bake_worker.failed and self._clean is not None:
+                self._bake_worker.submit(key, self._clean, self._content)
             return
         if self._depth_worker is None or self._depth_worker.failed:
             return
@@ -1493,7 +1520,7 @@ class ContentPlaneRenderer:
         self._mist_shader.set_float("mistOpacity", self._mist.opacity)
         self._mist.mesh.draw()
 
-    def _swap_source(self, path: Path, kind: str) -> None:
+    def _swap_source(self, path: Path | CleanPhoto, kind: str) -> None:
         if self._source is not None:
             self._source.close()
             self._source = None
@@ -1508,7 +1535,6 @@ class ContentPlaneRenderer:
             self._source = ImageSource(path)
             self._is_video = False
 
-        self._current_path = path.resolve()
         self._resize_plane(self._source.aspect_ratio)
 
     def _resize_plane(self, aspect: float) -> None:

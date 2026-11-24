@@ -24,6 +24,7 @@ sys.path.insert(0, str(ROOT))
 from scripts.layer_review import review_set  # noqa: E402
 from src.config.schema import ContentSettings  # noqa: E402
 from src.content.bake import BakeWorker  # noqa: E402
+from src.content.media_gate import import_photo  # noqa: E402
 
 
 def main(argv=None):
@@ -46,7 +47,7 @@ def main(argv=None):
         row = {"image": name, "bake_s": None, "cache_s": None, "k": None,
                "cache_hit": False, "error": ""}
         t0 = time.perf_counter()
-        worker.submit(name, path, content)
+        worker.submit(name, import_photo(path), content)
         while worker.busy:
             worker.poll()
             time.sleep(0.2)
@@ -63,7 +64,7 @@ def main(argv=None):
 
         # Lần hai: phải trúng cache và không mở tiến trình nào.
         t1 = time.perf_counter()
-        worker.submit(name + "#2", path, content)
+        worker.submit(name + "#2", import_photo(path), content)
         row["cache_hit"] = not worker.busy
         again = worker.pop_ready(name + "#2")
         row["cache_s"] = round(time.perf_counter() - t1, 3)

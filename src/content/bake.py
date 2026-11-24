@@ -31,6 +31,8 @@ import cv2
 import numpy as np
 import numpy.typing as npt
 
+from src.content.media_gate import CleanPhoto
+
 logger = logging.getLogger(__name__)
 
 #: Phiên bản định dạng cache. Tăng số này là mọi thư mục cũ thành vô hiệu —
@@ -211,7 +213,7 @@ def load_from_cache(cache_dir: Path) -> BakeResult | None:
         return None
 
 
-def bake(image_path: Path, content, root: Path, *,
+def bake(photo: CleanPhoto, content, root: Path, *,
          use_cache: bool = True) -> BakeResult:
     """
     Nướng (hoặc đọc cache) bộ lớp của một ảnh. **Không đụng GL.**
@@ -224,7 +226,9 @@ def bake(image_path: Path, content, root: Path, *,
     from src.content.layer_clustering import cluster_into_layers
     from src.content.adaptive_k import select_optimal_k
 
-    image_path = Path(image_path)
+    if not isinstance(photo, CleanPhoto):
+        raise TypeError("bake needs a CleanPhoto from media_gate.import_photo")
+    image_path = photo.path
     cfg_sha = settings_hash(content)
     img_sha = image_hash(image_path)
     cache_dir = cache_dir_for(root, img_sha, cfg_sha)
@@ -236,7 +240,7 @@ def bake(image_path: Path, content, root: Path, *,
             return hit
 
     t0 = time.perf_counter()
-    rgb = ImageSource(image_path).tick(0.0)
+    rgb = ImageSource(photo).tick(0.0)
     if rgb is None:
         raise ValueError(f"khong doc duoc anh: {image_path}")
     estimator = DepthEstimator(content.depth_model, content.depth_backend)
@@ -410,7 +414,7 @@ def _disocclusion(content):
 
 # ────────────────────────── tiến trình con ──────────────────────────────────
 
-def _child_main(image_path: str, content_dict: dict, root: str,
+def _child_main(photo: CleanPhoto, content_dict: dict, root: str,
                 mark_env: dict, out: mp.Queue) -> None:
     """
     Thân của tiến trình con. **Hàm cấp module** — ``spawn`` phải pickle được nó.
@@ -428,7 +432,7 @@ def _child_main(image_path: str, content_dict: dict, root: str,
         from src.config.schema import ContentSettings
 
         content = ContentSettings.from_dict(content_dict)
-        result = bake(Path(image_path), content, Path(root))
+        result = bake(photo, content, Path(root))
         out.put(("ok", str(result.cache_dir), result.bake_s))
     except BaseException as err:                      # noqa: BLE001
         import traceback
@@ -472,8 +476,12 @@ class BakeWorker:
     def start(self) -> None:
         """Có để gọi được như ``DepthWorker``; tiến trình mở theo từng việc."""
 
-    def submit(self, key: str, path: Path, content) -> None:
-        """Xin nướng ảnh ``path``. Cache trúng thì xong ngay, không mở gì."""
+    def submit(self, key: str, photo: CleanPhoto, content) -> None:
+        """Xin nướng ảnh ``photo`` (đã qua ``media_gate``). Cache trúng thì xong
+        ngay, không mở gì."""
+        if not isinstance(photo, CleanPhoto):
+            raise TypeError("submit needs a CleanPhoto from media_gate.import_photo")
+        path = photo.path
         if key in self._ready or (self._job is not None and self._job[0] == key):
             return
         from dataclasses import asdict, is_dataclass
@@ -492,7 +500,7 @@ class BakeWorker:
         self._queue = self._ctx.Queue()
         self._proc = self._ctx.Process(
             target=_child_main,
-            args=(str(path), payload, str(self._root),
+            args=(photo, payload, str(self._root),
                   {k: os.environ.get(k, "") for k in MARK_ENVS}, self._queue),
             name="hcpd-bake", daemon=True)
         self._proc.start()

@@ -30,7 +30,9 @@ import uuid
 from pathlib import Path
 from urllib.parse import quote
 
-from PIL import Image, ImageOps
+from PIL import Image
+
+from src.content import media_gate
 
 logger = logging.getLogger(__name__)
 
@@ -82,13 +84,15 @@ def can_upload(config: dict | None = None) -> bool:
 
 
 def _reencode(path) -> bytes | None:
-    """JPEG, long side <= 2048 px, quality 90, no EXIF. ``None`` = not a photo."""
+    """JPEG, long side <= 2048 px, quality 90, no EXIF. ``None`` = not a photo.
+
+    The file is read only through ``media_gate`` (checked, EXIF turned into
+    pixels, long side capped); here it is just encoded as JPEG."""
     try:
-        image = ImageOps.exif_transpose(Image.open(path))
-        image.load()
-    except (OSError, ValueError):
+        rgb = media_gate.load_rgb(media_gate.import_photo(path))
+    except (media_gate.PhotoRejected, ValueError):
         return None
-    image = image.convert("RGB")
+    image = Image.fromarray(rgb, "RGB")
     image.thumbnail((MAX_SIDE_PX, MAX_SIDE_PX), Image.LANCZOS)
     buffer = io.BytesIO()
     image.save(buffer, "JPEG", quality=JPEG_QUALITY)  # no exif= kwarg: EXIF dropped
@@ -265,14 +269,13 @@ def pick_random(items: list[dict], rng: random.Random | None = None) -> dict:
 
 
 def verify_photo(path, max_side: int = MAX_PHOTO_SIDE_PX) -> bool:
-    """Decodes as an image and is no larger than ``max_side`` on the long side."""
+    """Passes ``media_gate`` and is no larger than ``max_side`` on the long side."""
     try:
-        with Image.open(path) as image:
-            width, height = image.size
-            image.verify()
-    except (OSError, ValueError):
+        media_gate.import_photo(path, allowed_root=Path(path).parent,
+                                max_side_px=max_side)
+    except media_gate.PhotoRejected:
         return False
-    return 0 < max(width, height) <= max_side
+    return True
 
 
 def pick_random_and_download(dest_dir, rng: random.Random | None = None) -> Path | str:

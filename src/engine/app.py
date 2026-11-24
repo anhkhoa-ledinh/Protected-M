@@ -35,7 +35,7 @@ from src.content.prop_game import (
 )
 from src.content.prop_probe import probe_at, probe_props
 from src.content.prop_rest_eye import REST_MEASURE_S, rest_eye, spread_mm, z_rest_mm
-from src.content import shared_album
+from src.content import media_gate, shared_album
 from src.content.shared_album_worker import SharedAlbumWorker, PENDING as SHARE_PENDING
 from src.config.schema import AppConfig, ContentSettings, UiSettings, _merge_dataclass
 from src.gui.file_dialog import pick_media_file
@@ -437,7 +437,7 @@ class HcpdApplication:
                 self._screen_cal["screen_height"])
         return build_room_scene()
 
-    def _try_load_media(self, path: Path, now: float) -> None:
+    def _try_load_media(self, path: Path, now: float, *, clean=None) -> None:
         """
         Load image/video via picker or drag-drop; persist on success.
 
@@ -451,7 +451,10 @@ class HcpdApplication:
             self._renderer.show_toast("Unsupported file type", is_error=True)
             return
 
-        ok, msg = self._renderer.load_content_file(path)
+        # An image goes through ``media_gate`` inside ``load_content_file``
+        # (``clean``: the caller already did it, e.g. for a PvP photo).
+        ok, msg = self._renderer.load_content_file(
+            clean if clean is not None else path, label=path.name)
         if not ok:
             self._renderer.show_toast(msg, is_error=True)
             return
@@ -964,15 +967,15 @@ class HcpdApplication:
         lạ) trả ``None`` và ``assign_bug_camo`` bị bỏ qua — con bọ khi đó vẽ
         không nguỵ trang, không phải lỗi chết ván.
         """
-        from src.content.cv_io import imread_bgr
+        from src.content import media_gate
 
+        photo = self._renderer.current_clean_photo
+        if photo is None:
+            return None
         try:
-            bgr = imread_bgr(Path(self._content.content_path))
+            return media_gate.load_rgb(photo)
         except (OSError, ValueError):
             return None
-        if bgr is None:
-            return None
-        return bgr[..., ::-1]
 
     def _aim_context(self):
         """
@@ -1583,8 +1586,15 @@ class HcpdApplication:
         cache_dir.mkdir(parents=True, exist_ok=True)
         path = cache_dir / f"{local_sha1}.jpg"
         path.write_bytes(data)
+        # The other player's file is only ever loaded as a clean copy.
+        try:
+            clean = media_gate.import_photo(path, allowed_root=cache_dir)
+        except media_gate.PhotoRejected as exc:
+            path.unlink(missing_ok=True)
+            self._album.flow.say(state, str(exc))
+            return
         state.photo = path
-        self._try_load_media(path, now)
+        self._try_load_media(path, now, clean=clean)
         self._pvp_photo_ready = True
 
     def _pvp_lobby_message(self) -> str:

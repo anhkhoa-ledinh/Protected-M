@@ -301,13 +301,20 @@ class SceneRenderer:
 
         return ContentPlaneRenderer.DEPTH_STEP_M
 
-    def load_content_file(self, path: Path) -> tuple[bool, str]:
-        """Hot-swap the content plane media without restarting."""
+    def load_content_file(self, path, *, label: str | None = None) -> tuple[bool, str]:
+        """Hot-swap the content plane media without restarting. ``path`` is a
+        ``Path`` or an already checked ``media_gate.CleanPhoto``."""
         if self._project_root is None or self._content is None:
             return False, "Content system not initialized"
         self._ensure_content_plane()
         assert self._video_plane is not None
-        return self._video_plane.load_file(path)
+        return self._video_plane.load_file(path, label=label)
+
+    @property
+    def current_clean_photo(self):
+        """``media_gate.CleanPhoto`` on screen now (``None``: a video or none)."""
+        plane = self._video_plane
+        return None if plane is None else plane.clean_photo
 
     def _ensure_content_plane(self) -> None:
         if self._video_plane is not None:

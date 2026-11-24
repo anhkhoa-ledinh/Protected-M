@@ -96,6 +96,8 @@ class _Renderer:
     def layer_records(self):
         return []
 
+    current_clean_photo = None      # no photo on screen: camo is skipped
+
     def show_toast(self, text, is_error=False) -> None:
         self.toasts.append(text)
 

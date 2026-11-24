@@ -81,7 +81,9 @@ def _wait_for_bake(image_path: Path, content):
 
     worker = BakeWorker(ROOT)
     key = str(image_path)
-    worker.submit(key, image_path, content)
+    from src.content.media_gate import import_photo
+
+    worker.submit(key, import_photo(image_path), content)
     t0 = time.perf_counter()
     while worker.busy:
         worker.poll()
@@ -190,7 +192,7 @@ def _export_bugs(layers, content, scaled_w_m: float, scaled_h_m: float,
     khác hẳn ``scaled_w_m``/``scaled_h_m`` (kích thước QUAD của lớp, chỉ dùng
     để đặt chỗ/ẩn-hiện).
     """
-    from src.content.cv_io import imread_bgr
+    from src.content.media_gate import import_photo, load_rgb
     from src.content.hidden_props import LayerPlane
     from src.content.prop_game import start_game
     from src.ui_album.bugs import assign_bug_camo, assign_bug_sizes
@@ -208,9 +210,8 @@ def _export_bugs(layers, content, scaled_w_m: float, scaled_h_m: float,
                       time.perf_counter(), Path(image_path).name,
                       count=count)
     assign_bug_sizes(game.props, Path(image_path).name)
-    bgr = imread_bgr(image_path)
-    if bgr is not None:
-        rgb = bgr[..., ::-1]
+    rgb = load_rgb(import_photo(image_path))
+    if rgb is not None:
         assign_bug_camo(game.props, rgb, REST_EYE_MM,
                         (screen_w_m * 1000.0, screen_h_m * 1000.0))
     return [{"pos_mm": list(prop["pos_mm"]), "radius_mm": float(radius_mm),

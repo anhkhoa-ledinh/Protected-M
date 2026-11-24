@@ -85,7 +85,7 @@ def main(argv=None):
     estimator = DepthEstimator(str(cs.depth_model), str(cs.depth_backend))
     rows = []
     for name in NAMES:
-        rgb = ImageSource(folder / f"{name}.png").tick(0.0)
+        rgb = ImageSource(import_photo(folder / f"{name}.png")).tick(0.0)
         depth = estimator.estimate(rgb)
         k, _ = select_optimal_k(
             depth, k_min=int(cs.adaptive_k_min), k_max=int(cs.adaptive_k_max),
