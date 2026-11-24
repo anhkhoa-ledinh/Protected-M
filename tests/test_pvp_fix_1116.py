@@ -141,7 +141,8 @@ class PvpNeverSendsDebugSpheresToTheRendererTest(unittest.TestCase):
         app._bugs = SimpleNamespace(reset=lambda: None)
         app._content = SimpleNamespace(game_prop_radius_mm=6.0,
                                        overscan_design_eye_mm=(0.0, 85.0))
-        app._album = SimpleNamespace(game=None, flow=F, state=F.V3Flow())
+        app._album = SimpleNamespace(game=None, flow=F, state=F.V3Flow(),
+                                charge_items=lambda items: True)
         app._game = None
         app._game_planes = ()
         app._game_layers_revision = 0

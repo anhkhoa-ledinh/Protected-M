@@ -74,6 +74,10 @@ class _Manifest:
 
 class _UI:
     flow = F
+
+    @staticmethod
+    def charge_items(items):
+        return True
     manifest = _Manifest()
 
     def __init__(self) -> None:

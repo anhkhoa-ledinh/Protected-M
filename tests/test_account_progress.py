@@ -257,8 +257,10 @@ def test_board_you_row_uses_real_history(manifest_and_painter):
     flow = F.V3Flow()
     flow.go(F.BOARD)
     flow.player = "Bo"   # short enough that "You · Bo" fits unfitted
-    flow.history = {"a.jpg": {"score": 300}, "b.jpg": {"score": 150}}
-    state = v3_values.state_for(manifest, painter, flow)
+    flow.account_key = "bo"
+    accounts = {"accounts": {"bo": {"display": "Bo", "earned_total": 300,
+                                    "levels_cleared": [1]}}}
+    state = v3_values.state_for(manifest, painter, flow, accounts=accounts)
     assert state.texts["you_score"] == "300"
     assert state.texts["you_name"] == "You · Bo"
 
@@ -272,7 +274,7 @@ def test_board_you_row_name_is_fitted(manifest_and_painter):
     state = v3_values.state_for(manifest, painter, flow)
     record = manifest.text(F.BOARD, "you_name")
     width = painter.text_width([record["runs"][0]], [state.texts["you_name"]])
-    assert width <= float(record["rect"][2])
+    assert width <= float(state.text_rect["you_name"][2])   # the row's real width
 
 
 @pytest.fixture
