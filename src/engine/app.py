@@ -74,7 +74,7 @@ HOOK_ENV_VARS = (
     "HCPD_PERF_PROFILE", "HCPD_PVP_AUTO", "HCPD_PVP_SHOTS",
     "HCPD_PROP_PROBE", "HCPD_VIDEO_STATS", "HCPD_HUD_FIX_1119_SHOTS",
     "HCPD_ALBUM_AUTOWIN", "HCPD_BUG_SEED", "HCPD_ECONOMY_1124",
-    "HCPD_HARDENING_1124_SHOTS", "HCPD_BAD_PHOTO_1124",
+    "HCPD_HARDENING_1124_SHOTS", "HCPD_BAD_PHOTO_1124", "HCPD_DISPLAY_MODE",
 )
 
 #: Bug-placement seed an automatch run uses unless ``HCPD_BUG_SEED`` says
@@ -241,6 +241,10 @@ class HcpdApplication:
         from src.config import prefs as _prefs
 
         self._prefs = _prefs.load(project_root)
+        # Dev hook: a scripted run may force the windowed mode (the pin tool
+        # then sets the geometry), whatever the user's own prefs say.
+        if os.environ.get("HCPD_DISPLAY_MODE") == "window":
+            self._prefs = {**self._prefs, "display": "window"}
         self._window = GlfwWindow(config.renderer, demo=self._demo,
                                   album=self._album_options.enabled,
                                   ui_v3=self._album_options.is_v3,
