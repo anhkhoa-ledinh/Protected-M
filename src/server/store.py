@@ -7,12 +7,39 @@ import os
 import sqlite3
 import threading
 import time
+from contextlib import contextmanager
 from pathlib import Path
 
 #: Migrations run in order; the index + 1 is the schema version.
 MIGRATIONS: list[str] = [
     """
     CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+    """,
+    # 2 (C2): accounts and sessions. CHECKs keep the wallet >= 0 even if a
+    # bug slips past the application code.
+    """
+    CREATE TABLE accounts (
+        key TEXT PRIMARY KEY,
+        display TEXT NOT NULL,
+        pw_hash TEXT NOT NULL,
+        rec_hash TEXT NOT NULL,
+        wallet INTEGER NOT NULL CHECK (wallet >= 0),
+        earned_total INTEGER NOT NULL DEFAULT 0 CHECK (earned_total >= 0),
+        levels_cleared TEXT NOT NULL DEFAULT '[]',
+        progress TEXT NOT NULL DEFAULT '{}',
+        failures INTEGER NOT NULL DEFAULT 0,
+        locked_until REAL NOT NULL DEFAULT 0,
+        created_at REAL NOT NULL,
+        last_signed_in_at REAL NOT NULL
+    );
+    CREATE TABLE sessions (
+        token_hash TEXT PRIMARY KEY,
+        account_key TEXT NOT NULL REFERENCES accounts(key) ON DELETE CASCADE,
+        created_at REAL NOT NULL,
+        expires_at REAL NOT NULL,
+        revoked INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX sessions_account ON sessions(account_key);
     """,
 ]
 
@@ -47,6 +74,19 @@ class Store:
         if conn is not None:
             conn.close()
             self._local.conn = None
+
+    @contextmanager
+    def transaction(self):
+        """``BEGIN IMMEDIATE`` ... ``COMMIT`` (``ROLLBACK`` on an error): the
+        write lock is taken up front, so two writers never interleave."""
+        conn = self.connect()
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            yield conn
+        except BaseException:
+            conn.execute("ROLLBACK")
+            raise
+        conn.execute("COMMIT")
 
     def schema_version(self) -> int:
         return self.connect().execute("PRAGMA user_version").fetchone()[0]

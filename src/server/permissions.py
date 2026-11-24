@@ -17,6 +17,13 @@ ROLES = (ANONYMOUS, PLAYER, ADMIN)
 PERMISSIONS: dict[str, str] = {
     "hello": ANONYMOUS,
     "ping": ANONYMOUS,
+    # C2: accounts
+    "sign_up": ANONYMOUS,
+    "sign_in": ANONYMOUS,
+    "recover": ANONYMOUS,
+    "resume": ANONYMOUS,
+    "logout": PLAYER,
+    "me": PLAYER,
 }
 
 

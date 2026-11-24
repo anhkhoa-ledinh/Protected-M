@@ -18,10 +18,11 @@ class RequestError(Exception):
     """A normal failure: the client gets an ``error`` reply, the connection
     stays open."""
 
-    def __init__(self, code: str, msg: str = "") -> None:
+    def __init__(self, code: str, msg: str = "", **extra) -> None:
         super().__init__(code)
         self.code = code
         self.msg = msg or code
+        self.extra = extra          # e.g. retry_after for "locked"
 
 
 class ProtocolViolation(Exception):
@@ -34,6 +35,7 @@ class ConnState:
     role: str = ANONYMOUS
     account: str | None = None      # case-folded account key, set by sign-in
     greeted: bool = False
+    token_hash: str | None = None   # SHA-256 of this connection's session token
 
 
 #: handler(ctx, state, msg) -> dict of extra reply fields
@@ -62,6 +64,9 @@ class Dispatcher:
                 raise RequestError("forbidden", "not available over the network")
             if not state.greeted and mtype not in ("hello", "ping"):
                 raise ProtocolViolation("hello_required")
+            alive = getattr(self.ctx, "session_alive", None)
+            if alive is not None and state.token_hash and not alive(state):
+                state.role, state.account, state.token_hash = ANONYMOUS, None, None
             if not role_allows(state.role, need):
                 raise RequestError("forbidden", "sign in first")
             handler = self.handlers.get(mtype)
@@ -71,7 +76,8 @@ class Dispatcher:
             reply = {"t": "ok", "re": mtype}
             reply.update(data)
         except RequestError as exc:
-            reply = {"t": "error", "re": mtype, "code": exc.code, "msg": exc.msg}
+            reply = {"t": "error", "re": mtype, "code": exc.code, "msg": exc.msg,
+                     **exc.extra}
         except ProtocolViolation:
             raise
         except Exception:   # a handler bug must not take the server down

@@ -44,14 +44,14 @@ GUEST_KEY = account_rules.GUEST_KEY
 
 #: "Remember me" session lifetime (task's own number) and the sign-in
 #: failure throttle (task's own numbers).
-SESSION_LIFETIME_S = 30.0 * 24.0 * 3600.0
-MAX_FAILURES = 5
-COOLDOWN_S = 30.0
+SESSION_LIFETIME_S = account_rules.SESSION_LIFETIME_S
+MAX_FAILURES = account_rules.MAX_FAILURES
+COOLDOWN_S = account_rules.COOLDOWN_S
 
 #: Points economy. ``wallet`` is spendable; ``earned_total`` only ever grows
 #: (the leaderboard ranks by it); ``levels_cleared`` is the set of solo levels
 #: won at least once (stored as a sorted list).
-STARTING_WALLET = 100
+STARTING_WALLET = account_rules.STARTING_WALLET
 
 
 def accounts_path(root) -> Path:

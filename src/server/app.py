@@ -10,6 +10,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 from src.net.protocol import LineReader, ProtocolError, encode
+from src.server import accounts
 from src.server.config import ServerConfig
 from src.server.dispatch import ConnState, Dispatcher, ProtocolViolation
 from src.server.handlers import HANDLERS
@@ -23,11 +24,21 @@ _READ_CHUNK = 16 * 1024
 
 
 class Context:
-    """What handlers may use: settings and the store."""
+    """What handlers may use: settings, the store, the clock, the budget for
+    slow (hashing) requests."""
 
-    def __init__(self, config: ServerConfig, store: Store) -> None:
+    def __init__(self, config: ServerConfig, store: Store, clock=time.time) -> None:
         self.config = config
         self.store = store
+        self.clock = clock
+        self.heavy = IpLimiter(config.max_conns_per_ip, config.heavy_rate_per_s,
+                               config.heavy_burst, config.connects_per_min_per_ip)
+
+    def session_alive(self, state) -> bool:
+        """Is this connection's session still valid? Checked on every request,
+        so a revoked or expired token stops working at once."""
+        return accounts.session_account(self.store, state.token_hash,
+                                        self.clock()) is not None
 
 
 def build_ssl_context(cfg: ServerConfig) -> ssl.SSLContext | None:

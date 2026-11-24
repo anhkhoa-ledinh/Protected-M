@@ -36,7 +36,7 @@ registered handler and fails if one has no row (and if a row has no handler).
 |---|---|---|
 | `hello`, `ping` | anonymous | C1 |
 | `sign_up`, `sign_in`, `recover`, `resume` | anonymous | C2 |
-| `sign_out`, `me` | player | C2 |
+| `logout`, `me` | player | C2 |
 | `start_match`, `finish_match`, `leaderboard`, `buy` | player | C3 |
 | `create_room`, `join_room`, `queue`, `photo`, `bugs`, `ready`, `hit`, `killed`, `used_item`, `eye`, `relocate`, `end`, `rematch`, `cancel`, `rejoin` | player | C5 |
 
@@ -60,6 +60,8 @@ path inside it). Created with mode 0700.
 | 3. Oversized or malformed input (N2) | Line cap 64 KiB for every connection (the API needs less); the cap is checked on the raw buffer before a newline arrives. Any `ProtocolError` closes the connection. Handlers validate every field. Nothing is logged from a message body. |
 | 2. PvP photo relay unchecked (P7, N5) | C5: a `photo` needs a signed-in player in the room; the server raises the line cap for that one type only, checks base64, byte size and the pixel/size limits of the photo gate (header only, never a full decode), and drops the room on a violation. The receiving client still runs the photo gate. |
 | 4. Remote data trusted (P5) | The server never fetches a URL and never writes a client-chosen file name; the shared album stays a client-side matter (already behind the photo gate). |
+| Guessing passwords or tokens (C2) | 5 wrong tries lock one name for 30 s (stored in SQLite, survives a restart; same numbers as the local game). Unknown name and wrong password give the same reply and cost the same time (dummy hash). Sign-up, sign-in and recovery also share a stricter per-IP budget (1/s, burst 5) because scrypt is slow, and the account count is capped. Tokens are 32 random bytes; only their SHA-256 is stored; a token lasts 30 days, `logout`, recovery and the admin CLI revoke it, and a revoked token stops working on live connections at the next request. |
+| Secrets in logs (C2) | Handlers never log a message body, a password, a token or a recovery code; `tests/test_server_accounts.py` runs the real server, signs up/in/recovers and greps its log. |
 | Cheating client (N4) | The server never believes a score or a wallet value from a client (C3). |
 
 ## What the server cannot verify

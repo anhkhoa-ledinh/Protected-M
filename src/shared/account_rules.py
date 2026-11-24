@@ -15,6 +15,14 @@ RESULT_OK = "ok"
 RESULT_UNKNOWN = "unknown"
 RESULT_WRONG = "wrong"
 
+#: Sessions ("Remember me") last 30 days; 5 wrong tries in a row lock one
+#: name for 30 s; a new account starts with 100 points. Same numbers for the
+#: local store and the central server.
+SESSION_LIFETIME_S = 30.0 * 24.0 * 3600.0
+MAX_FAILURES = 5
+COOLDOWN_S = 30.0
+STARTING_WALLET = 100
+
 RECOVERY_CODE_CHARS = 12
 RECOVERY_GROUP_SIZE = 4
 
