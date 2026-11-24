@@ -188,3 +188,45 @@ def economy(row: sqlite3.Row) -> dict:
         cleared = []
     return {"display": row["display"], "wallet": int(row["wallet"]),
             "earned_total": int(row["earned_total"]), "levels_cleared": cleared}
+
+
+# ---- one-shot import of a local accounts.json (admin CLI only) -----------------------
+
+def _hash_ok(value) -> bool:
+    return isinstance(value, str) and value.startswith("scrypt$") and value.count("$") == 5
+
+
+def import_local(store: Store, data: dict, now: float) -> tuple[int, list[str]]:
+    """Add the accounts of a COPY of the game's ``accounts.json``. Password and
+    recovery hashes move as hashes; nothing is ever re-hashed or shown.
+    Returns ``(imported, [skipped name: why])``. Existing names are kept."""
+    imported, skipped = 0, []
+    for raw_key, rec in (data.get("accounts") or {}).items():
+        if not isinstance(rec, dict):
+            continue
+        display, why = rules.validate_username(str(rec.get("display") or raw_key))
+        if display is None:
+            skipped.append(f"{raw_key}: {why}")
+            continue
+        if not (_hash_ok(rec.get("password_hash")) and _hash_ok(rec.get("recovery_hash"))):
+            skipped.append(f"{display}: no usable hashes")
+            continue
+        try:
+            wallet = max(0, int(rec.get("wallet", rules.STARTING_WALLET)))
+            earned = max(0, int(rec.get("earned_total", 0)))
+            cleared = sorted({int(n) for n in rec.get("levels_cleared") or () if 1 <= int(n) <= 5})
+        except (TypeError, ValueError):
+            skipped.append(f"{display}: bad numbers")
+            continue
+        try:
+            with store.transaction() as conn:
+                conn.execute(
+                    "INSERT INTO accounts (key, display, pw_hash, rec_hash, wallet,"
+                    " earned_total, levels_cleared, created_at, last_signed_in_at)"
+                    " VALUES (?,?,?,?,?,?,?,?,?)",
+                    (rules.username_key(display), display, rec["password_hash"],
+                     rec["recovery_hash"], wallet, earned, json.dumps(cleared), now, now))
+            imported += 1
+        except sqlite3.IntegrityError:
+            skipped.append(f"{display}: name already on the server")
+    return imported, skipped

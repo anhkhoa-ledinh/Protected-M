@@ -87,6 +87,10 @@ class AccountMixin:
     def _apply_sign_in_result(self, result) -> None:
         outcome, key = result
         now = time.perf_counter()
+        if outcome == account_rules.RESULT_OFFLINE:
+            self.state.sign_in_error = "Can't reach the server. Try again, or play as guest."
+            self.state.go(F.SIGN_IN_ERR)
+            return
         if outcome == account_rules.RESULT_OK:
             self._accounts.throttle_reset(key)
             self.state.account_key = key
@@ -130,6 +134,11 @@ class AccountMixin:
 
     def _apply_sign_up_result(self, result) -> None:
         outcome, key, code = result
+        if outcome == account_rules.RESULT_OFFLINE:
+            self.state.touched.add(ID.FIELD_USER)
+            self.state.hint_bad = True
+            self.state.hint_text = "Can't reach the server"
+            return
         if outcome == "taken":
             self.state.touched.add(ID.FIELD_USER)
             self.state.hint_bad = True
@@ -166,6 +175,9 @@ class AccountMixin:
     def _apply_forgot_result(self, result) -> None:
         outcome, key, new_code = result
         now = time.perf_counter()
+        if outcome == account_rules.RESULT_OFFLINE:
+            self.state.forgot_error = "Can't reach the server. Try again."
+            return
         if outcome == account_rules.RESULT_OK:
             self._accounts.throttle_reset(key)
             self.state.forgot_open = False
@@ -243,16 +255,26 @@ class AccountMixin:
         self.state.earned_total = eco["earned_total"]
         self.state.levels_cleared = tuple(eco["levels_cleared"])
 
-    def charge_items(self, items) -> bool:
+    def charge_items(self, items, mode: str = "solo") -> bool:
         """Pay for ``items`` when a match starts. ``True`` = go on (paid,
         or a guest, or nothing to pay); ``False`` = cannot afford, nothing
-        taken (the caller keeps the player on the loadout)."""
+        taken (the caller keeps the player on the loadout). On the central
+        server a signed-in player always asks, even for no items: the server
+        needs the ticket that the end of the match closes."""
         cost = self.state.price_total(items)
         key = self.state.account_key
-        if cost <= 0 or self._accounts.economy(key) is None:
+        if self._accounts.economy(key) is None:
             return True
-        if not self._accounts.spend(key, cost):
+        if cost <= 0 and not self._accounts.wants_ticket:
+            return True
+        outcome = self._accounts.begin_match(key, self.state.level, list(items),
+                                             cost, mode)
+        if outcome != "ok":
             self.sync_economy()
+            if outcome == "offline":
+                F.say(self.state, "Can't reach the server - playing without items.")
+            elif outcome == "locked_mode":
+                F.say(self.state, "Win levels 1-5 to unlock PvP.")
             return False
         self._save_accounts()
         self.sync_economy()
@@ -266,21 +288,23 @@ class AccountMixin:
             F.say(self.state, "Couldn't save your points.")
 
     def note_match_finished(self, won: bool = False, level: int = 0,
-                            score: int = 0) -> None:
+                            score: int = 0, used: dict | None = None) -> int:
         """TASK_accounts_1119 Phase 5: call once right after a match
         result is written into ``state.history`` (``app.py``'s
         ``_tick_album_match``). A signed-in account saves immediately;
         a guest instead gets a ONE-TIME toast (never saved — this IS the
         explanation why)."""
-        if won:
-            self._accounts.record_win(self.state.account_key, level, score)
+        key = self.state.account_key
+        if self._accounts.economy(key) is not None:
+            score = self._accounts.end_match(key, level, won, dict(used or {}), score)
             self.sync_economy()
-        if self.state.account_key == account_rules.GUEST_KEY:
+        if key == account_rules.GUEST_KEY:
             if not self._guest_toast_shown:
                 self._guest_toast_shown = True
                 F.say(self.state, "Playing as guest — create an album to keep your scores.")
-            return
+            return score
         self.save_progress()
+        return score
 
     def _load_progress(self, key: str) -> None:
         """The other half of ``save_progress`` — called right after a

@@ -1,0 +1,6 @@
+{
+  "mode": "local",
+  "host": "192.168.1.10",
+  "port": 47830,
+  "cert": "central_cert.pem"
+}

@@ -75,7 +75,7 @@ HOOK_ENV_VARS = (
     "HCPD_PERF_PROFILE", "HCPD_PVP_AUTO", "HCPD_PVP_SHOTS",
     "HCPD_PROP_PROBE", "HCPD_VIDEO_STATS", "HCPD_HUD_FIX_1119_SHOTS",
     "HCPD_ALBUM_AUTOWIN", "HCPD_BUG_SEED", "HCPD_ECONOMY_1124",
-    "HCPD_HARDENING_1124_SHOTS", "HCPD_BAD_PHOTO_1124", "HCPD_DISPLAY_MODE", "HCPD_RELOAD_1124",
+    "HCPD_HARDENING_1124_SHOTS", "HCPD_BAD_PHOTO_1124", "HCPD_CENTRAL_CONFIG", "HCPD_DISPLAY_MODE", "HCPD_RELOAD_1124",
 )
 
 #: Bug-placement seed an automatch run uses unless ``HCPD_BUG_SEED`` says
@@ -1364,11 +1364,22 @@ class HcpdApplication:
                 # TASK_accounts_1119 Phase 5: save right after a match
                 # result (a signed-in account) or the one-time guest
                 # toast (never saved) — see V3UI.note_match_finished.
-                self._album.note_match_finished(
+                final = self._album.note_match_finished(
                     won=(ended == "win"), level=match.level,
-                    score=match.score())
+                    score=match.score(), used=dict(match.used))
+                if final != state.last_result["score"]:
+                    # The central server scores with its own clock.
+                    state.last_result["score"] = final
+                    if state.photo is not None:
+                        state.history[str(state.photo)]["score"] = final
             state.go(F.WIN if ended == "win" else F.LOSE)
             self._album.game = None
+
+    def _central_config_path(self) -> Path:
+        """``assets/config/central.json`` (absent = play locally);
+        ``HCPD_CENTRAL_CONFIG`` points a scripted run at another file."""
+        override = self._devtools.env("HCPD_CENTRAL_CONFIG").strip()
+        return Path(override) if override else self._root / "assets" / "config" / "central.json"
 
     # ---- TASK_pvp_lan_1116: PvP over LAN --------------------------------
     # Network I/O itself never runs here — ``PvpClient`` owns a background
@@ -1792,7 +1803,7 @@ class HcpdApplication:
             self._bugs.reset()
         weapon = state.weapon_name() or F.WEAPONS[0]
         items = list(state.items)
-        if not self._album.charge_items(items):
+        if not self._album.charge_items(items, state.mode):
             F.say(state, "Not enough points for these items — going in without.")
             items = []
         match = start_match(state.level, self._game, weapon, items,
@@ -2505,13 +2516,14 @@ class HcpdApplication:
                     account_root = tmp_dir
                 else:
                     account_root = self._root
-                from src.account.service import LocalAccountService
+                from src.account.remote import build_account_service
                 from src.services.prefs_service import LocalPrefsService
                 from src.services.shared_album_service import LocalSharedAlbumService
 
                 self._album = V3UI(self._root, self._shader_dir,
                                    self._album_options, window=self._window,
-                                   accounts=LocalAccountService(account_root),
+                                   accounts=build_account_service(
+                                       account_root, self._central_config_path()),
                                    shared_album=LocalSharedAlbumService(),
                                    prefs=LocalPrefsService(self._root))
                 self._register_album_actions()

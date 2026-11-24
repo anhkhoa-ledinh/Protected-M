@@ -6,6 +6,7 @@ network path to anything in here (docs/server.md, "Roles")."""
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 import time
 from pathlib import Path
@@ -76,7 +77,29 @@ def cmd_delete_account(store: Store, args) -> int:
     return 0
 
 
+def cmd_import_accounts(store: Store, args) -> int:
+    """``import-accounts <file>``: one-shot move of a COPY of the game's
+    accounts.json. Run on the server machine; the file is only read."""
+    if not args.name:
+        print("usage: import-accounts <path to a copy of accounts.json>", file=sys.stderr)
+        return 2
+    try:
+        data = json.loads(Path(args.name).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        print(f"cannot read {args.name}: {type(exc).__name__}", file=sys.stderr)
+        return 2
+    if not isinstance(data, dict):
+        print("not an accounts.json", file=sys.stderr)
+        return 2
+    imported, skipped = accounts.import_local(store, data, time.time())
+    print(f"imported {imported} accounts, skipped {len(skipped)}")
+    for line in skipped:
+        print(f"  skipped {line}")
+    return 0
+
+
 COMMANDS = {
+    "import-accounts": cmd_import_accounts,
     "info": lambda store, args: cmd_info(store),
     "list-accounts": cmd_list_accounts,
     "unlock": cmd_unlock,

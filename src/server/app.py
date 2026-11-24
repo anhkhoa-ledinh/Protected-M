@@ -71,6 +71,7 @@ class CentralServer:
         self._server = await asyncio.start_server(
             self._on_client, self.config.host, self.config.port,
             ssl=build_ssl_context(self.config), backlog=128,
+            ssl_shutdown_timeout=(None if self.config.insecure_localhost else 3.0),
             ssl_handshake_timeout=(None if self.config.insecure_localhost
                                    else self.config.handshake_timeout_s))
         self.port = self._server.sockets[0].getsockname()[1]
@@ -82,7 +83,7 @@ class CentralServer:
         if self._server is not None:
             self._server.close()
             for writer in list(self._writers):   # wait_closed waits for them
-                writer.close()
+                writer.transport.abort()          # no TLS goodbye: a stuck peer must not block
             await self._server.wait_closed()
         self._pool.shutdown(wait=False, cancel_futures=True)
         self.store.close()

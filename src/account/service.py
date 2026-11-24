@@ -90,6 +90,25 @@ class AccountService(ABC):
     def save(self) -> None:
         """Persist what changed in memory; raises on failure."""
 
+    #: True when a signed-in player needs a ticket even for a free match.
+    wants_ticket = False
+
+    # -- a match, as the economy sees it (the local default = today's rules)
+    def begin_match(self, key: str, level: int, items: list, cost: int,
+                    mode: str = "solo") -> str:
+        """Pay for ``items`` and start the match: ``"ok"``, ``"no_funds"``,
+        ``"locked"`` (PvP not open) or ``"offline"``. Locally the game names
+        the ``cost``; on the central server the server prices the items."""
+        return "ok" if cost <= 0 or self.spend(key, cost) else "no_funds"
+
+    def end_match(self, key: str, level: int, won: bool, used: dict,
+                  score: int) -> int:
+        """The match is over. Returns the score that counts (locally the one
+        the game computed; on the server, the server's own)."""
+        if won:
+            self.record_win(key, level, score)
+        return score
+
 
 class LocalAccountService(AccountService):
     def __init__(self, root) -> None:

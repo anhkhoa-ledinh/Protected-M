@@ -14,6 +14,8 @@ import unicodedata
 RESULT_OK = "ok"
 RESULT_UNKNOWN = "unknown"
 RESULT_WRONG = "wrong"
+#: Only the central-server service returns this: the server did not answer.
+RESULT_OFFLINE = "offline"
 
 #: Sessions ("Remember me") last 30 days; 5 wrong tries in a row lock one
 #: name for 30 s; a new account starts with 100 points. Same numbers for the
