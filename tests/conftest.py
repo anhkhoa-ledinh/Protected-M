@@ -18,6 +18,7 @@ resource-less machine to prove the suite survives their absence.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 import sys
@@ -26,6 +27,26 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _config_md5s() -> dict[str, str]:
+    cfg = ROOT / "assets" / "config"
+    return {f.name: hashlib.md5(f.read_bytes()).hexdigest()
+            for f in sorted(cfg.glob("*.json"))}
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _real_config_untouched():
+    """Fail the session if any test changed a file in ``assets/config``
+    (the user's real accounts, prefs, ...). Tests must use a temp root."""
+    before = _config_md5s()
+    yield
+    after = _config_md5s()
+    changed = sorted(n for n in before.keys() | after.keys()
+                     if before.get(n) != after.get(n))
+    if changed:
+        pytest.fail("tests touched the real config: " + ", ".join(changed),
+                    pytrace=False)
 
 
 @pytest.fixture(autouse=True)
