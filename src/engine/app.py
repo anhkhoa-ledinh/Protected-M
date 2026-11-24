@@ -742,12 +742,19 @@ class HcpdApplication:
         if input_state.focus_down:
             album.move_focus(1)
         if input_state.replay:
+            logger.info("Key R: screen=%s match=%s", state.screen,
+                        album.game is not None)
             if state.screen in (album.flow.WIN, album.flow.LOSE):
                 state.go(album.flow.TILT)
             elif (state.screen in (album.flow.PLAY, album.flow.PVP_HUNT)
-                  and album.game is not None and not self._v3_field_focused()):
+                  and album.game is not None):
                 # Reload to a full magazine at any time (solo and PvP hunter).
-                album.game.start_reload(now)
+                # No text field exists on these screens, so a stale menu focus
+                # must not swallow the key.
+                if not album.game.start_reload(now):
+                    logger.info("R ignored: %d/%d rounds, reloading=%s",
+                                album.game.rounds_left, album.game.mag_size,
+                                album.game.reloading(now))
             elif state.screen == album.flow.PHOTOS:
                 # TASK_shared_album_1111 P3: cung phim R, nghia khac theo man —
                 # y het Enter (album.submit()) da doi nghia theo man tu truoc.

@@ -587,7 +587,11 @@ class DevTools:
             if self._rl_fired >= 10:
                 logger.info("RELOAD_1124: fired 10, rounds %d/%d, pressing R",
                             match.rounds_left, match.mag_size)
-                app._window._replay_requested = True   # what the R key sets
+                import glfw
+                app._window._on_key(None, glfw.KEY_R, 0, glfw.PRESS, 0)  # the real key callback
+                logger.info("RELOAD_1124: focus=%r forgot_open=%r field_focused=%r",
+                            app._album.state.focus, app._album.state.forgot_open,
+                            app._v3_field_focused())
                 self._rl_phase, self._rl_t = "wait", now
         elif self._rl_phase == "wait":
             if now - self._rl_t > match.reload_s + 1.5:
