@@ -24,6 +24,11 @@ PERMISSIONS: dict[str, str] = {
     "resume": ANONYMOUS,
     "logout": PLAYER,
     "me": PLAYER,
+    # C3: the economy
+    "start_match": PLAYER,
+    "begin_play": PLAYER,
+    "finish_match": PLAYER,
+    "leaderboard": PLAYER,
 }
 
 

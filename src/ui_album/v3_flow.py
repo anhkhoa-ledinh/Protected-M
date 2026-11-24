@@ -21,7 +21,7 @@ import time
 from dataclasses import dataclass, field
 
 from src.game.view import (ITEM_WEIGHT, ITEMS_HAVE_EFFECT, LEVEL_TABLE,
-                          PVP_MODES, item_price)
+                          PVP_MODES, PVP_UNLOCK_LEVELS, item_price)
 from src.ui_album.ids import (BOARD, LEVELS, LOADING, LOADING_READY, LOADOUT,  # noqa: F401
                                 LOSE, MENU, OFFLINE, PHOTOS, PLAY, PVP_FOUND,
                                 PVP_HIDE, PVP_HUNT, PVP_INVITE, PVP_MODE,
@@ -533,10 +533,6 @@ def start_search(flow: V3Flow, now: float) -> None:
     flow.search_started_s = now
     flow.search_target_s = random.uniform(3.0, 5.0)
     flow.go(PVP_SEARCH)
-
-
-#: PvP opens once every solo level has been won at least once.
-PVP_UNLOCK_LEVELS = (1, 2, 3, 4, 5)
 
 
 def pvp_lock_reason(flow: V3Flow) -> str | None:

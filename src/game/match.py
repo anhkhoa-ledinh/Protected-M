@@ -14,6 +14,7 @@ import random
 import time
 from dataclasses import dataclass, field
 
+from src.game.scoring import OVERTIME_MAX_S, OVERTIME_PENALTY, match_score  # noqa: F401
 from src.game.levels import (LEVELS, WEAPON_DAMAGE, WEAPONS_SPEC, DamageSpec,
                              WeaponSpec, hit_damage)
 
@@ -27,9 +28,9 @@ ITEM_WEIGHT = {"Pháo sáng": 3, "Thuốc giải": 5, "Khiên axit": 4,
               "Kính lọc": 4, "La bàn": 2, "Máy quét nhiệt": 8,
               "Nước tăng lực": 3, "Bom khói": 6}
 
-#: Quá giờ ở cấp Châu Á: −5 điểm mỗi giây, thua sau ngần này giây.
-OVERTIME_MAX_S = 30.0
-OVERTIME_PENALTY = 5.0
+# Quá giờ ở cấp Châu Á: −5 điểm mỗi giây, thua sau ngần này giây —
+# ``OVERTIME_MAX_S`` / ``OVERTIME_PENALTY`` come from ``scoring`` (the server
+# uses the same numbers).
 
 
 #: Ba khẩu khác nhau ở cả ba con số, đúng lời mô tả in trên màn trang bị:
@@ -341,15 +342,8 @@ class AlbumMatch:
         A lost match scores 0. Level 5 keeps its overtime penalty inside the
         same ``max(0, ...)``.
         """
-        if self.ended == "lose":
-            return 0
-        table = self.weights or ITEM_WEIGHT
-        spent = sum(table.get(name, 0) * count
-                    for name, count in self.used.items())
-        base = max(0.0, self.time_left_s) * self.level - spent
-        if self.level == 5:
-            base -= OVERTIME_PENALTY * self.overtime_s
-        return max(0, int(round(base)))
+        return match_score(self.level, self.ended == "lose", self.time_left_s,
+                           self.used, self.weights or ITEM_WEIGHT)
 
     def tick(self, head_ok: bool, layer_label: str = "") -> str:
         """Nhịp mỗi khung; trả ``""``/``"win"``/``"lose"``."""

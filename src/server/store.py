@@ -41,6 +41,33 @@ MIGRATIONS: list[str] = [
     );
     CREATE INDEX sessions_account ON sessions(account_key);
     """,
+    # 3 (C3): one-time match tickets and the record of won matches.
+    """
+    CREATE TABLE tickets (
+        nonce_hash TEXT PRIMARY KEY,
+        account_key TEXT NOT NULL REFERENCES accounts(key) ON DELETE CASCADE,
+        mode TEXT NOT NULL,
+        level INTEGER NOT NULL,
+        items TEXT NOT NULL,
+        cost INTEGER NOT NULL,
+        started_at REAL NOT NULL,
+        expires_at REAL NOT NULL,
+        used INTEGER NOT NULL DEFAULT 0,
+        began INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX tickets_account ON tickets(account_key);
+    CREATE TABLE scores (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        account_key TEXT NOT NULL REFERENCES accounts(key) ON DELETE CASCADE,
+        level INTEGER NOT NULL,
+        score INTEGER NOT NULL,
+        seconds REAL NOT NULL,
+        items_used TEXT NOT NULL,
+        at REAL NOT NULL
+    );
+    CREATE INDEX scores_account ON scores(account_key);
+    CREATE INDEX accounts_earned ON accounts(earned_total);
+    """,
 ]
 
 DB_NAME = "server.db"

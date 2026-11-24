@@ -37,7 +37,7 @@ registered handler and fails if one has no row (and if a row has no handler).
 | `hello`, `ping` | anonymous | C1 |
 | `sign_up`, `sign_in`, `recover`, `resume` | anonymous | C2 |
 | `logout`, `me` | player | C2 |
-| `start_match`, `finish_match`, `leaderboard`, `buy` | player | C3 |
+| `start_match`, `begin_play`, `finish_match`, `leaderboard` | player | C3 |
 | `create_room`, `join_room`, `queue`, `photo`, `bugs`, `ready`, `hit`, `killed`, `used_item`, `eye`, `relocate`, `end`, `rematch`, `cancel`, `rejoin` | player | C5 |
 
 ## Data model (SQLite, `server.db` in the data dir)
@@ -63,6 +63,28 @@ path inside it). Created with mode 0700.
 | Guessing passwords or tokens (C2) | 5 wrong tries lock one name for 30 s (stored in SQLite, survives a restart; same numbers as the local game). Unknown name and wrong password give the same reply and cost the same time (dummy hash). Sign-up, sign-in and recovery also share a stricter per-IP budget (1/s, burst 5) because scrypt is slow, and the account count is capped. Tokens are 32 random bytes; only their SHA-256 is stored; a token lasts 30 days, `logout`, recovery and the admin CLI revoke it, and a revoked token stops working on live connections at the next request. |
 | Secrets in logs (C2) | Handlers never log a message body, a password, a token or a recovery code; `tests/test_server_accounts.py` runs the real server, signs up/in/recovers and greps its log. |
 | Cheating client (N4) | The server never believes a score or a wallet value from a client (C3). |
+
+## The economy (C3)
+
+- `start_match {level, items, mode?}`: `mode` is `solo` (default), `Competitive` or `Hunt & Hide`.
+  A PvP mode needs levels 1-5 cleared. Items must be distinct, known, and fit the level's slots.
+  The price (`weight x 10`, the game's own table) is taken from the wallet in one transaction
+  (`UPDATE ... WHERE wallet >= cost` and `CHECK (wallet >= 0)`); not enough points means no
+  charge and no ticket. The reply carries `ticket` (random, only its hash is stored), the
+  server's `started_at` and `expires_at`. Starting a new match voids the account's older unused
+  ticket (its items stay paid).
+- `begin_play {ticket}`: optional, once. Moves the ticket's start to the server's "now", so the
+  seconds spent loading a photo do not count against the player. Same account only.
+- `finish_match {ticket, won, items_used}`: the ticket is spent first (so it works once, even
+  when two requests race), must belong to the caller and be unexpired (level time + level-5
+  overtime + 120 s). The time part comes from `server now - started_at`; the formula is
+  `src.game.scoring.match_score`, the same function the game uses. A solo win credits wallet and
+  `earned_total` by the score and adds the level to `levels_cleared`. A PvP ticket pays nothing.
+  `items_used` may only name items the ticket paid for, each 0-50.
+- Two refusals that turn a claimed win into a loss: faster than 1 s per bug (`too_fast`), and
+  later than the level time + 10 s (`time`; level 5 also gets its 30 s overtime).
+- `leaderboard`: top 20 by `earned_total`, ties share a rank, then name; plus the caller's rank
+  (`null` while they have won nothing). PvP boards stay "No matches yet".
 
 ## What the server cannot verify
 

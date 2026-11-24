@@ -39,3 +39,6 @@ def item_price(item: str) -> int:
 ITEMS_HAVE_EFFECT = False
 
 PVP_MODES = ("Competitive", "Hunt & Hide")
+
+#: PvP opens once every solo level has been won at least once.
+PVP_UNLOCK_LEVELS = (1, 2, 3, 4, 5)

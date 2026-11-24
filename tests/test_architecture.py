@@ -504,3 +504,21 @@ def test_nothing_else_imports_the_server_package():
             if imp == "src.server" or imp.startswith("src.server."):
                 offenders.append(f"{path.relative_to(ROOT)}: {imp}")
     assert offenders == [], offenders
+
+
+def test_importing_the_server_pulls_in_no_heavy_or_ui_modules():
+    """The server runs on a bare VM: no OpenCV, NumPy, Pillow, GL, no UI,
+    camera or content code may come in, even through ``src.game``."""
+    import subprocess
+
+    code = (
+        "import sys, src.server.app, src.server.admin, src.server.__main__\n"
+        "bad = [m for m in sys.modules if m.split('.')[0] in "
+        "('cv2','numpy','PIL','OpenGL','glfw','torch','onnxruntime') or "
+        "m.startswith(('src.ui_album','src.engine','src.renderer','src.camera',"
+        "'src.tracking','src.pose','src.content','src.fx','src.scene'))]\n"
+        "print(sorted(bad))\n")
+    done = subprocess.run([sys.executable, "-c", code], cwd=ROOT,
+                          capture_output=True, text=True)
+    assert done.returncode == 0, done.stderr
+    assert done.stdout.strip() == "[]", done.stdout

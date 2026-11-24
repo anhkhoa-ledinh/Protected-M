@@ -6,7 +6,7 @@ from __future__ import annotations
 import math
 
 from src.account.crypto import hash_token
-from src.server import accounts
+from src.server import accounts, economy
 from src.server.config import PROTO_VERSION
 from src.server.dispatch import ConnState, RequestError
 from src.server.permissions import ANONYMOUS, PLAYER
@@ -152,6 +152,54 @@ def me(ctx, state: ConnState, msg: dict) -> dict:
     return _profile(ctx, state.account)
 
 
+# ---- the economy (C3) ---------------------------------------------------------------
+
+def _int(msg: dict, field: str) -> int:
+    value = msg.get(field)
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise RequestError("bad_request", f"bad {field}")
+    return value
+
+
+def _economy_call(fn, *args):
+    try:
+        return fn(*args)
+    except economy.EconomyError as exc:
+        raise RequestError(exc.code, exc.msg) from None
+
+
+def start_match(ctx, state: ConnState, msg: dict) -> dict:
+    items = msg.get("items", [])
+    if not isinstance(items, list) or len(items) > 16 \
+            or not all(isinstance(n, str) and len(n) <= 32 for n in items):
+        raise RequestError("bad_request", "bad items")
+    mode = msg.get("mode", economy.SOLO)
+    if not isinstance(mode, str):
+        raise RequestError("bad_request", "bad mode")
+    nonce, info = _economy_call(economy.start_match, ctx.store, state.account, mode,
+                                _int(msg, "level"), items, ctx.clock())
+    return {"ticket": nonce, **info}
+
+
+def begin_play(ctx, state: ConnState, msg: dict) -> dict:
+    started = _economy_call(economy.begin_play, ctx.store, state.account,
+                            _text(msg, "ticket", 64), ctx.clock())
+    return {"started_at": started}
+
+
+def finish_match(ctx, state: ConnState, msg: dict) -> dict:
+    won = msg.get("won")
+    used = msg.get("items_used", {})
+    if not isinstance(won, bool) or not isinstance(used, dict) or len(used) > 16:
+        raise RequestError("bad_request", "bad finish_match")
+    return _economy_call(economy.finish_match, ctx.store, state.account,
+                         _text(msg, "ticket", 64), won, used, ctx.clock())
+
+
+def leaderboard(ctx, state: ConnState, msg: dict) -> dict:
+    return economy.leaderboard(ctx.store, state.account)
+
+
 HANDLERS = {
     "hello": hello,
     "ping": ping,
@@ -161,4 +209,8 @@ HANDLERS = {
     "resume": resume,
     "logout": logout,
     "me": me,
+    "start_match": start_match,
+    "begin_play": begin_play,
+    "finish_match": finish_match,
+    "leaderboard": leaderboard,
 }
