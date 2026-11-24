@@ -56,9 +56,9 @@ def test_becoming_unready_resets_the_2s_timer(monkeypatch):
     monkeypatch.setattr("src.devtools.time.perf_counter", lambda: clock["t"])
     dt._measurement_ready()                      # starts timer at t=100
     clock["t"] = 101.0
-    dt._app._renderer.waiting_for_depth = True    # un-ready again (layer rebuild)
+    dt._app.renderer.waiting_for_depth = True    # un-ready again (layer rebuild)
     assert dt._measurement_ready() is False
-    dt._app._renderer.waiting_for_depth = False
+    dt._app.renderer.waiting_for_depth = False
     clock["t"] = 102.5                             # ready again — timer restarts here
     assert dt._measurement_ready() is False
     clock["t"] = 103.5                              # only 1.0s since the restart

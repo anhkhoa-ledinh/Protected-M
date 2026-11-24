@@ -40,7 +40,9 @@ class DevTools:
     _FX_PENDING_POST_FRAMES = 8
 
     def __init__(self, app) -> None:
-        self._app = app
+        from src.engine.dev_hooks import DevHooks
+
+        self._app = app if isinstance(app, DevHooks) else DevHooks(app)
 
     def env(self, name: str, default: str = "") -> str:
         """The one place that actually reads an ``HCPD_*`` env var —
@@ -71,7 +73,7 @@ class DevTools:
     def tick_post_render(self, now: float) -> None:
         """Replaces the post-render shots if/elif chain in ``run()``."""
         app = self._app
-        if app._album_options.shots or app._album_options.ui_shots:
+        if app.album_options.shots or app.album_options.ui_shots:
             self._album_shots_step()
         elif self.env("HCPD_ECONOMY_1124"):
             self._tick_economy_1124(now)
@@ -97,7 +99,7 @@ class DevTools:
         from src.devtools import v3_live
 
         app = self._app
-        if app._window.is_iconified():
+        if app.window.is_iconified():
             return
         self._live_hold = getattr(self, "_live_hold", 0) + 1
         if self._live_hold < 3:
@@ -110,15 +112,15 @@ class DevTools:
             if name == v3_live.DESKTOP:
                 self._grab_desktop(name)
             else:
-                app._save_album_shot(name)
+                app.save_album_shot(name)
         index += 1
         if index >= len(v3_live.ORDER):
             logger.info("UI v3 live: xong %d anh", len(v3_live.ORDER))
-            app._window.request_close()
+            app.window.request_close()
             return
         self._live_index = index
-        app._album.game = v3_live.apply(v3_live.ORDER[index],
-                                        app._album.state, app._window)
+        app.album.game = v3_live.apply(v3_live.ORDER[index],
+                                        app.album.state, app.window)
 
     # ---- TASK_economy_1124: scripted walk over the real screens ------------
 
@@ -133,7 +135,7 @@ class DevTools:
         from src.ui_album.shots import save_framebuffer
 
         app = self._app
-        if app._window.is_iconified():
+        if app.window.is_iconified():
             return
         steps = [s.strip() for s in self.env("HCPD_ECONOMY_1124").split(";") if s.strip()]
         # Art textures decode off-thread; give each step time, not a frame count.
@@ -150,8 +152,8 @@ class DevTools:
         kind, _, arg = step.partition(":")
         # a toast lives 4 s: the shot right after a click/equip must come sooner
         self._eco_wait = 1.5 if kind in ("equip", "click") else 4.0
-        F = app._album.flow
-        state = app._album.state
+        F = app.album.flow
+        state = app.album.state
         if kind == "go":
             state.go(getattr(F, arg))
         elif kind == "level":
@@ -159,16 +161,16 @@ class DevTools:
         elif kind == "equip":
             F.toggle_item(state, arg)
         elif kind == "click":
-            app._album_action(app._album.activate(arg), now)
+            app.album_action(app.album.activate(arg), now)
         elif kind == "seg":
             state.board_seg = arg
         elif kind == "shot":
             from OpenGL import GL
 
             GL.glFinish()
-            out = Path(self.env("HCPD_ECONOMY_OUT") or app._root / "results"
+            out = Path(self.env("HCPD_ECONOMY_OUT") or app.root / "results"
                        / "economy_1124" / "shots")
-            width, height = app._window.framebuffer_size()
+            width, height = app.window.framebuffer_size()
             save_framebuffer(out / f"{arg}.png", width, height)
             logger.info("ECONOMY: shot %s (%dx%d) screen=%s msg=%r", arg, width,
                         height, state.screen, state.message)
@@ -177,7 +179,7 @@ class DevTools:
                         arg, state.wallet, state.earned_total,
                         state.levels_cleared, state.items)
         elif kind == "quit":
-            app._window.request_close()
+            app.window.request_close()
         logger.info("ECONOMY: step %d/%d %s", index + 1, len(steps), step)
 
     def _grab_desktop(self, stem: str) -> None:
@@ -195,10 +197,10 @@ class DevTools:
         trình duyệt — hỏng còn tệ hơn là thiếu.
         """
         app = self._app
-        path = app._root / "results" / "ui_v3_1107" / "live" / f"{stem}.png"
+        path = app.root / "results" / "ui_v3_1107" / "live" / f"{stem}.png"
         logger.info(
             "UI v3 live: cua so dang o che do Window %s — chup tay bang "
-            "Win+Shift+S roi luu de len %s", app._window.window_rect(), path)
+            "Win+Shift+S roi luu de len %s", app.window.window_rect(), path)
 
     # ---- TASK_game_feel_1118 P6/P7: scope bench -----------------------------
 
@@ -212,7 +214,7 @@ class DevTools:
         và bắn theo nhịp.
         """
         app = self._app
-        if (self.env("HCPD_SCOPE_BENCH") != "1" or not app._album_options.is_v3
+        if (self.env("HCPD_SCOPE_BENCH") != "1" or not app.album_options.is_v3
                 or self.env("HCPD_EVIDENCE_1118") == "1"):
             # TASK_game_feel_fix_1118: the evidence hook flips
             # HCPD_SCOPE_BENCH itself (so _tick_scope treats it as "held"
@@ -220,8 +222,8 @@ class DevTools:
             # react to that and take mouse control away with its own
             # circular motion.
             return
-        F = app._album.flow
-        if app._album.state.screen != F.PLAY:
+        F = app.album.flow
+        if app.album.state.screen != F.PLAY:
             return
         if not hasattr(self, "_scope_bench_start"):
             if not self._measurement_ready():
@@ -235,20 +237,20 @@ class DevTools:
         angle = elapsed * (2.0 * math.pi / 10.0)      # one slow turn over 10s
         circle_mouse = (640.0 + 150.0 * math.cos(angle),
                         360.0 + 150.0 * math.sin(angle))
-        app._album.mouse = app._tick_scope(now, circle_mouse)
+        app.album.mouse = app.tick_scope(now, circle_mouse)
         self._scope_bench_frame_times.append(now - self._scope_bench_last_frame_t)
         self._scope_bench_last_frame_t = now
         if now - self._scope_bench_last_shot >= 0.6:
             self._scope_bench_last_shot += 0.6
-            app._album_shoot(now)
+            app.album_shoot(now)
         if elapsed >= 10.0:
             times = sorted(self._scope_bench_frame_times)
             n = len(times)
             median_dt = times[n // 2] if n else 0.0
             fps = (1.0 / median_dt) if median_dt > 0.0 else 0.0
             logger.info("SCOPE_BENCH: %d khung trong 10s, FPS median %.1f, "
-                        "zoom cuoi %.2f", n, fps, app._album.scope_zoom)
-            app._window.request_close()
+                        "zoom cuoi %.2f", n, fps, app.album.scope_zoom)
+            app.window.request_close()
 
     # ---- TASK_game_feel_fix_1118: evidence screenshot sequence --------------
 
@@ -259,21 +261,21 @@ class DevTools:
         report's evidence section, then self-closes — same spirit as
         ``HCPD_FX_BENCH``/``HCPD_SCOPE_BENCH``, not meant to ship."""
         app = self._app
-        if self.env("HCPD_EVIDENCE_1118") != "1" or not app._album_options.is_v3:
+        if self.env("HCPD_EVIDENCE_1118") != "1" or not app.album_options.is_v3:
             return
-        F = app._album.flow
-        if app._album.state.screen not in (F.PLAY, F.WIN):
+        F = app.album.flow
+        if app.album.state.screen not in (F.PLAY, F.WIN):
             return
         if not hasattr(self, "_evidence_step"):
             if not self._measurement_ready():
                 return
             self._evidence_step = 0
             self._evidence_step_t = now
-            self._evidence_out = app._root / "results" / "game_feel_fix_1118"
+            self._evidence_out = app.root / "results" / "game_feel_fix_1118"
             self._evidence_steps = self._build_evidence_steps()
             return
         if self._evidence_step >= len(self._evidence_steps):
-            app._window.request_close()
+            app.window.request_close()
             return
         name, setup, hold_s = self._evidence_steps[self._evidence_step]
         setup(app)
@@ -283,8 +285,8 @@ class DevTools:
 
                 from src.ui_album.shots import save_framebuffer
 
-                app._window.restore_and_focus()
-                app._window.pump_events()
+                app.window.restore_and_focus()
+                app.window.pump_events()
                 # Force an explicit, synchronous redraw against the
                 # state THIS tick just set, instead of trusting whatever
                 # the main loop's own next render happens to land on —
@@ -296,25 +298,25 @@ class DevTools:
                 # ``_on_refresh`` redraws with) for steps that DO have a
                 # 3D viewport (scope/HUD proximity) — a no-op would
                 # render those as an empty void instead of the real scene.
-                scene = app._last_scene or (lambda: None)
-                if not app._album.has_viewport():
-                    app._album.draw_hidden_scene(scene)
-                app._album_draw_guarded(scene)
-                width, height = app._window.framebuffer_size()
+                scene = app.last_scene or (lambda: None)
+                if not app.album.has_viewport():
+                    app.album.draw_hidden_scene(scene)
+                app.album_draw_guarded(scene)
+                width, height = app.window.framebuffer_size()
                 if width >= 2 and height >= 2:
                     GL.glFinish()
                     save_framebuffer(self._evidence_out / f"{name}.png", width, height)
                     logger.info("EVIDENCE_1118: %s.png (screen=%s game=%s)",
-                               name, app._album.state.screen,
-                               app._album.game is not None)
-                app._window.swap_buffers()
+                               name, app.album.state.screen,
+                               app.album.game is not None)
+                app.window.swap_buffers()
             self._evidence_step += 1
             self._evidence_step_t = now
 
     def _build_evidence_steps(self) -> list:
         def crosshair(xy):
             def setup(app):
-                app._album.mouse = xy
+                app.album.mouse = xy
             return setup
 
         def scoped(xy):
@@ -328,7 +330,7 @@ class DevTools:
                 import os as _os
 
                 _os.environ["HCPD_SCOPE_BENCH"] = "1"
-                app._album.mouse = app._tick_scope(time.perf_counter(), xy)
+                app.album.mouse = app.tick_scope(time.perf_counter(), xy)
             return setup
 
         def unscoped(xy):
@@ -336,7 +338,7 @@ class DevTools:
                 import os as _os
 
                 _os.environ.pop("HCPD_SCOPE_BENCH", None)
-                app._album.mouse = app._tick_scope(time.perf_counter(), xy)
+                app.album.mouse = app.tick_scope(time.perf_counter(), xy)
             return setup
 
         def crit_impact(active):
@@ -347,7 +349,7 @@ class DevTools:
             # (nothing public does that early; the real path is just
             # waiting out CRIT_IMPACT_S).
             def setup(app):
-                feel = app._album._shot_feel
+                feel = app.album._shot_feel
                 if active:
                     if feel._crit_impact_age is None:
                         feel.on_shot("Precision gun", (640.0, 360.0),
@@ -358,8 +360,8 @@ class DevTools:
 
         def go_win():
             def setup(app):
-                if app._album.state.screen != app._album.flow.WIN:
-                    app._album.state.go(app._album.flow.WIN)
+                if app.album.state.screen != app.album.flow.WIN:
+                    app.album.state.go(app.album.flow.WIN)
             return setup
 
         centre, corner, edge = (640.0, 360.0), (120.0, 120.0), (1180.0, 620.0)
@@ -403,21 +405,21 @@ class DevTools:
         not meant to ship."""
         app = self._app
         if (self.env("HCPD_HUD_FIX_1119_SHOTS") != "1"
-                or not app._album_options.is_v3):
+                or not app.album_options.is_v3):
             return
-        F = app._album.flow
-        if app._album.state.screen != F.PLAY:
+        F = app.album.flow
+        if app.album.state.screen != F.PLAY:
             return
         if not hasattr(self, "_hud1119_step"):
             if not self._measurement_ready():
                 return
             self._hud1119_step = 0
             self._hud1119_step_t = now
-            self._hud1119_out = app._root / "results" / "hud_fix_1119"
+            self._hud1119_out = app.root / "results" / "hud_fix_1119"
             self._hud1119_steps = self._build_hud_fix_1119_steps()
             return
         if self._hud1119_step >= len(self._hud1119_steps):
-            app._window.request_close()
+            app.window.request_close()
             return
         name, setup, hold_s = self._hud1119_steps[self._hud1119_step]
         setup(app)
@@ -427,25 +429,25 @@ class DevTools:
 
                 from src.ui_album.shots import save_framebuffer
 
-                app._window.restore_and_focus()
-                app._window.pump_events()
-                scene = app._last_scene or (lambda: None)
-                if not app._album.has_viewport():
-                    app._album.draw_hidden_scene(scene)
-                app._album_draw_guarded(scene)
-                width, height = app._window.framebuffer_size()
+                app.window.restore_and_focus()
+                app.window.pump_events()
+                scene = app.last_scene or (lambda: None)
+                if not app.album.has_viewport():
+                    app.album.draw_hidden_scene(scene)
+                app.album_draw_guarded(scene)
+                width, height = app.window.framebuffer_size()
                 if width >= 2 and height >= 2:
                     GL.glFinish()
                     save_framebuffer(self._hud1119_out / f"{name}.png", width, height)
                     logger.info("HUD_FIX_1119: %s.png", name)
-                app._window.swap_buffers()
+                app.window.swap_buffers()
             self._hud1119_step += 1
             self._hud1119_step_t = now
 
     def _build_hud_fix_1119_steps(self) -> list:
         def crosshair(xy):
             def setup(app):
-                app._album.mouse = xy
+                app.album.mouse = xy
             return setup
 
         def scoped(xy):
@@ -453,13 +455,13 @@ class DevTools:
                 import os as _os
 
                 _os.environ["HCPD_SCOPE_BENCH"] = "1"
-                app._album.mouse = app._tick_scope(time.perf_counter(), xy)
+                app.album.mouse = app.tick_scope(time.perf_counter(), xy)
             return setup
 
         def hidden(want: bool):
             def setup(app):
-                if app._album.hud_hidden != want:
-                    app._album.toggle_hud_hidden()
+                if app.album.hud_hidden != want:
+                    app.album.toggle_hud_hidden()
             return setup
 
         def weapon(name):
@@ -469,7 +471,7 @@ class DevTools:
 
         def clear_toast():
             def setup(app):
-                app._album.state.message = ""
+                app.album.state.message = ""
             return setup
 
         centre, weapon_card = (640.0, 360.0), (1130.0, 650.0)
@@ -496,17 +498,17 @@ class DevTools:
         from src.ui_album.shots import save_framebuffer
 
         app = self._app
-        app._window.restore_and_focus()
-        app._window.pump_events()
-        scene = app._last_scene or (lambda: None)
-        if not app._album.has_viewport():
-            app._album.draw_hidden_scene(scene)
-        app._album_draw_guarded(scene)
-        width, height = app._window.framebuffer_size()
+        app.window.restore_and_focus()
+        app.window.pump_events()
+        scene = app.last_scene or (lambda: None)
+        if not app.album.has_viewport():
+            app.album.draw_hidden_scene(scene)
+        app.album_draw_guarded(scene)
+        width, height = app.window.framebuffer_size()
         if width >= 2 and height >= 2:
             GL.glFinish()
             save_framebuffer(path, width, height)
-        app._window.swap_buffers()
+        app.window.swap_buffers()
 
     def _bad_photo_1124(self, now: float) -> bool:
         """``HCPD_BAD_PHOTO_1124=<file>``: before the automatch loads its own
@@ -517,11 +519,11 @@ class DevTools:
         if not bad or getattr(self, "_bad_photo_done", False):
             return False
         out = Path(self.env("HCPD_HARDENING_1124_OUT")
-                   or app._root / "results" / "hardening_1124" / "g5")
+                   or app.root / "results" / "hardening_1124" / "g5")
         if not hasattr(self, "_bad_photo_t"):
             if not self._measurement_ready():
                 return True
-            app._try_load_media(Path(bad), now)
+            app.try_load_media(Path(bad), now)
             self._bad_photo_t = now
             logger.info("BAD_PHOTO_1124: loaded %s through _try_load_media", bad)
             return True
@@ -539,30 +541,30 @@ class DevTools:
         also logs the live card alphas, so the pixel check has the numbers
         the UI itself used."""
         app = self._app
-        if self.env("HCPD_HARDENING_1124_SHOTS") != "1" or not app._album_options.is_v3:
+        if self.env("HCPD_HARDENING_1124_SHOTS") != "1" or not app.album_options.is_v3:
             return
-        F = app._album.flow
-        if app._album.state.screen != F.PLAY:
+        F = app.album.flow
+        if app.album.state.screen != F.PLAY:
             return
         if not hasattr(self, "_h24_step"):
             if not self._measurement_ready():
                 return
             self._h24_step, self._h24_t = 0, now
             self._h24_out = Path(self.env("HCPD_HARDENING_1124_OUT")
-                                 or app._root / "results" / "hardening_1124" / "g3")
+                                 or app.root / "results" / "hardening_1124" / "g3")
             self._h24_steps = self._build_hardening_1124_steps()
             return
         if self._h24_step >= len(self._h24_steps):
-            app._window.request_close()
+            app.window.request_close()
             return
         name, setup, hold_s = self._h24_steps[self._h24_step]
         setup(app)
-        app._album.state.message = ""      # the H-hide toast must not sit on a slot
+        app.album.state.message = ""      # the H-hide toast must not sit on a slot
         if now - self._h24_t >= hold_s:
             if name is not None:
                 self._shoot_framebuffer(self._h24_out / f"{name}.png")
                 logger.info("HARDENING_1124: %s.png alphas=%s", name,
-                            {k: round(v, 3) for k, v in app._album.hud_card_alpha.items()})
+                            {k: round(v, 3) for k, v in app.album.hud_card_alpha.items()})
             self._h24_step += 1
             self._h24_t = now
 
@@ -573,8 +575,8 @@ class DevTools:
         app = self._app
         if self.env("HCPD_RELOAD_1124") != "1":
             return
-        match = app._album.game
-        if match is None or app._album.state.screen != app._album.flow.PLAY:
+        match = app.album.game
+        if match is None or app.album.state.screen != app.album.flow.PLAY:
             return
         if not hasattr(self, "_rl_phase"):
             if not self._measurement_ready():
@@ -588,22 +590,22 @@ class DevTools:
                 logger.info("RELOAD_1124: fired 10, rounds %d/%d, pressing R",
                             match.rounds_left, match.mag_size)
                 import glfw
-                app._window._on_key(None, glfw.KEY_R, 0, glfw.PRESS, 0)  # the real key callback
+                app.window._on_key(None, glfw.KEY_R, 0, glfw.PRESS, 0)  # the real key callback
                 logger.info("RELOAD_1124: focus=%r forgot_open=%r field_focused=%r",
-                            app._album.state.focus, app._album.state.forgot_open,
-                            app._v3_field_focused())
+                            app.album.state.focus, app.album.state.forgot_open,
+                            app.v3_field_focused())
                 self._rl_phase, self._rl_t = "wait", now
         elif self._rl_phase == "wait":
             if now - self._rl_t > match.reload_s + 1.5:
                 logger.info("RELOAD_1124: after, rounds %d/%d",
                             match.rounds_left, match.mag_size)
-                app._window.request_close()
+                app.window.request_close()
                 self._rl_phase = "done"
 
     def _build_hardening_1124_steps(self) -> list:
         def crosshair(xy):
             def setup(app):
-                app._album.mouse = xy
+                app.album.mouse = xy
             return setup
 
         def scoped(xy):
@@ -611,13 +613,13 @@ class DevTools:
                 import os as _os
 
                 _os.environ["HCPD_SCOPE_BENCH"] = "1"
-                app._album.mouse = app._tick_scope(time.perf_counter(), xy)
+                app.album.mouse = app.tick_scope(time.perf_counter(), xy)
             return setup
 
         def hidden(want: bool):
             def setup(app):
-                if app._album.hud_hidden != want:
-                    app._album.toggle_hud_hidden()
+                if app.album.hud_hidden != want:
+                    app.album.toggle_hud_hidden()
             return setup
 
         def weapon(name):
@@ -627,7 +629,7 @@ class DevTools:
 
         def clear_toast():
             def setup(app):
-                app._album.state.message = ""
+                app.album.state.message = ""
             return setup
 
         far, slot, health = (640.0, 330.0), (640.0, 628.0), (204.0, 626.0)
@@ -656,27 +658,27 @@ class DevTools:
         dùng 07/11: "không thấy bọ ở đâu cả, không tin bạn có thể tự test".
         """
         app = self._app
-        F = app._album.flow
+        F = app.album.flow
 
         if self.env("HCPD_ALBUM_AUTOMATCH") not in ("1", "2"):
             return
         if getattr(self, "_automatch_fired", False):
             # TASK_automatch_regress_1121: a won/lost match clears
-            # ``app._album.game`` and leaves the result screen (see
+            # ``app.album.game`` and leaves the result screen (see
             # ``_tick_album_match``'s ``state.go(F.WIN/F.LOSE)``) -- to
             # this hook that looks identical to the cold-launch MENU
             # state below, so without this guard it jumps back to PLAY
             # and starts a new match every tick, forever.
             return
-        if app._album.game is not None or app._renderer.waiting_for_depth:
+        if app.album.game is not None or app.renderer.waiting_for_depth:
             return
-        if app._album.state.screen != F.PLAY:
+        if app.album.state.screen != F.PLAY:
             # TASK_hud_fix_1119 Fix 4: accounts added a sign-in screen
             # ahead of MENU since this hook was written -- a cold
             # ``--album-guest`` launch now lands on MENU, not PLAY, so
             # "no clicking through the whole flow" needs to jump there
             # itself instead of just waiting for it.
-            app._album.state.go(F.PLAY)
+            app.album.state.go(F.PLAY)
             return
         if self._bad_photo_1124(now):
             return
@@ -689,10 +691,10 @@ class DevTools:
             # that file for ``--album`` (see its own PB-055/1121 guard),
             # so this is as config-safe as the hook it modifies.
             self._automatch_photo_loaded = True
-            app._try_load_media(Path(photo), now)
+            app.try_load_media(Path(photo), now)
             return
         self._automatch_fired = True
-        app._album.state.weapon = 0
+        app.album.state.weapon = 0
         if self.env("HCPD_ALBUM_AUTOMATCH") == "2":
             # Bọ đặt TAY ở chỗ biết trước: để kiểm riêng phần VẼ sprite, tách
             # khỏi phần tìm chỗ giấu (place_props có ảnh trả về 0 chỗ).
@@ -700,28 +702,28 @@ class DevTools:
             from src.content.prop_game import GameState, bug_radius_mm
             from src.game.match import start_match
 
-            radius = bug_radius_mm(app._content)
+            radius = bug_radius_mm(app.content)
             props = [{"pos_mm": (x, 0.0, -180.0), "radius_mm": radius,
                       "reveal_axis": "x", "reveal_450_mm": 0.0,
                       "reveal_330_mm": 0.0} for x in (-70.0, 0.0, 70.0)]
-            app._game = GameState(image="debug", props=props,
+            app.game = GameState(image="debug", props=props,
                                   tracking_on=True, started_at_s=now)
-            app._game_planes = layer_planes(app._renderer.layer_records())
+            app.game_planes = layer_planes(app.renderer.layer_records())
             # Không gán số hiệu bộ lớp thì _sync_prop_game bỏ ván ngay khung sau.
-            app._game_layers_revision = app._renderer.layers_revision
-            app._renderer.set_props([])
-            if app._bugs is not None:
-                app._bugs.reset()
-            app._album.game = start_match(1, app._game, "Sung", [])
+            app.game_layers_revision = app.renderer.layers_revision
+            app.renderer.set_props([])
+            if app.bugs is not None:
+                app.bugs.reset()
+            app.album.game = start_match(1, app.game, "Sung", [])
             logger.info("DEBUG MATCH: dat tay %d bo", len(props))
             return
         items = [n.strip() for n in self.env("HCPD_AUTOMATCH_ITEMS").split(",")
                  if n.strip()]
         for name in items:
-            F.toggle_item(app._album.state, name)
+            F.toggle_item(app.album.state, name)
         if items:
-            logger.info("AUTOMATCH: items %s", app._album.state.items)
-        app._start_album_match(now)
+            logger.info("AUTOMATCH: items %s", app.album.state.items)
+        app.start_album_match(now)
         # TASK_hud_fix_1119 Fix 4: the real-click SendInput check needs a
         # SPECIFIC gun (Spread, mag 8) rather than automatch's always-
         # Precision default -- reuses ``_apply_bench_weapon`` (until now
@@ -746,11 +748,11 @@ class DevTools:
         app = self._app
         if self.env("HCPD_ALBUM_AUTOWIN") != "1":
             return
-        match = app._album.game
-        F = app._album.flow
-        if match is None or app._album.state.screen != F.PLAY:
+        match = app.album.game
+        F = app.album.flow
+        if match is None or app.album.state.screen != F.PLAY:
             return
-        if app._game is None or not app._game.props:
+        if app.game is None or not app.game.props:
             return
         if now < getattr(self, "_autowin_next_s", 0.0):
             return
@@ -762,10 +764,10 @@ class DevTools:
             if killed:
                 match.state.found[index] = True
                 match.last_shot_hits = [(index, False, True)]
-                app._renderer.set_prop_found(index)
-                if app._bugs is not None:
-                    app._bugs.mark_found(
-                        index, [v / 1000.0 for v in app._game.props[index]["pos_mm"]])
+                app.renderer.set_prop_found(index)
+                if app.bugs is not None:
+                    app.bugs.mark_found(
+                        index, [v / 1000.0 for v in app.game.props[index]["pos_mm"]])
                 logger.info("AUTOWIN: ha bo #%d (%d/%d)", index,
                             match.bugs_found, match.bugs_total)
             break
@@ -783,9 +785,9 @@ class DevTools:
         FPS) were measuring one-time launch cost, not steady-state play.
         """
         app = self._app
-        fx = getattr(app._album, "_fx_library", None)
-        fx_ready = fx is None or not app._album.fx_enabled or fx.preload_remaining == 0
-        depth_ready = not app._renderer.waiting_for_depth
+        fx = getattr(app.album, "_fx_library", None)
+        fx_ready = fx is None or not app.album.fx_enabled or fx.preload_remaining == 0
+        depth_ready = not app.renderer.waiting_for_depth
         now = time.perf_counter()
         if not (fx_ready and depth_ready):
             self._measurement_ready_since = None
@@ -822,10 +824,10 @@ class DevTools:
         recorded across the whole window (G6's own check).
         """
         app = self._app
-        if self.env("HCPD_FX_BENCH") != "1" or not app._album_options.is_v3:
+        if self.env("HCPD_FX_BENCH") != "1" or not app.album_options.is_v3:
             return
-        F = app._album.flow
-        if app._album.state.screen != F.PLAY:
+        F = app.album.flow
+        if app.album.state.screen != F.PLAY:
             return
         if not hasattr(self, "_fx_bench_start"):
             if not self._measurement_ready():
@@ -843,31 +845,31 @@ class DevTools:
             self._fx_bench_weapon_applied = False
             return
         weapon = getattr(self, "_fx_bench_weapon", None)
-        if weapon and not self._fx_bench_weapon_applied and app._album.game is not None:
+        if weapon and not self._fx_bench_weapon_applied and app.album.game is not None:
             self._apply_bench_weapon(weapon)
             self._fx_bench_weapon_applied = True
         self._fx_bench_frame_times.append(now - self._fx_bench_last_frame_t)
         self._fx_bench_last_frame_t = now
-        fx = getattr(app._album, "_fx_library", None)
+        fx = getattr(app.album, "_fx_library", None)
         self._fx_bench_fx_times.append(
             (fx.frame_mipmap_s + fx.frame_upload_s) if fx is not None else 0.0)
         if weapon == "Heavy-mag gun":
             # P7: "holds the button so auto-fire is exercised" — the real
             # click-and-hold path (``_tick_auto_fire``), not the
             # synthetic cycle below.
-            app._album.mouse_down = True
+            app.album.mouse_down = True
         elif now - self._fx_bench_last_shot >= 0.25:       # 4 phat/s
             self._fx_bench_last_shot += 0.25
             kind = self._fx_bench_cycle % 3
             self._fx_bench_cycle += 1
             if weapon:
-                app._album.register_shot(kind != 2, kind == 1)
+                app.album.register_shot(kind != 2, kind == 1)
             if kind == 0:
-                app._album.spawn_hit_fx(False)
+                app.album.spawn_hit_fx(False)
             elif kind == 1:
-                app._album.spawn_hit_fx(True)
+                app.album.spawn_hit_fx(True)
             else:
-                app._album.spawn_miss_fx()
+                app.album.spawn_miss_fx()
         if now - self._fx_bench_start >= 20.0:
             times = sorted(self._fx_bench_frame_times)
             n = len(times)
@@ -882,7 +884,7 @@ class DevTools:
                         max(times) * 1000.0 if times else 0.0)
             self._log_slowest_frame_stage(self._fx_bench_frame_times,
                                           self._fx_bench_fx_times, fx)
-            app._window.request_close()
+            app.window.request_close()
 
     def _log_slowest_frame_stage(self, frame_times: list, fx_times: list, fx) -> None:
         """TASK_game_feel_fix_1118 Fix 2: breaks down the single slowest
@@ -912,7 +914,7 @@ class DevTools:
         fresh magazine, for ``HCPD_BENCH_WEAPON``."""
         from src.game.match import WEAPONS_SPEC
 
-        match = self._app._album.game
+        match = self._app.album.game
         if match is None:
             return
         spec = WEAPONS_SPEC[weapon_name]
@@ -941,8 +943,8 @@ class DevTools:
             return
         from src.ui_album import v3_routes
 
-        F = app._album.flow
-        state = app._album.state
+        F = app.album.flow
+        state = app.album.state
         if state.screen in F.LOCKED:
             state.player = state.player or "guest"
             state.go(F.MENU)
@@ -959,7 +961,7 @@ class DevTools:
             # thẳng _pvp_action: _pvp()'s F.start_search() (đổi màn sang
             # PVP_SEARCH) phải chạy, không chỉ phần mạng.
             action = v3_routes.on_click(state, ID.BTN_FIND_MATCH, now)
-            app._pvp_action(action, now)
+            app.pvp_action(action, now)
         elif state.screen == F.PVP_RESULT:
             # Đứng lại 2 s trước khi quay lại tìm trận tiếp — không chỉ cho
             # _tick_pvp_shots kịp chụp (PVP_RESULT biến mất ngay khung đầu
@@ -991,8 +993,8 @@ class DevTools:
         app = self._app
         if self.env("HCPD_PVP_SHOTS") != "1":
             return
-        F = app._album.flow
-        state = app._album.state
+        F = app.album.flow
+        state = app.album.state
         screen = state.screen
         delay_s = {F.PVP_FOUND: 0.5, F.PVP_HUNT: 2.0, F.PVP_HIDE: 2.0,
                   F.PVP_RESULT: 0.5}.get(screen)
@@ -1025,10 +1027,10 @@ class DevTools:
         from src.ui_album.shots import save_framebuffer
 
         app = self._app
-        path = app._root / "results" / "pvp_1116" / f"{screen}.png"
-        app._window.restore_and_focus()
-        app._window.pump_events()
-        width, height = app._window.framebuffer_size()
+        path = app.root / "results" / "pvp_1116" / f"{screen}.png"
+        app.window.restore_and_focus()
+        app.window.pump_events()
+        width, height = app.window.framebuffer_size()
         if width < 2 or height < 2:
             logger.warning("PvP shot bo qua: framebuffer %dx%d", width, height)
             return path
@@ -1055,29 +1057,29 @@ class DevTools:
         from OpenGL import GL
 
         app = self._app
-        if app._window.is_iconified():
+        if app.window.is_iconified():
             logger.warning("Album shots: cua so dang thu nho — cho")
             return
-        if app._album_options.is_v3 and not app._album.current_screen_ready():
+        if app.album_options.is_v3 and not app.album.current_screen_ready():
             return
         self._shot_hold = getattr(self, "_shot_hold", 0) + 1
         if self._shot_hold < 3:
             return
         self._shot_hold = 0
         index = getattr(self, "_shot_index", 0)
-        plan = app._album.shot_plan()
+        plan = app.album.shot_plan()
         entry = plan[index]
         # Bộ v3 chỉ có MỘT theme, nên kế hoạch của nó là danh sách tên màn
         # phẳng; bộ cũ là cặp (màn, theme).
         stem = entry if isinstance(entry, str) else f"{entry[0]}_{entry[1]}"
         GL.glFinish()
-        app._save_album_shot(stem)
+        app.save_album_shot(stem)
         if index + 1 >= len(plan):
             logger.info("UI shots: xong %d anh", len(plan))
-            app._window.request_close()
+            app.window.request_close()
             return
         self._shot_index = index + 1
-        app._album.apply_shot(index + 1)
+        app.album.apply_shot(index + 1)
 
     # ---- TASK_ui_sakuga_1117 G5: 20 ảnh hover/press/focus/tilt/fx --------
 
@@ -1087,7 +1089,7 @@ class DevTools:
         bình thường (``album.tick()``/``draw()``) tự chạy tiếp, đúng như
         người chơi thật đứng yên ở trạng thái đó."""
         app = self._app
-        F = app._album.flow
+        F = app.album.flow
         # HOVER_HOLD: đủ để spring hover/press ổn định (k=420,d=26 lắng
         # trong vài chục khung). AUTO_FX_HOLD: cho hiệu ứng tự spawn qua
         # ``_step_fx_triggers`` (loading/toast/win/primary) đủ thời gian
@@ -1100,7 +1102,7 @@ class DevTools:
         def hotspot_rect(screen, name):
             from src.ui_album.v3_hit import hotspot_rect as _rect
 
-            for hotspot in app._album.manifest.screens[screen].get(
+            for hotspot in app.album.manifest.screens[screen].get(
                     "hotspots", ()):
                 if hotspot["n"] == name:
                     return _rect(screen, hotspot)
@@ -1108,65 +1110,65 @@ class DevTools:
 
         def hover_at(screen, name, press=False):
             def setup():
-                app._album.state.go(screen)
-                app._album.state.focus = None
+                app.album.state.go(screen)
+                app.album.state.focus = None
                 rect = hotspot_rect(screen, name)
                 if rect is not None:
-                    app._album.mouse = (rect[0] + rect[2] * 0.5,
+                    app.album.mouse = (rect[0] + rect[2] * 0.5,
                                         rect[1] + rect[3] * 0.5)
-                app._album.mouse_down = press
+                app.album.mouse_down = press
             return setup
 
         def focus_at(screen, name):
             def setup():
-                app._album.state.go(screen)
-                app._album.mouse = (-1000.0, -1000.0)
-                app._album.mouse_down = False
-                app._album.state.focus = name
+                app.album.state.go(screen)
+                app.album.mouse = (-1000.0, -1000.0)
+                app.album.mouse_down = False
+                app.album.state.focus = name
             return setup
 
         def tilt_state(face, left, right):
             def setup():
-                app._album.state.go(F.TILT)
-                app._album.state.face_seen = face
-                app._album.state.tilt_left_done = left
-                app._album.state.tilt_right_done = right
-                app._album.mouse = (-1000.0, -1000.0)
+                app.album.state.go(F.TILT)
+                app.album.state.face_seen = face
+                app.album.state.tilt_left_done = left
+                app.album.state.tilt_right_done = right
+                app.album.mouse = (-1000.0, -1000.0)
             return setup
 
         def fx_shot(screen, name, point, **kwargs):
             def setup():
-                app._album.state.go(screen)
-                app._album.mouse = (-1000.0, -1000.0)
+                app.album.state.go(screen)
+                app.album.mouse = (-1000.0, -1000.0)
                 # TASK_game_feel_1118 P3: fx_kill/fx_crit/fx_miss all fire
                 # on the SAME screen back to back — a screen change is
                 # what normally clears the previous shot's effect, so
                 # without this the next shot's screenshot still shows it
                 # (fx_miss.png showing fx_crit's red DON).
-                app._album.clear_fx()
+                app.album.clear_fx()
                 self._fx_shot_pending = (name, point, kwargs)
             return setup
 
         def loading_state(pct):
             def setup():
-                app._album.state.go(F.LOADING)
-                app._album.state.pipeline_pct = pct
-                app._album.state.layer_count = 4
-                app._album.mouse = (-1000.0, -1000.0)
+                app.album.state.go(F.LOADING)
+                app.album.state.pipeline_pct = pct
+                app.album.state.layer_count = 4
+                app.album.mouse = (-1000.0, -1000.0)
             return setup
 
         def primary_click(screen):
             def setup():
-                app._album.state.go(screen)
-                app._album.mouse = (-1000.0, -1000.0)
-                app._album.submit()
+                app.album.state.go(screen)
+                app.album.mouse = (-1000.0, -1000.0)
+                app.album.submit()
             return setup
 
         def toast_shot():
             def setup():
-                app._album.state.go(F.MENU)
-                app._album.mouse = (-1000.0, -1000.0)
-                F.say(app._album.state, "Reloading")
+                app.album.state.go(F.MENU)
+                app.album.mouse = (-1000.0, -1000.0)
+                F.say(app.album.state, "Reloading")
             return setup
 
         def win_shot():
@@ -1176,13 +1178,13 @@ class DevTools:
                 # survive the PLAY -> WIN transition (1117's own fx_win.png
                 # showed it lingering; a MENU -> WIN jump never exercises
                 # that path at all).
-                app._album.state.go(F.PLAY)
-                F.say(app._album.state, "Reloading")
-                app._album.state.last_result = {
+                app.album.state.go(F.PLAY)
+                F.say(app.album.state, "Reloading")
+                app.album.state.last_result = {
                     "found": 3, "total": 3, "score": 120,
                     "time_left": 10, "used": {}}
-                app._album.state.go(F.WIN)
-                app._album.mouse = (-1000.0, -1000.0)
+                app.album.state.go(F.WIN)
+                app.album.mouse = (-1000.0, -1000.0)
             return setup
 
         return [
@@ -1233,7 +1235,7 @@ class DevTools:
         from OpenGL import GL
 
         app = self._app
-        if app._window.is_iconified():
+        if app.window.is_iconified():
             return
         plan = self._sakuga_shot_plan()
         index = getattr(self, "_sakuga_shot_index", 0)
@@ -1248,7 +1250,7 @@ class DevTools:
         pending = getattr(self, "_fx_shot_pending", None)
         if pending is not None:
             name, point, kwargs = pending
-            if app._album.spawn_fx(name, point[0], point[1], **kwargs):
+            if app.album.spawn_fx(name, point[0], point[1], **kwargs):
                 self._fx_shot_pending = None
                 self._sakuga_shot_post = 0
             return      # moi spawn xong (chua du khung de chup) HOAC van
@@ -1273,19 +1275,19 @@ class DevTools:
         self._sakuga_shot_index = index + 1
         if self._sakuga_shot_index >= len(plan):
             logger.info("Sakuga UI shots: xong %d anh", len(plan))
-            app._window.request_close()
+            app.window.request_close()
 
     def _save_sakuga_shot(self, stem: str) -> None:
         from src.ui_album.shots import save_framebuffer
 
         app = self._app
-        app._window.restore_and_focus()
-        app._window.pump_events()
-        width, height = app._window.framebuffer_size()
+        app.window.restore_and_focus()
+        app.window.pump_events()
+        width, height = app.window.framebuffer_size()
         if width < 2 or height < 2:
             logger.warning("Sakuga shot bo qua: framebuffer %dx%d", width, height)
             return
-        path = app._root / "results" / "ui_sakuga_1117" / f"{stem}.png"
+        path = app.root / "results" / "ui_sakuga_1117" / f"{stem}.png"
         save_framebuffer(path, width, height)
         logger.info("Sakuga UI shot: %s (%dx%d)", path, width, height)
 
@@ -1295,21 +1297,21 @@ class DevTools:
         """5 bước — màn/khoảnh khắc y hệt cho cả ảnh "trước" (Phase 0) và
         "sau" (Phase 7); việc cắt/zoom 3x làm ở bước riêng, ngoài app."""
         app = self._app
-        F = app._album.flow
+        F = app.album.flow
         HOLD = 30
 
         def go_levels():
-            app._album.state.go(F.LEVELS)
-            app._album.state.level = 2
-            app._album.mouse = (-1000.0, -1000.0)
+            app.album.state.go(F.LEVELS)
+            app.album.state.level = 2
+            app.album.mouse = (-1000.0, -1000.0)
 
         def go_play_static():
-            app._album.state.go(F.PLAY)
-            app._album.mouse = (-1000.0, -1000.0)
+            app.album.state.go(F.PLAY)
+            app.album.mouse = (-1000.0, -1000.0)
 
         def spawn_burst():
-            app._album.state.go(F.PLAY)
-            app._album.mouse = (640.0, 360.0)
+            app.album.state.go(F.PLAY)
+            app.album.mouse = (640.0, 360.0)
             self._aa_burst_pending = True
 
         return [
@@ -1329,7 +1331,7 @@ class DevTools:
         from OpenGL import GL
 
         app = self._app
-        if app._window.is_iconified():
+        if app.window.is_iconified():
             return
         plan = self._aa_shot_plan()
         index = getattr(self, "_aa_shot_index", 0)
@@ -1341,12 +1343,12 @@ class DevTools:
             self._aa_shot_started = True
             self._aa_shot_hold = 0
         if stem in ("aa_layer_edge", "aa_bug", "aa_burst"):
-            F = app._album.flow
-            if (app._album.state.screen != F.PLAY or app._album.game is None
-                    or app._renderer.waiting_for_depth):
+            F = app.album.flow
+            if (app.album.state.screen != F.PLAY or app.album.game is None
+                    or app.renderer.waiting_for_depth):
                 return          # cho ván thật mở xong (lop + bo)
         if getattr(self, "_aa_burst_pending", False):
-            if app._album.spawn_fx("hit_kill", 640.0, 360.0):
+            if app.album.spawn_fx("hit_kill", 640.0, 360.0):
                 self._aa_burst_pending = False
             else:
                 return
@@ -1362,19 +1364,19 @@ class DevTools:
         self._aa_shot_index = index + 1
         if self._aa_shot_index >= len(plan):
             logger.info("AA baseline: xong %d anh", len(plan))
-            app._window.request_close()
+            app.window.request_close()
 
     def _save_aa_shot(self, stem: str) -> None:
         from src.ui_album.shots import save_framebuffer
 
         app = self._app
-        app._window.restore_and_focus()
-        app._window.pump_events()
-        width, height = app._window.framebuffer_size()
+        app.window.restore_and_focus()
+        app.window.pump_events()
+        width, height = app.window.framebuffer_size()
         if width < 2 or height < 2:
             logger.warning("AA shot bo qua: framebuffer %dx%d", width, height)
             return
         out = self.env("HCPD_AA_OUT") or "results/game_feel_1118/baseline/aa_raw"
-        path = app._root / out / f"raw_{stem}.png"
+        path = app.root / out / f"raw_{stem}.png"
         save_framebuffer(path, width, height)
         logger.info("AA baseline shot: %s (%dx%d)", path, width, height)

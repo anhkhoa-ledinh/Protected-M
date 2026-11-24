@@ -432,3 +432,28 @@ def test_ui_album_writes_no_files():
 def test_v3_ui_stays_small():
     lines = (ROOT / "src/ui_album/v3_ui.py").read_text("utf-8").count("\n")
     assert lines <= 760, f"v3_ui.py is {lines} lines; move work out of V3UI"
+
+
+def test_devtools_touch_the_app_only_through_dev_hooks():
+    """B6: no ``app._x`` / ``self._app._x`` access (and no getattr with a
+    private name) under ``src/devtools``."""
+    import ast
+
+    offenders = []
+    for path in _production_py_files():
+        if "src/devtools/" not in path.as_posix():
+            continue
+        for node in ast.walk(ast.parse(path.read_text("utf-8"))):
+            if isinstance(node, ast.Attribute) and node.attr.startswith("_") \
+                    and not node.attr.startswith("__"):
+                base = node.value
+                if (isinstance(base, ast.Name) and base.id == "app") or (
+                        isinstance(base, ast.Attribute) and base.attr == "_app"):
+                    offenders.append(f"{path.relative_to(ROOT)}:{node.lineno} .{node.attr}")
+            if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                    and node.func.id in {"getattr", "hasattr", "setattr"}
+                    and len(node.args) > 1 and isinstance(node.args[0], ast.Name)
+                    and node.args[0].id == "app" and isinstance(node.args[1], ast.Constant)
+                    and str(node.args[1].value).startswith("_")):
+                offenders.append(f"{path.relative_to(ROOT)}:{node.lineno} {node.func.id}(app, ...)")
+    assert offenders == [], offenders
