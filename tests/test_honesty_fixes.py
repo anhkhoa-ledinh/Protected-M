@@ -69,3 +69,20 @@ def test_result_screen_covers_memory_saved_only_when_refused():
     assert ["Not saved"] in texts and any("too fast" in t[0] for t in texts)
     assert not any("Time left" in t[0] for t in texts)
     assert "rank_up" in bad.hidden
+
+
+def test_board_subtitle_names_the_server():
+    assert board.subtitle_for({"accounts": {}}) == "Accounts on this computer"
+    assert board.subtitle_for(None) == "Accounts on this computer"
+    assert board.subtitle_for({"accounts": {}, "server": "Home Pi"}) == "Players on Home Pi"
+
+
+def test_server_name_comes_from_central_json_and_defaults_to_the_host(srv, tmp_path):
+    cfg = tmp_path / "central.json"
+    cert = tmp_path / "c.pem"
+    cert.write_bytes(Path(srv.cert).read_bytes())
+    base = {"mode": "remote", "host": "127.0.0.1", "port": srv.port, "cert": "c.pem"}
+    cfg.write_text(json.dumps({**base, "name": "Home Pi"}))
+    assert build_account_service(tmp_path / "r1", cfg).accounts_view()["server"] == "Home Pi"
+    cfg.write_text(json.dumps(base))
+    assert build_account_service(tmp_path / "r2", cfg).accounts_view()["server"] == "127.0.0.1"

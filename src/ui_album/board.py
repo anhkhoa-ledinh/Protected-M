@@ -205,15 +205,23 @@ def _initial(name: str) -> str:
     return text[:1].upper() if text else "?"
 
 
+def subtitle_for(data) -> str:
+    """"Players on <server>" in remote mode, else the local wording."""
+    server = (data or {}).get("server") if isinstance(data, dict) else None
+    if isinstance(server, str) and server.strip():
+        return f"Players on {server.strip()[:32]}"
+    return "Accounts on this computer"
+
+
 def fill_state(state, flow, manifest, painter, data) -> None:
     """Fill ``state`` for the leaderboard: covers + real text. ``data`` is the
     accounts store; ``flow.account_key`` says which row is "you"."""
     entries = collect(data)
     seg = flow.board_seg or SEG_SOLO
     state.covers = covers_for(entries, seg, manifest.path(f"{SCREEN}/base.png"))
+    subtitle = subtitle_for(data)
     state.extra.append((_d(96, 168, 520, 204), [_run(
-        "Accounts on this computer", "Patrick Hand", 400, 20.0, INK_SOFT)],
-        ["Accounts on this computer"], "left"))
+        subtitle, "Patrick Hand", 400, 20.0, INK_SOFT)], [subtitle], "left"))
     mine = next((e for e in entries if e.key == flow.account_key), None)
     state.texts["you_rank"] = str(mine.rank) if mine else NO_SCORE
     you_name = f"You · {flow.player or 'guest'}"
