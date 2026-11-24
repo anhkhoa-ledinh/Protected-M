@@ -538,6 +538,21 @@ def start_search(flow: V3Flow, now: float) -> None:
     flow.go(PVP_SEARCH)
 
 
+#: PvP opens once every solo level has been won at least once.
+PVP_UNLOCK_LEVELS = (1, 2, 3, 4, 5)
+
+
+def pvp_lock_reason(flow: V3Flow) -> str | None:
+    """Why PvP is closed to this player, or ``None`` when it is open."""
+    if flow.wallet is None:                       # guest or nobody signed in
+        return "Sign in and win levels 1–5 to unlock PvP"
+    done = sum(1 for n in PVP_UNLOCK_LEVELS if n in flow.levels_cleared)
+    if done < len(PVP_UNLOCK_LEVELS):
+        return (f"Win levels 1–5 to unlock PvP — "
+                f"{done}/{len(PVP_UNLOCK_LEVELS)} done")
+    return None
+
+
 def toggle_item(flow: V3Flow, item: str) -> None:
     """Gắn/bỏ một vật phẩm. Hết ô hoặc hết điểm thì báo, không im lặng bỏ qua."""
     if item in flow.items:

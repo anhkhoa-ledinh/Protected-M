@@ -305,6 +305,10 @@ def _menu(state, flow, manifest=None, painter=None) -> None:
     if flow.wallet is not None:
         _wallet_line(state, manifest, F.MENU, (144, 612, 360, 24),
                      "photo_caption", f"Points  {flow.wallet}")
+    reason = F.pvp_lock_reason(flow)
+    if reason is not None:
+        _wallet_line(state, manifest, F.MENU, (144, 640, 600, 24),
+                     "photo_caption", reason)
 
 
 # ---- màn cài đặt -------------------------------------------------------

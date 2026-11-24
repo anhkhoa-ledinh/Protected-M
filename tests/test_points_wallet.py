@@ -73,3 +73,31 @@ def test_guest_has_no_wallet_and_items_are_free(ui):
 
 def test_item_price_is_weight_times_ten():
     assert F.item_price("Flare") == 30 and F.item_price("Thermal scan") == 80
+
+
+def test_pvp_lock_reason_counts_levels(ui):
+    _sign_up(ui, "Wally")
+    assert F.pvp_lock_reason(ui.state) == "Win levels 1–5 to unlock PvP — 0/5 done"
+    ui.state.levels_cleared = (1, 2, 3)
+    assert "3/5" in F.pvp_lock_reason(ui.state)
+    ui.state.levels_cleared = (1, 2, 3, 4, 5)
+    assert F.pvp_lock_reason(ui.state) is None
+    ui.state.wallet = None                         # guest
+    assert F.pvp_lock_reason(ui.state) is not None
+
+
+def test_pvp_tab_and_button_respect_the_lock(ui):
+    from src.ui_album import v3_routes as R
+
+    _sign_up(ui, "Wally")
+    ui.state.recovery_code_shown = ""             # the one-time dialog
+    ui.state.go(F.MENU)
+    ui.state.levels_cleared = (1, 2, 3)
+    for name in ("btn_PvP", "tab_PvP"):
+        ui.state.go(F.MENU)
+        R.on_click(ui.state, name, 0.0)
+        assert ui.state.screen == F.MENU and "3/5" in ui.state.message
+    ui.state.levels_cleared = (1, 2, 3, 4, 5)
+    ui.state.go(F.MENU)
+    R.on_click(ui.state, "btn_PvP", 0.0)
+    assert ui.state.screen == F.PVP_MODE

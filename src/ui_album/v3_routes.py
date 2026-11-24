@@ -387,7 +387,7 @@ def on_click(state, name: str | None, now: float, point=None) -> str:
         return _sign_in(state, name)
     if name in F.TABS:
         state.focus = None
-        state.go(F.TABS[name])
+        _open_tab(state, F.TABS[name])
         return ""
     if name in ("sign_out", "btn_Sign out"):
         return ACT_LOGOUT
@@ -399,9 +399,9 @@ def on_click(state, name: str | None, now: float, point=None) -> str:
     if name in F.MENU_BUTTONS:
         state.menu_focus = F.MENU_BUTTONS.index(name)
         state.focus = name
-        state.go({"btn_Solo": F.LEVELS, "btn_PvP": F.PVP_MODE,
-                  "btn_Leaderboard": F.BOARD,
-                  "btn_Settings": F.SETTINGS}[name])
+        _open_tab(state, {"btn_Solo": F.LEVELS, "btn_PvP": F.PVP_MODE,
+                          "btn_Leaderboard": F.BOARD,
+                          "btn_Settings": F.SETTINGS}[name])
         return ""
     if state.screen == F.SETTINGS:
         return _settings(state, name, point)
@@ -411,6 +411,21 @@ def on_click(state, name: str | None, now: float, point=None) -> str:
                         F.PVP_HUNT, F.PVP_HIDE, F.PVP_RESULT, F.OFFLINE):
         return _pvp(state, name, now)
     return _solo(state, name)
+
+
+def _open_tab(state, target: str) -> None:
+    """Go to a top-level screen; PvP stays shut (with the reason) until
+    every solo level has been won."""
+    if target == F.PVP_MODE and state.screen not in _PVP_SCREENS:
+        reason = F.pvp_lock_reason(state)
+        if reason is not None:
+            F.say(state, reason)
+            return
+    state.go(target)
+
+
+_PVP_SCREENS = (F.PVP_MODE, F.PVP_SEARCH, F.PVP_INVITE, F.PVP_FOUND,
+                F.PVP_HUNT, F.PVP_HIDE, F.PVP_RESULT, F.OFFLINE)
 
 
 # ---- TASK_perf_textures_1119 Fix 3: prefetch graph ------------------------
