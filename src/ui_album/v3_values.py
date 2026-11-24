@@ -22,6 +22,7 @@ from src.content import shared_album
 from src.ui_album import v3_flow as F
 from src.game.match import WEAPON_LABEL
 from src.ui_album.v3 import V3State
+from src.ui_album import ids as ID
 
 #: Màu lấy từ bảng ``colors`` của manifest, gọi tên cho dễ đọc.
 INK, SAFE, DANGER = "#24415F", "#3AA17A", "#E8676B"
@@ -215,18 +216,18 @@ def _signup_problem(flow, accounts: dict | None) -> str | None:
     (để kiểm tên đã bị lấy chưa); ``None`` bỏ qua việc kiểm đó (vd. khi
     gọi mà chưa có kho — không nên xảy ra ở đường chạy thật, nhưng tránh
     văng thay vì giả định)."""
-    if "field_user" in flow.touched:
+    if ID.FIELD_USER in flow.touched:
         display, reason = account_crypto.validate_username(flow.player)
         if display is None:
             return reason
         if accounts is not None and account_crypto.username_key(display) in accounts.get(
                 "accounts", {}):
             return "Username already taken"
-    if "field_pass" in flow.touched:
+    if ID.FIELD_PASS in flow.touched:
         ok, reason = account_crypto.validate_password(flow.password)
         if not ok:
             return reason
-    if "field_pass2" in flow.touched and flow.password2 != flow.password:
+    if ID.FIELD_PASS2 in flow.touched and flow.password2 != flow.password:
         return "Passwords don't match"
     return None
 
@@ -238,8 +239,8 @@ def _sign_in(state, flow, accounts: dict | None = None) -> None:
     state.texts["pass"] = dots
     state.texts["pass2"] = dots2
     state.remember = flow.remember
-    state.caret = {"field_user": "user", "field_pass": "pass",
-                   "field_pass2": "pass2"}.get(flow.focus or "")
+    state.caret = {ID.FIELD_USER: "user", ID.FIELD_PASS: "pass",
+                   ID.FIELD_PASS2: "pass2"}.get(flow.focus or "")
     state.caret_index = flow.caret_index
     state.focus = flow.focus
     if flow.screen == F.SIGN_IN_ERR:
@@ -994,7 +995,7 @@ def _pvp_lobby(state, flow, now, manifest=None, painter=None,
     elif screen == F.PVP_INVITE:
         state.texts["room_code"] = f"PM-{(flow.room_code or '0000')[:4]}"
         state.texts["join_typed"] = flow.join_typed.ljust(4, "_")
-        state.focus = "field_join" if flow.focus == "field_join" else None
+        state.focus = ID.FIELD_JOIN if flow.focus == ID.FIELD_JOIN else None
     elif screen == F.PVP_FOUND:
         state.texts["countdown"] = str(max(1, 3 - int(now - flow.found_at_s)))
         # TASK_accounts_1119: NETWORK-SUPPLIED — the opponent's own typed
@@ -1099,7 +1100,7 @@ def _selected_hotspots(screen: str, flow) -> set:
     (Phase 5's halved hover-ring alpha on an already-selected row)."""
     selected: set = set()
     for name in F.TABS:
-        in_section = (screen in _SOLO_TAB_SCREENS if name == "tab_Solo"
+        in_section = (screen in _SOLO_TAB_SCREENS if name == ID.TAB_SOLO
                      else screen == F.TABS[name])
         if in_section:
             selected.add(name)
@@ -1108,8 +1109,8 @@ def _selected_hotspots(screen: str, flow) -> set:
     if screen == F.LOADOUT:
         selected.add(f"weapon_{flow.weapon_name()}")
     if screen == F.SETTINGS:
-        selected.add("display_window" if flow.display == "window" else "display_full")
-        selected.add("theme_night" if flow.theme == "night" else "theme_day")
+        selected.add(ID.DISPLAY_WINDOW if flow.display == "window" else ID.DISPLAY_FULL)
+        selected.add(ID.THEME_NIGHT if flow.theme == "night" else ID.THEME_DAY)
     return selected
 
 

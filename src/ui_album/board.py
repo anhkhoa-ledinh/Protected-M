@@ -15,11 +15,12 @@ from dataclasses import dataclass
 from functools import lru_cache
 
 from src.account import crypto as account_crypto
+from src.ui_album import ids as ID
 
 #: The one switch for every cover below.
 COVERS_ENABLED = True
 
-SCREEN = "v3_14_leaderboard"
+SCREEN = ID.BOARD
 SEG_SOLO = "Solo"
 NO_SCORE = "—"
 PODIUM_SLOTS = 3

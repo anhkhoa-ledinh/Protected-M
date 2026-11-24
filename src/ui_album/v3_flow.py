@@ -22,22 +22,14 @@ from dataclasses import dataclass, field
 
 from src.game.pvp import (ITEM_WEIGHT, ITEMS_HAVE_EFFECT, LEVEL_TABLE,
                           PVP_MODES, item_price)
+from src.ui_album.ids import (BOARD, LEVELS, LOADING, LOADING_READY, LOADOUT,  # noqa: F401
+                                LOSE, MENU, OFFLINE, PHOTOS, PLAY, PVP_FOUND,
+                                PVP_HIDE, PVP_HUNT, PVP_INVITE, PVP_MODE,
+                                PVP_RESULT, PVP_SEARCH, SETTINGS, SIGN_IN,
+                                SIGN_IN_ERR, SIGN_UP, TILT, WIN)
+from src.ui_album import ids as ID
 
 logger = logging.getLogger(__name__)
-
-SIGN_IN, SIGN_UP = "v3_01a_sign_in", "v3_01b_sign_up"
-SIGN_IN_ERR = "v3_01c_sign_in_error"
-MENU, SETTINGS = "v3_02a_menu", "v3_02b_settings"
-OFFLINE = "v3_02c_disconnected"
-LEVELS, PHOTOS = "v3_03_level_select", "v3_04_choose_photo"
-LOADING, LOADING_READY = "v3_07_loading", "v3_07_loading_ready"
-LOADOUT, TILT = "v3_05_loadout", "v3_06_head_tilt_check"
-PLAY = "v3_08_gameplay_hud"
-WIN, LOSE = "v3_09a_result_win", "v3_09b_result_lose"
-PVP_MODE, PVP_SEARCH = "v3_10_pvp_mode", "v3_11a_pvp_searching"
-PVP_INVITE, PVP_FOUND = "v3_11b_pvp_invite", "v3_11c_pvp_found"
-PVP_HUNT, PVP_HIDE = "v3_12a_pvp_hunter_hud", "v3_12b_pvp_bug_hud"
-PVP_RESULT, BOARD = "v3_13_pvp_result", "v3_14_leaderboard"
 
 #: Bí danh theo tên của ``flow.py``. ``app.py`` dùng CHUNG một bộ hàm cho cả
 #: hai giao diện (``self._album.flow.PIPE0``…); giữ đúng tên thuộc tính ở đây
@@ -52,8 +44,8 @@ PIPE100 = LOADING_READY
 BUG_THEME = "ngay"
 
 #: Tab trên cùng → màn. Chạy được ở **mọi** màn có bốn hotspot này.
-TABS = {"tab_Solo": LEVELS, "tab_PvP": PVP_MODE,
-        "tab_Leaderboard": BOARD, "tab_Settings": SETTINGS}
+TABS = {ID.TAB_SOLO: LEVELS, ID.TAB_PVP: PVP_MODE,
+        ID.TAB_LEADERBOARD: BOARD, ID.TAB_SETTINGS: SETTINGS}
 
 #: Màn không được rời bằng tab (chưa đăng nhập thì chưa có gì để xem).
 LOCKED = (SIGN_IN, SIGN_UP, SIGN_IN_ERR)
@@ -103,7 +95,7 @@ TILT_TIMEOUT_S = 15.0
 TILT_ANGLE_DEG = 8.0
 
 #: Bốn nút của màn chính, theo thứ tự ↑/↓ chạy qua.
-MENU_BUTTONS = ("btn_Solo", "btn_PvP", "btn_Leaderboard", "btn_Settings")
+MENU_BUTTONS = (ID.BTN_SOLO, ID.BTN_PVP, ID.BTN_LEADERBOARD, ID.BTN_SETTINGS)
 
 
 @dataclass
@@ -295,31 +287,31 @@ class V3Flow:
 
 #: Ô nhập → tên thuộc tính giữ chuỗi của nó. Ba chuỗi RIÊNG: dùng chung một
 #: biến thì gõ ô này ô kia cũng đầy theo (lỗi người dùng gặp 06/11 23:01).
-FIELD_ATTR = {"field_user": "player", "field_pass": "password",
-              "field_pass2": "password2"}
+FIELD_ATTR = {ID.FIELD_USER: "player", ID.FIELD_PASS: "password",
+              ID.FIELD_PASS2: "password2"}
 
 #: TASK_accounts_1119: trần ký tự riêng từng ô — mật khẩu hợp lệ dài tới 64
 #: (``crypto.validate_password``), nên trần 24 cũ (dùng chung mọi ô) sẽ cắt
 #: mật khẩu dài mà người dùng không hề biết ("Raise the field cap so a
 #: password is never truncated silently").
-FIELD_MAXLEN = {"field_user": 32, "field_pass": 64, "field_pass2": 64}
+FIELD_MAXLEN = {ID.FIELD_USER: 32, ID.FIELD_PASS: 64, ID.FIELD_PASS2: 64}
 
 #: Thứ tự ô nhập khi bấm Tab.
-FIELD_ORDER = ("field_user", "field_pass", "field_pass2")
+FIELD_ORDER = (ID.FIELD_USER, ID.FIELD_PASS, ID.FIELD_PASS2)
 
 #: TASK_accounts_1119 Phase 6: the forgot-password dialog's own fields —
 #: declared here (next to ``FIELD_ATTR``) so ``field_value``/the caret
 #: helpers below can read both tables without a forward reference.
-FORGOT_FIELD_ATTR = {"field_forgot_user": "forgot_user",
-                     "field_forgot_code": "forgot_code",
-                     "field_forgot_pass": "forgot_new_pass",
-                     "field_forgot_pass2": "forgot_new_pass2"}
+FORGOT_FIELD_ATTR = {ID.FIELD_FORGOT_USER: "forgot_user",
+                     ID.FIELD_FORGOT_CODE: "forgot_code",
+                     ID.FIELD_FORGOT_PASS: "forgot_new_pass",
+                     ID.FIELD_FORGOT_PASS2: "forgot_new_pass2"}
 #: The code field gets slack for the dashes/spaces a user might type —
 #: normalised (stripped + upper-cased) only at submit time.
-FORGOT_FIELD_MAXLEN = {"field_forgot_user": 32, "field_forgot_code": 20,
-                       "field_forgot_pass": 64, "field_forgot_pass2": 64}
-FORGOT_FIELD_ORDER = ("field_forgot_user", "field_forgot_code",
-                      "field_forgot_pass", "field_forgot_pass2")
+FORGOT_FIELD_MAXLEN = {ID.FIELD_FORGOT_USER: 32, ID.FIELD_FORGOT_CODE: 20,
+                       ID.FIELD_FORGOT_PASS: 64, ID.FIELD_FORGOT_PASS2: 64}
+FORGOT_FIELD_ORDER = (ID.FIELD_FORGOT_USER, ID.FIELD_FORGOT_CODE,
+                      ID.FIELD_FORGOT_PASS, ID.FIELD_FORGOT_PASS2)
 
 
 def field_value(flow: V3Flow, name: str | None) -> str:
@@ -366,7 +358,7 @@ def _edit_delete(value: str, caret: int) -> tuple[str, int]:
 
 def type_char(flow: V3Flow, char: str) -> None:
     """Gõ một ký tự vào **đúng vị trí con trỏ** của ô đang chọn."""
-    if flow.focus == "field_join":
+    if flow.focus == ID.FIELD_JOIN:
         if char.isdigit() and len(flow.join_typed) < 4:
             flow.join_typed += char
         return
@@ -382,7 +374,7 @@ def type_char(flow: V3Flow, char: str) -> None:
 
 
 def backspace(flow: V3Flow) -> None:
-    if flow.focus == "field_join":
+    if flow.focus == ID.FIELD_JOIN:
         flow.join_typed = flow.join_typed[:-1]
         return
     attr = FIELD_ATTR.get(flow.focus or "")

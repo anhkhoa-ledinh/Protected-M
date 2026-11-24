@@ -28,6 +28,7 @@ import math
 import os
 import time
 from pathlib import Path
+from src.ui_album import ids as ID
 
 logger = logging.getLogger(__name__)
 
@@ -953,7 +954,7 @@ class DevTools:
             # Qua đúng cổng một cú bấm thật đi qua (on_click), không gọi
             # thẳng _pvp_action: _pvp()'s F.start_search() (đổi màn sang
             # PVP_SEARCH) phải chạy, không chỉ phần mạng.
-            action = v3_routes.on_click(state, "btn_Find match", now)
+            action = v3_routes.on_click(state, ID.BTN_FIND_MATCH, now)
             app._pvp_action(action, now)
         elif state.screen == F.PVP_RESULT:
             # Đứng lại 2 s trước khi quay lại tìm trận tiếp — không chỉ cho
@@ -1185,14 +1186,14 @@ class DevTools:
             # four big cards are "btn_Solo" etc — the top tab bar only
             # exists on LEVELS/PHOTOS/LOADOUT/TILT/SETTINGS/...), so the
             # old shot never moved the mouse and just showed a plain menu.
-            ("hover_tab_solo", hover_at(F.LEVELS, "tab_Solo"), HOVER_HOLD),
-            ("hover_display_full", hover_at(F.SETTINGS, "display_full"), HOVER_HOLD),
-            ("hover_link_guest", hover_at(F.SIGN_IN, "link_guest"), HOVER_HOLD),
-            ("hover_level_row_2", hover_at(F.LEVELS, "level_row_2"), HOVER_HOLD),
-            ("hover_btn_sign_in", hover_at(F.SIGN_IN, "btn_Sign in"), HOVER_HOLD),
-            ("hover_slider", hover_at(F.SETTINGS, "slider"), HOVER_HOLD),
-            ("press_btn_sign_in", hover_at(F.SIGN_IN, "btn_Sign in", press=True), HOVER_HOLD),
-            ("focus_field_user", focus_at(F.SIGN_IN, "field_user"), HOVER_HOLD),
+            ("hover_tab_solo", hover_at(F.LEVELS, ID.TAB_SOLO), HOVER_HOLD),
+            ("hover_display_full", hover_at(F.SETTINGS, ID.DISPLAY_FULL), HOVER_HOLD),
+            ("hover_link_guest", hover_at(F.SIGN_IN, ID.LINK_GUEST), HOVER_HOLD),
+            ("hover_level_row_2", hover_at(F.LEVELS, ID.LEVEL_ROW_2), HOVER_HOLD),
+            ("hover_btn_sign_in", hover_at(F.SIGN_IN, ID.BTN_SIGN_IN), HOVER_HOLD),
+            ("hover_slider", hover_at(F.SETTINGS, ID.SLIDER), HOVER_HOLD),
+            ("press_btn_sign_in", hover_at(F.SIGN_IN, ID.BTN_SIGN_IN, press=True), HOVER_HOLD),
+            ("focus_field_user", focus_at(F.SIGN_IN, ID.FIELD_USER), HOVER_HOLD),
             ("tilt_face", tilt_state(False, False, False), HOVER_HOLD),
             ("tilt_left", tilt_state(True, False, False), HOVER_HOLD),
             ("tilt_right", tilt_state(True, True, False), HOVER_HOLD),

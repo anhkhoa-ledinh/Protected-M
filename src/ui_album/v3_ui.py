@@ -34,6 +34,7 @@ from src.ui_album.v3 import V3Manifest, draw_screen, shot_state
 from src.ui_album.v3_hit import hit_test
 from src.ui_album.v3_painter import V3Painter
 from src.ui_album.v3_hover import HoverFx, cursor_for
+from src.ui_album import ids as ID
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +52,7 @@ FX_WIDE_THRESHOLD_PX = 1920
 #: noise on a text-entry/drag control).
 _UI_TAP_PREFIXES = ("btn_", "tab_", "seg_", "mode_", "display_", "theme_",
                     "level_row_", "weapon_", "sticker_", "slot_")
-_UI_TAP_EXACT = frozenset({"leave", "continue"})
+_UI_TAP_EXACT = frozenset({ID.LEAVE, ID.CONTINUE})
 #: A tap on something this tall/wide shows at the CLICK point, not the
 #: hotspot centre (a 300px-wide ``mode_`` card, or the full-screen
 #: ``continue`` hotspot) — centred would land far from where the player
@@ -292,8 +293,8 @@ class V3UI:
         """Hộp xác nhận chia sẻ che cả màn — hai nút của nó, không gì khác."""
         from src.ui_album.v3_screen_draw import CONFIRM_NO_RECT, CONFIRM_YES_RECT
 
-        for name, rect in (("btn_confirm_yes", CONFIRM_YES_RECT),
-                          ("btn_confirm_no", CONFIRM_NO_RECT)):
+        for name, rect in ((ID.BTN_CONFIRM_YES, CONFIRM_YES_RECT),
+                          (ID.BTN_CONFIRM_NO, CONFIRM_NO_RECT)):
             rx, ry, rw, rh = rect
             if rx <= x <= rx + rw and ry <= y <= ry + rh:
                 return name
@@ -305,8 +306,8 @@ class V3UI:
         the share-confirm dialog."""
         from src.ui_album.v3_screen_draw import RECOVERY_COPY_RECT, RECOVERY_SAVED_RECT
 
-        for name, rect in (("btn_recovery_copy", RECOVERY_COPY_RECT),
-                          ("btn_recovery_saved", RECOVERY_SAVED_RECT)):
+        for name, rect in ((ID.BTN_RECOVERY_COPY, RECOVERY_COPY_RECT),
+                          (ID.BTN_RECOVERY_SAVED, RECOVERY_SAVED_RECT)):
             rx, ry, rw, rh = rect
             if rx <= x <= rx + rw and ry <= y <= ry + rh:
                 return name
@@ -322,8 +323,8 @@ class V3UI:
             if (FORGOT_FIELD_X <= x <= FORGOT_FIELD_X + FORGOT_FIELD_W
                     and field_y <= y <= field_y + FORGOT_FIELD_H):
                 return name
-        for name, rect in (("btn_forgot_submit", FORGOT_SUBMIT_RECT),
-                          ("btn_forgot_cancel", FORGOT_CANCEL_RECT)):
+        for name, rect in ((ID.BTN_FORGOT_SUBMIT, FORGOT_SUBMIT_RECT),
+                          (ID.BTN_FORGOT_CANCEL, FORGOT_CANCEL_RECT)):
             rx, ry, rw, rh = rect
             if rx <= x <= rx + rw and ry <= y <= ry + rh:
                 return name
@@ -408,15 +409,15 @@ class V3UI:
                 value = "•" * len(raw) if masked else raw
                 return forgot_field_value_rect(field_y), _FIELD_VALUE_FONT, value
             return None
-        key = {"field_user": "user", "field_pass": "pass",
-              "field_pass2": "pass2"}.get(name)
+        key = {ID.FIELD_USER: "user", ID.FIELD_PASS: "pass",
+              ID.FIELD_PASS2: "pass2"}.get(name)
         if key is None:
             return None
         spec = self.manifest.text(self.state.screen, key)
         if spec is None:
             return None
         raw = F.field_value(self.state, name)
-        masked = name in ("field_pass", "field_pass2") and not self.state.show_password
+        masked = name in (ID.FIELD_PASS, ID.FIELD_PASS2) and not self.state.show_password
         value = "•" * len(raw) if masked else raw
         rect = _field_box_rect(self.manifest, self.state.screen, key,
                               [float(v) for v in spec["rect"]])
@@ -455,11 +456,11 @@ class V3UI:
                 FORGOT_FIELDS, FORGOT_SUBMIT_RECT,
                 RECOVERY_COPY_RECT, RECOVERY_SAVED_RECT)
 
-            rects = {"btn_confirm_yes": CONFIRM_YES_RECT, "btn_confirm_no": CONFIRM_NO_RECT,
-                    "btn_recovery_copy": RECOVERY_COPY_RECT,
-                    "btn_recovery_saved": RECOVERY_SAVED_RECT,
-                    "btn_forgot_submit": FORGOT_SUBMIT_RECT,
-                    "btn_forgot_cancel": FORGOT_CANCEL_RECT}
+            rects = {ID.BTN_CONFIRM_YES: CONFIRM_YES_RECT, ID.BTN_CONFIRM_NO: CONFIRM_NO_RECT,
+                    ID.BTN_RECOVERY_COPY: RECOVERY_COPY_RECT,
+                    ID.BTN_RECOVERY_SAVED: RECOVERY_SAVED_RECT,
+                    ID.BTN_FORGOT_SUBMIT: FORGOT_SUBMIT_RECT,
+                    ID.BTN_FORGOT_CANCEL: FORGOT_CANCEL_RECT}
             for field_name, _label, field_y, _masked in FORGOT_FIELDS:
                 rects[field_name] = (FORGOT_FIELD_X, field_y, FORGOT_FIELD_W, FORGOT_FIELD_H)
             return rects.get(name)
@@ -482,7 +483,7 @@ class V3UI:
         if not self._fx_enabled:
             return
         if in_dialog:
-            if name in ("btn_confirm_yes", "btn_confirm_no") and rect is not None:
+            if name in (ID.BTN_CONFIRM_YES, ID.BTN_CONFIRM_NO) and rect is not None:
                 self.spawn_fx("ui_tap", rect[0] + rect[2] * 0.5,
                              rect[1] + rect[3] * 0.5)
             return
@@ -551,9 +552,9 @@ class V3UI:
         """Enter = nút chính của màn đang mở (U2: "Enter = the primary
         button") — or of whichever dialog is open, if one is."""
         if self.state.recovery_code_shown:
-            return self._click("btn_recovery_saved")
+            return self._click(ID.BTN_RECOVERY_SAVED)
         if self.state.forgot_open:
-            return self._click("btn_forgot_submit")
+            return self._click(ID.BTN_FORGOT_SUBMIT)
         name = v3_routes.primary_button(self.manifest, self.state)
         if not name:
             return ""
@@ -819,7 +820,7 @@ class V3UI:
     def _apply_sign_up_result(self, result) -> None:
         outcome, key, code = result
         if outcome == "taken":
-            self.state.touched.add("field_user")
+            self.state.touched.add(ID.FIELD_USER)
             self.state.hint_bad = True
             self.state.hint_text = "Username already taken"
             return

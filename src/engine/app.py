@@ -51,6 +51,7 @@ from src.renderer.webcam_preview import WebcamPreviewSettings
 from src.scene import build_room_scene
 from src.scene.window_box import build_scene_for
 from src.ui_album.options import AlbumOptions
+from src.ui_album import ids as ID
 
 logger = logging.getLogger(__name__)
 
@@ -750,11 +751,11 @@ class HcpdApplication:
             elif state.screen == album.flow.PHOTOS:
                 # TASK_shared_album_1111 P3: cung phim R, nghia khac theo man —
                 # y het Enter (album.submit()) da doi nghia theo man tu truoc.
-                self._album_action(album.activate("btn_Random from album"), now)
+                self._album_action(album.activate(ID.BTN_RANDOM_FROM_ALBUM), now)
         if input_state.item_slot and not self._v3_field_focused():
             state.slot_selected = int(input_state.item_slot)
         if input_state.share_to_album and state.screen == album.flow.PHOTOS:
-            self._album_action(album.activate("btn_Share to album"), now)
+            self._album_action(album.activate(ID.BTN_SHARE_TO_ALBUM), now)
         if (input_state.hud_hide_toggle and not self._v3_field_focused()
                 and state.screen in (album.flow.PLAY, album.flow.PVP_HUNT,
                                      album.flow.PVP_HIDE)):
@@ -787,7 +788,7 @@ class HcpdApplication:
         # không đọc được qua danh sách cú bấm.
         if (state.screen == album.flow.SETTINGS
                 and self._window.is_mouse_down()
-                and album.hover() == "slider"):
+                and album.hover() == ID.SLIDER):
             self._album_action(album.click(), now)
         # Màn thử nghiêng cần góc đầu thật để chấm hai dấu trái/phải.
         if state.screen == album.flow.TILT and not self._v3_live:
@@ -1270,8 +1271,8 @@ class HcpdApplication:
             self._start_share_upload(path)
         elif action == "random_from_album":
             self._start_random_photo()
-        elif action in ("display_full", "display_window"):
-            mode = "fullscreen" if action == "display_full" else "window"
+        elif action in (ID.DISPLAY_FULL, ID.DISPLAY_WINDOW):
+            mode = "fullscreen" if action == ID.DISPLAY_FULL else "window"
             if self._window.set_display_mode(mode):
                 self._apply_display_mode(mode)
         elif action.startswith("pvp_"):

@@ -10,6 +10,7 @@ from OpenGL import GL
 
 from src.ui_album.v3_hit import hotspot_rect
 from src.ui_album.v3_painter import rgba
+from src.ui_album import ids as ID
 
 #: Con trỏ nhập của ô đang chọn (ghi trong ``screens[].notes``).
 CARET_SIZE = (2.0, 20.0)
@@ -26,8 +27,8 @@ FORGOT_FIELD_W = 524.0
 #: three sign-in/up fields whose caret must scroll within the FULL field
 #: BOX, not the narrow rect Penpot exported around the box's SAMPLE value
 #: (``user``'s sample "anhkhoa" measures 65px; the box itself is 356px).
-_CARET_FIELD_HOTSPOT = {"user": "field_user", "pass": "field_pass",
-                       "pass2": "field_pass2"}
+_CARET_FIELD_HOTSPOT = {"user": ID.FIELD_USER, "pass": ID.FIELD_PASS,
+                       "pass2": ID.FIELD_PASS2}
 
 
 def _field_box_rect(manifest, screen: str, key: str, text_rect):

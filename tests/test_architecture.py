@@ -324,3 +324,32 @@ def test_only_known_modules_write_images_and_none_outside_devtools_sees_a_camera
         if chain:
             touching[module] = " -> ".join(chain)
     assert touching == {}, f"a module that writes images can reach the camera: {touching}"
+
+
+#: B1. ``src.fx`` may not import ``ui_album`` (see ``_FIXED_PAIRS``), so its
+#: screen table keeps copies; ``tests/test_ui_ids.py`` checks they match.
+_ID_LITERAL_EXEMPT = {"src/fx/screens.py", "src/ui_album/ids.py"}
+
+
+def test_no_ui_id_literal_outside_ids_py():
+    import ast
+    import importlib
+
+    ids = importlib.import_module("src.ui_album.ids")
+    wanted = {v for k, v in vars(ids).items() if k.isupper() and isinstance(v, str)}
+    wanted |= set(ids.NOT_USED_IN_CODE)
+    offenders = []
+    for path in _production_py_files():
+        rel = path.relative_to(ROOT).as_posix()
+        if rel in _ID_LITERAL_EXEMPT:
+            continue
+        tree = ast.parse(path.read_text("utf-8"))
+        docstrings = {id(n.body[0].value) for n in ast.walk(tree)
+                      if isinstance(n, (ast.Module, ast.ClassDef, ast.FunctionDef,
+                                        ast.AsyncFunctionDef))
+                      and n.body and isinstance(n.body[0], ast.Expr)}
+        for node in ast.walk(tree):
+            if (isinstance(node, ast.Constant) and isinstance(node.value, str)
+                    and node.value in wanted and id(node) not in docstrings):
+                offenders.append(f"{rel}:{node.lineno} {node.value!r}")
+    assert offenders == [], "use src.ui_album.ids instead of the literal:\n" + "\n".join(offenders)

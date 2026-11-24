@@ -14,6 +14,7 @@ import logging
 from src.account import crypto as _account_crypto
 from src.content import shared_album
 from src.ui_album import v3_flow as F
+from src.ui_album import ids as ID
 
 logger = logging.getLogger(__name__)
 
@@ -26,8 +27,8 @@ ACT_START_GAME = "start_game"
 ACT_NEXT_LEVEL = "next_level"
 ACT_LOGOUT = "logout"
 ACT_COPY_CODE = "copy_code"
-ACT_DISPLAY_FULL = "display_full"
-ACT_DISPLAY_WINDOW = "display_window"
+ACT_DISPLAY_FULL = ID.DISPLAY_FULL
+ACT_DISPLAY_WINDOW = ID.DISPLAY_WINDOW
 ACT_SHARE_CONFIRMED = "share_confirmed"
 ACT_RANDOM_FROM_ALBUM = "random_from_album"
 #: TASK_pvp_lan_1116: PvP thật — app.py làm việc mạng, giao diện chỉ hỏi.
@@ -50,15 +51,15 @@ ACT_COPY_RECOVERY_CODE = "account_copy_recovery_code"
 #: Nút chính của từng màn — Enter bấm đúng nút này (U2 "Enter = the primary
 #: button"). Màn không có tên trong bảng thì Enter không làm gì.
 PRIMARY = {
-    F.SIGN_IN: "btn_Sign in", F.SIGN_UP: "btn_Create album",
-    F.SIGN_IN_ERR: "btn_Sign in", F.MENU: None,
-    F.LEVELS: "btn_Next: choose a photo",
-    F.PHOTOS: "btn_Split layers & continue",
-    F.LOADING_READY: "continue", F.LOADOUT: "btn_Start",
-    F.TILT: "btn_Enter match", F.WIN: "btn_Next level",
-    F.LOSE: "btn_Try again", F.PVP_MODE: "btn_Find match",
-    F.PVP_INVITE: "btn_Join room", F.PVP_RESULT: "btn_Rematch",
-    F.OFFLINE: "btn_Try again now", F.SETTINGS: "btn_recalibrate",
+    F.SIGN_IN: ID.BTN_SIGN_IN, F.SIGN_UP: ID.BTN_CREATE_ALBUM,
+    F.SIGN_IN_ERR: ID.BTN_SIGN_IN, F.MENU: None,
+    F.LEVELS: ID.BTN_NEXT_CHOOSE_A_PHOTO,
+    F.PHOTOS: ID.BTN_SPLIT_LAYERS_CONTINUE,
+    F.LOADING_READY: ID.CONTINUE, F.LOADOUT: ID.BTN_START,
+    F.TILT: ID.BTN_ENTER_MATCH, F.WIN: ID.BTN_NEXT_LEVEL,
+    F.LOSE: ID.BTN_TRY_AGAIN, F.PVP_MODE: ID.BTN_FIND_MATCH,
+    F.PVP_INVITE: ID.BTN_JOIN_ROOM, F.PVP_RESULT: ID.BTN_REMATCH,
+    F.OFFLINE: ID.BTN_TRY_AGAIN_NOW, F.SETTINGS: ID.BTN_RECALIBRATE_LOWER,
 }
 
 #: Esc / ``btn_Back`` lùi về đâu. Màn vắng mặt thì lùi về màn chính.
@@ -108,18 +109,18 @@ def _sign_in(state, name: str) -> str:
     ``ACT_*`` để app.py tự quyết phần còn lại off-thread, đúng khuôn mọi
     hành động khác trong file này.
     """
-    if name == "btn_Sign in":
+    if name == ID.BTN_SIGN_IN:
         state.focus = None
         if not state.player.strip() or not state.password:
             state.sign_in_error = "Enter a username and password."
             state.go(F.SIGN_IN_ERR)
             return ""
         return ACT_SIGN_IN
-    elif name == "btn_Create album" and state.screen == F.SIGN_UP:
+    elif name == ID.BTN_CREATE_ALBUM and state.screen == F.SIGN_UP:
         state.focus = None
         # Chạm hết ba ô: bấm thẳng nút mà chưa gõ ô nào (vd. chỉ gõ mật
         # khẩu rồi Tab qua nút) vẫn phải thấy đúng gợi ý, không im lặng.
-        state.touched |= {"field_user", "field_pass", "field_pass2"}
+        state.touched |= {ID.FIELD_USER, ID.FIELD_PASS, ID.FIELD_PASS2}
         display, reason = _account_crypto.validate_username(state.player)
         if display is None:
             return ""                          # gợi ý đã hiện qua state_for
@@ -127,10 +128,10 @@ def _sign_in(state, name: str) -> str:
         if not pass_ok or state.password != state.password2:
             return ""
         return ACT_SIGN_UP
-    elif name in ("btn_Create album", "btn_Create a new album"):
+    elif name in (ID.BTN_CREATE_ALBUM, ID.BTN_CREATE_A_NEW_ALBUM):
         state.focus = None
         state.go(F.SIGN_UP)                    # trên màn đăng nhập = sang đăng ký
-    elif name == "footer_link":
+    elif name == ID.FOOTER_LINK:
         state.focus = None
         # Màn đăng ký: về đăng nhập. Màn lỗi: vào bằng khách.
         if state.screen == F.SIGN_UP:
@@ -144,23 +145,23 @@ def _sign_in(state, name: str) -> str:
             # hạng hiện nhầm dữ liệu của người khác.
             state.history, state.recent = {}, []
             state.go(F.MENU)
-    elif name == "link_guest":
+    elif name == ID.LINK_GUEST:
         state.focus = None
         state.player = state.player or "guest"
         state.account_key = _account_crypto.GUEST_KEY
         state.history, state.recent = {}, []
         state.go(F.MENU)
-    elif name == "link_forgot":
+    elif name == ID.LINK_FORGOT:
         state.forgot_open = True
         state.forgot_user = state.player
         state.forgot_code = ""
         state.forgot_new_pass = state.forgot_new_pass2 = ""
         state.forgot_error = ""
         state.forgot_touched = set()
-        state.forgot_focus = "field_forgot_user"
-    elif name == "switch_remember":
+        state.forgot_focus = ID.FIELD_FORGOT_USER
+    elif name == ID.SWITCH_REMEMBER:
         state.remember = not state.remember
-    elif name == "icon_show_password":
+    elif name == ID.ICON_SHOW_PASSWORD:
         state.show_password = not state.show_password
     elif name.startswith("field_"):
         state.focus = name
@@ -168,24 +169,24 @@ def _sign_in(state, name: str) -> str:
 
 
 def _settings(state, name: str, point) -> str:
-    if name == "theme_day":
+    if name == ID.THEME_DAY:
         state.theme = "day"
-    elif name == "theme_night":
+    elif name == ID.THEME_NIGHT:
         # Bộ v3 chỉ có một bảng màu. Nói thẳng, và KHÔNG đổi cái điều khiển:
         # để nó nhảy sang Night rồi màn vẫn sáng là hứa điều không có.
         F.say(state, "Night theme is not in v2 yet.")
-    elif name == "display_full":
+    elif name == ID.DISPLAY_FULL:
         return ACT_DISPLAY_FULL
-    elif name == "display_window":
+    elif name == ID.DISPLAY_WINDOW:
         return ACT_DISPLAY_WINDOW
-    elif name == "dropdown_webcam":
+    elif name == ID.DROPDOWN_WEBCAM:
         state.webcam_index = (state.webcam_index + 1) % 2
         F.say(state, "Switching webcam isn't supported while running.")
-    elif name == "btn_recalibrate":
+    elif name == ID.BTN_RECALIBRATE_LOWER:
         return ACT_REST_EYE
-    elif name == "slider":
+    elif name == ID.SLIDER:
         state.volume = _slider_value(state, point)
-    elif name == "btn_Sign out":
+    elif name == ID.BTN_SIGN_OUT:
         return ACT_LOGOUT
     return ""
 
@@ -208,7 +209,7 @@ def _confirm_share(state, name: str) -> str:
     """Hộp xác nhận chia sẻ (TASK_shared_album_1111 P2.3): Yes / No."""
     path = state.shared_album_pending
     state.shared_album_pending = ""
-    if name == "btn_confirm_no":
+    if name == ID.BTN_CONFIRM_NO:
         return ""
     state.shared_album_confirmed.add(path)
     state.shared_album_upload_path = path
@@ -218,9 +219,9 @@ def _confirm_share(state, name: str) -> str:
 def _recovery_dialog(state, name: str) -> str:
     """TASK_accounts_1119 Phase 6: the one-time recovery-code dialog —
     "Copy" (clipboard, app.py's job) and "I saved it" (closes it)."""
-    if name == "btn_recovery_copy":
+    if name == ID.BTN_RECOVERY_COPY:
         return ACT_COPY_RECOVERY_CODE
-    elif name == "btn_recovery_saved":
+    elif name == ID.BTN_RECOVERY_SAVED:
         state.recovery_code_shown = ""
         return ACT_RECOVERY_SAVED
     return ""
@@ -235,13 +236,13 @@ def _forgot_dialog(state, name: str) -> str:
     """
     if name.startswith("field_forgot_"):
         state.forgot_focus = name
-    elif name == "btn_forgot_cancel":
+    elif name == ID.BTN_FORGOT_CANCEL:
         state.forgot_open = False
         state.forgot_focus = None
         state.forgot_error = ""
-    elif name == "btn_forgot_submit":
-        state.forgot_touched |= {"field_forgot_user", "field_forgot_code",
-                                 "field_forgot_pass", "field_forgot_pass2"}
+    elif name == ID.BTN_FORGOT_SUBMIT:
+        state.forgot_touched |= {ID.FIELD_FORGOT_USER, ID.FIELD_FORGOT_CODE,
+                                 ID.FIELD_FORGOT_PASS, ID.FIELD_FORGOT_PASS2}
         display, reason = _account_crypto.validate_username(state.forgot_user)
         if display is None:
             state.forgot_error = reason
@@ -263,7 +264,7 @@ def _forgot_dialog(state, name: str) -> str:
 
 
 def _solo(state, name: str) -> str:
-    if name == "btn_Share to album":
+    if name == ID.BTN_SHARE_TO_ALBUM:
         if not shared_album.can_upload():
             pass                     # nhãn nút đã nói "not configured"
         elif not state.photo:
@@ -273,21 +274,21 @@ def _solo(state, name: str) -> str:
             return ACT_SHARE_CONFIRMED  # đã hỏi ảnh này rồi, khỏi hỏi lại
         else:
             state.shared_album_pending = state.photo
-    elif name == "btn_Random from album":
+    elif name == ID.BTN_RANDOM_FROM_ALBUM:
         if shared_album.load_config() is not None:
             return ACT_RANDOM_FROM_ALBUM  # nhan da noi "not configured" neu khong
     elif name.startswith("level_row_"):
         state.level = int(name.rsplit("_", 1)[1])
-    elif name == "btn_Next: choose a photo":
+    elif name == ID.BTN_NEXT_CHOOSE_A_PHOTO:
         state.go(F.PHOTOS)
-    elif name in ("btn_Choose from computer", "dropzone"):
+    elif name in (ID.BTN_CHOOSE_FROM_COMPUTER, ID.DROPZONE):
         return ACT_PICK_FILE
-    elif name == "recent_memory":
+    elif name == ID.RECENT_MEMORY:
         if state.recent:
             state.photo = state.recent[0]
-    elif name == "btn_Split layers & continue":
+    elif name == ID.BTN_SPLIT_LAYERS_CONTINUE:
         return ACT_START_PIPELINE
-    elif name == "continue":
+    elif name == ID.CONTINUE:
         state.go(F.LOADOUT)
     elif name.startswith("weapon_"):
         chosen = name[len("weapon_"):]
@@ -299,14 +300,14 @@ def _solo(state, name: str) -> str:
         # Bấm vào ô ĐANG CÓ vật phẩm = bỏ nó ra (U2 — Loadout). Ô trống thì
         # không có gì để bỏ, nên cú bấm rơi vào im lặng là đúng.
         F.remove_slot(state, int(name.rsplit("_", 1)[1]) - 1)
-    elif name == "btn_Start":
+    elif name == ID.BTN_START:
         if state.weapon is None:
             F.say(state, "Choose a weapon first.")
         else:
             state.go(F.TILT)
-    elif name in ("btn_Recalibrate", "btn_recalibrate"):
+    elif name in (ID.BTN_RECALIBRATE, ID.BTN_RECALIBRATE_LOWER):
         return ACT_REST_EYE
-    elif name == "btn_Enter match":
+    elif name == ID.BTN_ENTER_MATCH:
         if not state.tilt_ready():
             F.say(state, "Finish the three checks first.")
             return ""
@@ -315,13 +316,13 @@ def _solo(state, name: str) -> str:
 
 
 def _results(state, name: str) -> str:
-    if name == "btn_Next level":
+    if name == ID.BTN_NEXT_LEVEL:
         return ACT_NEXT_LEVEL
-    if name in ("btn_Play again", "btn_Try again"):
+    if name in (ID.BTN_PLAY_AGAIN, ID.BTN_TRY_AGAIN):
         state.go(F.TILT)
-    elif name == "btn_Choose another photo":
+    elif name == ID.BTN_CHOOSE_ANOTHER_PHOTO:
         state.go(F.PHOTOS)
-    elif name == "btn_Back to album":
+    elif name == ID.BTN_BACK_TO_ALBUM:
         state.go(F.MENU)
     return ""
 
@@ -337,37 +338,37 @@ def _pvp(state, name: str, now: float) -> str:
         chosen = name[len("mode_"):]
         if chosen in F.PVP_MODES:
             state.mode = chosen
-    elif name == "btn_Find match":
+    elif name == ID.BTN_FIND_MATCH:
         F.start_search(state, now)          # chỉ để "search_time" có mốc
         return ACT_PVP_FIND
-    elif name == "btn_Invite a friend":
+    elif name == ID.BTN_INVITE_A_FRIEND:
         state.room_code = ""                 # trống tới khi server trả "room"
         state.join_typed = ""
         state.go(F.PVP_INVITE)
         return ACT_PVP_CREATE_ROOM
-    elif name == "btn_Copy code":
+    elif name == ID.BTN_COPY_CODE:
         return ACT_COPY_CODE
-    elif name == "field_join":
-        state.focus = "field_join"
-    elif name == "btn_Join room":
+    elif name == ID.FIELD_JOIN:
+        state.focus = ID.FIELD_JOIN
+    elif name == ID.BTN_JOIN_ROOM:
         if len(state.join_typed) != 4:
             F.say(state, "Enter the 4-digit room code first.")
             return ""
         return ACT_PVP_JOIN_ROOM
-    elif name == "btn_Close room":
+    elif name == ID.BTN_CLOSE_ROOM:
         state.go(F.PVP_MODE)
         return ACT_PVP_CANCEL
-    elif name in ("btn_Cancel", "leave"):
+    elif name in (ID.BTN_CANCEL, ID.LEAVE):
         state.go(F.PVP_MODE)
         return ACT_PVP_CANCEL
-    elif name == "btn_Rematch":
+    elif name == ID.BTN_REMATCH:
         return ACT_PVP_REMATCH
-    elif name == "btn_Leaderboard":
+    elif name == ID.BTN_LEADERBOARD:
         state.go(F.BOARD)
-    elif name == "btn_Try again now":
+    elif name == ID.BTN_TRY_AGAIN_NOW:
         state.go(F.PVP_MODE)
         return ACT_PVP_RECONNECT
-    elif name == "btn_Back to album":
+    elif name == ID.BTN_BACK_TO_ALBUM:
         state.go(F.MENU)
     return ""
 
@@ -377,7 +378,7 @@ def on_click(state, name: str | None, now: float, point=None) -> str:
     if not name:
         return ""
     logger.info("UI v3 click: %s (man %s)", name, state.screen)
-    if state.shared_album_pending and name in ("btn_confirm_yes", "btn_confirm_no"):
+    if state.shared_album_pending and name in (ID.BTN_CONFIRM_YES, ID.BTN_CONFIRM_NO):
         return _confirm_share(state, name)
     if state.recovery_code_shown:
         return _recovery_dialog(state, name)
@@ -389,9 +390,9 @@ def on_click(state, name: str | None, now: float, point=None) -> str:
         state.focus = None
         _open_tab(state, F.TABS[name])
         return ""
-    if name in ("sign_out", "btn_Sign out"):
+    if name in (ID.SIGN_OUT, ID.BTN_SIGN_OUT):
         return ACT_LOGOUT
-    if name == "btn_Back":
+    if name == ID.BTN_BACK:
         return on_back(state, now)
     if name.startswith("seg_"):
         state.board_seg = name[len("seg_"):]   # U2: viên pill dịch, dữ liệu giữ
@@ -399,9 +400,9 @@ def on_click(state, name: str | None, now: float, point=None) -> str:
     if name in F.MENU_BUTTONS:
         state.menu_focus = F.MENU_BUTTONS.index(name)
         state.focus = name
-        _open_tab(state, {"btn_Solo": F.LEVELS, "btn_PvP": F.PVP_MODE,
-                          "btn_Leaderboard": F.BOARD,
-                          "btn_Settings": F.SETTINGS}[name])
+        _open_tab(state, {ID.BTN_SOLO: F.LEVELS, ID.BTN_PVP: F.PVP_MODE,
+                          ID.BTN_LEADERBOARD: F.BOARD,
+                          ID.BTN_SETTINGS: F.SETTINGS}[name])
         return ""
     if state.screen == F.SETTINGS:
         return _settings(state, name, point)
