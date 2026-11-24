@@ -74,6 +74,7 @@ HOOK_ENV_VARS = (
     "HCPD_PERF_PROFILE", "HCPD_PVP_AUTO", "HCPD_PVP_SHOTS",
     "HCPD_PROP_PROBE", "HCPD_VIDEO_STATS", "HCPD_HUD_FIX_1119_SHOTS",
     "HCPD_ALBUM_AUTOWIN", "HCPD_BUG_SEED", "HCPD_ECONOMY_1124",
+    "HCPD_HARDENING_1124_SHOTS", "HCPD_BAD_PHOTO_1124",
 )
 
 #: Bug-placement seed an automatch run uses unless ``HCPD_BUG_SEED`` says
@@ -437,6 +438,14 @@ class HcpdApplication:
                 self._screen_cal["screen_height"])
         return build_room_scene()
 
+    def _load_error(self, text: str) -> None:
+        """A photo that could not be opened: the toast of the 3D pass, plus the
+        album's own message line (the toast alone is not visible in v3)."""
+        self._renderer.show_toast(text, is_error=True)
+        album = self._album
+        if album is not None and self._album_options.is_v3:
+            album.flow.say(album.state, text, 5.0)
+
     def _try_load_media(self, path: Path, now: float, *, clean=None) -> None:
         """
         Load image/video via picker or drag-drop; persist on success.
@@ -445,10 +454,10 @@ class HcpdApplication:
         vòng lặp — để số giây của ván bị bỏ dở không gồm thời gian chọn file.
         """
         if not path.exists():
-            self._renderer.show_toast(f"File not found: {path.name}", is_error=True)
+            self._load_error(f"File not found: {path.name}")
             return
         if not is_supported_media(path):
-            self._renderer.show_toast("Unsupported file type", is_error=True)
+            self._load_error("Unsupported file type")
             return
 
         # An image goes through ``media_gate`` inside ``load_content_file``
@@ -456,7 +465,7 @@ class HcpdApplication:
         ok, msg = self._renderer.load_content_file(
             clean if clean is not None else path, label=path.name)
         if not ok:
-            self._renderer.show_toast(msg, is_error=True)
+            self._load_error(msg)
             return
 
         kind = detect_content_type(path) or "video"
@@ -502,7 +511,9 @@ class HcpdApplication:
         # ``evidence_1118`` right below — ``_build_hud_fix_1119_steps``
         # also drives its own fixed ``album.mouse`` per step.
         hud_fix_1119_shots = self._devtools.env("HCPD_HUD_FIX_1119_SHOTS") == "1"
-        if not sakuga_shots and not scope_bench and not evidence_1118 and not hud_fix_1119_shots:
+        hardening_1124_shots = self._devtools.env("HCPD_HARDENING_1124_SHOTS") == "1"
+        if (not sakuga_shots and not scope_bench and not evidence_1118
+                and not hud_fix_1119_shots and not hardening_1124_shots):
             # TASK_ui_sakuga_1117: lượt chụp 20 ảnh tự đặt ``album.mouse``
             # cho từng bước (hover_*/press_*) — con trỏ OS thật ghi đè lên
             # đúng mỗi khung thì KHÔNG BAO GIỜ thấy hover, bất kể bước nào

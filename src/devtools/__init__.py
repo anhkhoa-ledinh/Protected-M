@@ -58,6 +58,7 @@ class DevTools:
         self._tick_scope_bench(now)
         self._tick_evidence_1118(now)
         self._tick_hud_fix_1119_shots(now)
+        self._tick_hardening_1124_shots(now)
 
     def tick_pvp(self, now: float) -> None:
         """Replaces, in the SAME order, the two devtools ticks that used
@@ -484,6 +485,131 @@ class DevTools:
             ("hud_scope", scoped(centre), 1.5),
         ]
 
+    # ---- TASK_hardening_1124: item-slot fade shots + bad-photo check ---------
+
+    def _shoot_framebuffer(self, path: Path) -> None:
+        """One F12-style shot of the real window (same path as the other hooks)."""
+        from OpenGL import GL
+
+        from src.ui_album.shots import save_framebuffer
+
+        app = self._app
+        app._window.restore_and_focus()
+        app._window.pump_events()
+        scene = app._last_scene or (lambda: None)
+        if not app._album.has_viewport():
+            app._album.draw_hidden_scene(scene)
+        app._album_draw_guarded(scene)
+        width, height = app._window.framebuffer_size()
+        if width >= 2 and height >= 2:
+            GL.glFinish()
+            save_framebuffer(path, width, height)
+        app._window.swap_buffers()
+
+    def _bad_photo_1124(self, now: float) -> bool:
+        """``HCPD_BAD_PHOTO_1124=<file>``: before the automatch loads its own
+        photo, push this (bad) file through the real loader ``_try_load_media``
+        and shoot the window with the error toast on it. True while busy."""
+        app = self._app
+        bad = self.env("HCPD_BAD_PHOTO_1124").strip()
+        if not bad or getattr(self, "_bad_photo_done", False):
+            return False
+        out = Path(self.env("HCPD_HARDENING_1124_OUT")
+                   or app._root / "results" / "hardening_1124" / "g5")
+        if not hasattr(self, "_bad_photo_t"):
+            if not self._measurement_ready():
+                return True
+            app._try_load_media(Path(bad), now)
+            self._bad_photo_t = now
+            logger.info("BAD_PHOTO_1124: loaded %s through _try_load_media", bad)
+            return True
+        if now - self._bad_photo_t < 0.7:
+            return True
+        self._shoot_framebuffer(out / "g5_bad_file_error.png")
+        logger.info("BAD_PHOTO_1124: shot g5_bad_file_error.png")
+        self._bad_photo_done = True
+        return False
+
+    def _tick_hardening_1124_shots(self, now: float) -> None:
+        """``HCPD_HARDENING_1124_SHOTS=1`` (with ``HCPD_ALBUM_AUTOMATCH=1`` and
+        ``HCPD_AUTOMATCH_ITEMS`` of two items): the item-slot fade evidence,
+        shots of the real window into ``HCPD_HARDENING_1124_OUT``. Each step
+        also logs the live card alphas, so the pixel check has the numbers
+        the UI itself used."""
+        app = self._app
+        if self.env("HCPD_HARDENING_1124_SHOTS") != "1" or not app._album_options.is_v3:
+            return
+        F = app._album.flow
+        if app._album.state.screen != F.PLAY:
+            return
+        if not hasattr(self, "_h24_step"):
+            if not self._measurement_ready():
+                return
+            self._h24_step, self._h24_t = 0, now
+            self._h24_out = Path(self.env("HCPD_HARDENING_1124_OUT")
+                                 or app._root / "results" / "hardening_1124" / "g3")
+            self._h24_steps = self._build_hardening_1124_steps()
+            return
+        if self._h24_step >= len(self._h24_steps):
+            app._window.request_close()
+            return
+        name, setup, hold_s = self._h24_steps[self._h24_step]
+        setup(app)
+        app._album.state.message = ""      # the H-hide toast must not sit on a slot
+        if now - self._h24_t >= hold_s:
+            if name is not None:
+                self._shoot_framebuffer(self._h24_out / f"{name}.png")
+                logger.info("HARDENING_1124: %s.png alphas=%s", name,
+                            {k: round(v, 3) for k, v in app._album.hud_card_alpha.items()})
+            self._h24_step += 1
+            self._h24_t = now
+
+    def _build_hardening_1124_steps(self) -> list:
+        def crosshair(xy):
+            def setup(app):
+                app._album.mouse = xy
+            return setup
+
+        def scoped(xy):
+            def setup(app):
+                import os as _os
+
+                _os.environ["HCPD_SCOPE_BENCH"] = "1"
+                app._album.mouse = app._tick_scope(time.perf_counter(), xy)
+            return setup
+
+        def hidden(want: bool):
+            def setup(app):
+                if app._album.hud_hidden != want:
+                    app._album.toggle_hud_hidden()
+            return setup
+
+        def weapon(name):
+            def setup(app):
+                self._apply_bench_weapon(name)
+            return setup
+
+        def clear_toast():
+            def setup(app):
+                app._album.state.message = ""
+            return setup
+
+        far, slot, health = (640.0, 330.0), (640.0, 628.0), (204.0, 626.0)
+        return [
+            (None, clear_toast(), 0.1),
+            ("a_far", crosshair(far), 1.2),
+            (None, hidden(True), 0.6),
+            ("bg_unscoped", crosshair(far), 0.4),
+            (None, hidden(False), 0.6),
+            ("b_slot", crosshair(slot), 1.2),
+            ("c_health", crosshair(health), 1.2),
+            (None, weapon("Precision gun"), 0.1),
+            (None, clear_toast(), 0.1),
+            ("d_scoped", scoped(far), 1.8),
+            (None, hidden(True), 0.6),
+            ("bg_scoped", scoped(far), 0.4),
+        ]
+
     # ---- TASK_hud_fix_1119 Fix 4 / Part A: automatch + autowin --------------
 
     def _tick_album_automatch(self, now: float) -> None:
@@ -515,6 +641,8 @@ class DevTools:
             # "no clicking through the whole flow" needs to jump there
             # itself instead of just waiting for it.
             app._album.state.go(F.PLAY)
+            return
+        if self._bad_photo_1124(now):
             return
         photo = self.env("HCPD_AUTOMATCH_PHOTO").strip()
         if photo and not getattr(self, "_automatch_photo_loaded", False):

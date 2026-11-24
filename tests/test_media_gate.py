@@ -207,3 +207,26 @@ def test_gate_matches_the_old_decoder_pixel_for_pixel(tmp_path):
                                         cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB)
         new = G.load_rgb(G.import_photo(path, tmp_path / "cache"))
         assert np.array_equal(old, new), name
+
+
+def test_a_rejected_photo_shows_its_error_on_the_album_screen(tmp_path):
+    """The renderer toast is not visible in v3, so ``_try_load_media`` also
+    puts the message on the album's own line (logic-only: no window here)."""
+    from types import SimpleNamespace
+
+    from src.engine.app import HcpdApplication
+    from src.ui_album import v3_flow as F
+
+    bad = tmp_path / "zip.png"
+    bad.write_bytes(M.png_bytes() + M.zip_bytes())
+    toasts = []
+    app = HcpdApplication.__new__(HcpdApplication)
+    flow = F.V3Flow()
+    app._album = SimpleNamespace(flow=F, state=flow)
+    app._album_options = SimpleNamespace(is_v3=True, enabled=True)
+    app._renderer = SimpleNamespace(
+        show_toast=lambda text, is_error=False: toasts.append(text),
+        load_content_file=lambda src, label=None: (False, G.USER_MESSAGE))
+    app._try_load_media(bad, 0.0)
+    assert toasts == [G.USER_MESSAGE]
+    assert flow.message == G.USER_MESSAGE
