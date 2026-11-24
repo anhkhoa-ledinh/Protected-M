@@ -44,6 +44,7 @@ class CardRect:
 
     rect: tuple[float, float, float, float]   # (x, y, w, h)
     fades: bool                               # False = corner trim, never fades
+    art: bool = True                          # False = no baked art (item-slot group)
 
     def contains_point(self, x: float, y: float, grow: float = 0.0) -> bool:
         rx, ry, rw, rh = self.rect
@@ -107,10 +108,11 @@ def card_index_for_rect(cards: tuple[CardRect, ...],
                         rect: tuple[float, float, float, float]) -> int | None:
     """Which card (by index into ``cards``) a dynamic element's rect
     belongs to — its CENTRE must fall inside a *fadeable* card. ``None``
-    = "free" (crosshair, bite, effects, item slots, corner trim — nothing
-    that should ever fade with a card)."""
+    = "free" (crosshair, bite, effects, corner trim — nothing that should
+    ever fade with a card). The item-slot group is a card too, but its
+    contents are tagged by ``v3_values`` (``slot_labels``), not found here."""
     for index, card in enumerate(cards):
-        if card.fades and card.contains_rect(rect):
+        if card.fades and card.art and card.contains_rect(rect):
             return index
     return None
 
@@ -129,10 +131,31 @@ def card_index_for_point(cards: tuple[CardRect, ...], point: tuple[float, float]
 def cards_for_screen(manifest, screen: str) -> tuple[CardRect, ...]:
     """Convenience over :func:`cards_for_top_png` — takes the manifest +
     screen name directly, like the rest of ``v3.py``'s drawing code."""
-    top = manifest.screens[screen].get("top")
+    record = manifest.screens[screen]
+    top = record.get("top")
     if not top:
         return ()
-    return cards_for_top_png(manifest.root, top, manifest.image_scale)
+    cards = cards_for_top_png(manifest.root, top, manifest.image_scale)
+    slots = record.get("item_slots")
+    if not slots:
+        return cards
+    # The item slots are drawn live (no art in top.png), so they get one
+    # extra fadeable card around the whole row: same crosshair-proximity
+    # and scope fade as every other card. Appended last, so the indexes of
+    # the top.png cards do not move.
+    x0 = min(s[0] for s in slots)
+    y0 = min(s[1] for s in slots)
+    x1 = max(s[0] + s[2] for s in slots)
+    y1 = max(s[1] + s[3] for s in slots)
+    return cards + (CardRect((x0, y0, x1 - x0, y1 - y0), fades=True, art=False),)
+
+
+def item_slot_card_index(cards: tuple[CardRect, ...]) -> int | None:
+    """Index of the item-slot group card in ``cards`` (``None`` = none)."""
+    for index, card in enumerate(cards):
+        if not card.art:
+            return index
+    return None
 
 
 _element_cache: dict[str, dict[str, int | None]] = {}

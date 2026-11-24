@@ -822,6 +822,8 @@ def _hud_items(state, flow, game, manifest, screen) -> None:
         item = flow.items[index]
         left = max(0, 1 - int(used.get(item, 0)))
         mark = "selected" if number == selected else "normal"
+        state.slot_labels |= {f"islot#{index}", f"ikey#{index}",
+                              f"islot_icon#{index}", f"iused#{index}"}
         _place(state, manifest, screen, f"islot:{mark}", slot, (0.0, 0.0),
                f"islot#{index}")
         key_off = layout.get("key") or (0, 0, 20, 20)
@@ -873,8 +875,8 @@ def _slot_text(state, manifest, screen, key, slot, offset, text,
         rect = [slot[0] + offset[0], slot[1] + offset[1], offset[2], offset[3]]
     else:
         rect = [slot[0] + offset[0], slot[1] + offset[1], base[2], base[3]]
-    state.extra.append((rect, template["runs"], [str(text)],
-                        align or template.get("al", "left")))
+    state.slot_extra.append((rect, template["runs"], [str(text)],
+                             align or template.get("al", "left")))
 
 
 #: Hiệu ứng xếp từ x = 52, cách nhau 8 px thiết kế (README mục Key rules).

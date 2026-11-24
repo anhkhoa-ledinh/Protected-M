@@ -161,7 +161,8 @@ class V3State:
                  "hover_fx", "aim_kick_scale", "hit_markers", "hp_bars",
                  "crit_impact_alpha", "scene_shake", "scope_zoom",
                  "card_alpha", "hud_hidden_alpha", "recovery_code", "forgot_open",
-                 "forgot_focus", "remember", "caret_index", "covers")
+                 "forgot_focus", "remember", "caret_index", "covers",
+                 "slot_extra", "slot_labels")
 
     def __init__(self) -> None:
         #: ``key`` → chuỗi (thay run đầu) hoặc danh sách chuỗi (thay từng run).
@@ -214,6 +215,11 @@ class V3State:
         #: cần ba ô và số dòng thay đổi — chỗ lặp lại nằm ở đây, không phải
         #: trong manifest.
         self.extra: list = []
+        #: Item-slot texts (same tuples as ``extra``) and the ``borrowed``
+        #: labels of the slot art: both fade with the item-slot card
+        #: (``hud_cards.item_slot_card_index``) like any other HUD card.
+        self.slot_extra: list = []
+        self.slot_labels: set = set()
         #: Flat shapes drawn right after the art and before every dynamic
         #: element, to hide sample text baked into ``base.png`` (see
         #: ``board.py``): ``("rect", rect, hex)``, ``("rounded", rect, radius,

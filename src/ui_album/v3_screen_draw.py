@@ -16,7 +16,8 @@ from typing import TYPE_CHECKING
 from OpenGL import GL
 import numpy as np
 
-from src.ui_album.hud_cards import element_card_map, cards_for_screen
+from src.ui_album.hud_cards import (cards_for_screen, element_card_map,
+                                    item_slot_card_index)
 from src.ui_album.scope import (RETICLE_ARM_PX, RETICLE_COL, RETICLE_GAP_PX,
                                 RETICLE_THICK_PX, VIGNETTE_ALPHA,
                                 VIGNETTE_COL, VIGNETTE_RADIUS_PX,
@@ -329,6 +330,12 @@ def _card_fade(card_map: dict, state: V3State, key: str) -> tuple[int | None, fl
     return index, base * float(state.hud_hidden_alpha)
 
 
+def _slot_card_alpha(manifest, screen: str, state: V3State) -> float:
+    """Current alpha of the item-slot card (1.0 on a screen without one)."""
+    index = item_slot_card_index(cards_for_screen(manifest, screen))
+    return 1.0 if index is None else float(state.card_alpha.get(index, 1.0))
+
+
 def _draw_hud_top_cards(painter, manifest, screen, record, state) -> None:
     """TASK_game_feel_fix_1118 Fix 10.1: draw ``top.png`` per CARD, each
     at its own current alpha, instead of one single full-canvas quad —
@@ -347,6 +354,8 @@ def _draw_hud_top_cards(painter, manifest, screen, record, state) -> None:
     """
     top = record.get("top")
     for index, card in enumerate(cards_for_screen(manifest, screen)):
+        if not card.art:
+            continue
         base = float(state.card_alpha.get(index, 1.0)) if card.fades else 1.0
         alpha = base * float(state.hud_hidden_alpha)
         painter.layer_region(card.rect, top, alpha)
@@ -453,12 +462,14 @@ def _draw_sprites(painter, manifest, screen, record, state, card_map) -> None:
     # directly instead of through ``_card_fade`` — none of them are in
     # the always-visible whitelist (that's only crosshair/bite, neither
     # ever borrowed).
+    slot_fade = _slot_card_alpha(manifest, screen, state)
     for label, (other, key, rect) in state.borrowed.items():
         borrowed = manifest.sprite(other, key)
         if borrowed is not None:
             painter.sprite(rect, borrowed.get("file"),
                            float(state.alpha.get(label, 1.0))
-                           * float(state.hud_hidden_alpha),
+                           * float(state.hud_hidden_alpha)
+                           * (slot_fade if label in state.slot_labels else 1.0),
                            label in state.mirror)
     _ = screen
 
@@ -516,6 +527,10 @@ def _draw_texts(painter, manifest, screen, record, state, card_map) -> None:
     # its own, same reasoning as the borrowed-sprite loop above).
     for rect, runs, texts, align in state.extra:
         painter.line(rect, runs, texts, align, float(state.hud_hidden_alpha))
+    slot_alpha = (float(state.hud_hidden_alpha)
+                  * _slot_card_alpha(manifest, screen, state))
+    for rect, runs, texts, align in state.slot_extra:
+        painter.line(rect, runs, texts, align, slot_alpha)
 
 
 def _hole(painter, x: float, y: float, size: float, colour) -> None:
