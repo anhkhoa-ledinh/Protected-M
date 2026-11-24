@@ -23,12 +23,6 @@ from src.ui_album import v3_flow as F
 from src.game.match import WEAPON_LABEL
 from src.ui_album.v3 import V3State
 
-#: Bảng xếp hạng mẫu (U2: "The data stays the sample").
-SAMPLE_BOARD = (
-    ("Mai", 980), ("Huy", 910), ("Lan", 845), ("Quang", 780), ("Bao", 720),
-    ("Trang", 690), ("Nam", 655), ("Linh", 610), ("Son", 575), ("Khanh", 540),
-)
-
 #: Màu lấy từ bảng ``colors`` của manifest, gọi tên cho dễ đọc.
 INK, SAFE, DANGER = "#24415F", "#3AA17A", "#E8676B"
 MUTED, PRIMARY, AMBER = "#8DA3BA", "#3B72B4", "#E08A1E"
@@ -303,11 +297,11 @@ def _menu(state, flow, manifest=None, painter=None) -> None:
         state.texts["photo_damage"] = "not played yet"
     state.focus = flow.focus if flow.focus in F.MENU_BUTTONS else None
     if flow.wallet is not None:
-        _wallet_line(state, manifest, F.MENU, (144, 612, 360, 24),
+        _wallet_line(state, manifest, F.MENU, (144, 596, 360, 22),
                      "photo_caption", f"Points  {flow.wallet}")
     reason = F.pvp_lock_reason(flow)
     if reason is not None:
-        _wallet_line(state, manifest, F.MENU, (144, 640, 600, 24),
+        _wallet_line(state, manifest, F.MENU, (144, 622, 600, 22),
                      "photo_caption", reason)
 
 
@@ -915,7 +909,7 @@ def _hud_effects(state, flow, game, manifest, screen) -> None:
 
 
 # ---- kết quả đơn -------------------------------------------------------
-def _result(state, flow, manifest, win: bool) -> None:
+def _result(state, flow, manifest, win: bool, accounts=None) -> None:
     screen = F.WIN if win else F.LOSE
     level = flow.level
     result = flow.last_result or {}
@@ -956,8 +950,10 @@ def _result(state, flow, manifest, win: bool) -> None:
         state.colours["score"] = SAFE
     else:
         state.colours["score"] = DANGER if score < 0 else INK
-    rank = _board_rank(score)
-    if win and rank is not None:
+    from src.ui_album import board
+
+    rank = board.rank_of(accounts, flow.account_key)
+    if win and rank is not None and rank <= 10:
         state.sprites["rank_up"] = True
         state.texts["rank_up_text"] = f"You're now #{rank} on the Solo board"
     else:
@@ -973,14 +969,9 @@ def _hide_spare_rows(state, manifest, screen, prefixes, count) -> None:
                 state.hidden.add(key)
 
 
-def _board_rank(score: int) -> int | None:
-    """Thứ hạng nếu điểm chen được vào bảng mẫu; ``None`` nếu không."""
-    better = sum(1 for _name, value in SAMPLE_BOARD if value > score)
-    return better + 1 if better < len(SAMPLE_BOARD) else None
-
-
 # ---- PvP ---------------------------------------------------------------
-def _pvp_lobby(state, flow, now, manifest=None, painter=None) -> None:
+def _pvp_lobby(state, flow, now, manifest=None, painter=None,
+               accounts=None) -> None:
     screen = flow.screen
     state.texts["eyebrow"] = (f"PVP · {flow.mode.upper()}"
                               if screen == F.PVP_INVITE else
@@ -993,8 +984,11 @@ def _pvp_lobby(state, flow, now, manifest=None, painter=None) -> None:
     if screen == F.PVP_SEARCH:
         state.texts["search_time"] = mmss(now - flow.search_started_s)
         items = ", ".join(flow.items) or "no items"
-        rank = _board_rank(int((flow.last_result or {}).get("score", 0))) or 99
-        state.texts["you_sub"] = f"Solo rank #{rank} · {items}"
+        from src.ui_album import board
+
+        rank = board.rank_of(accounts, flow.account_key)
+        state.texts["you_sub"] = (f"Solo rank #{rank} · {items}" if rank
+                                  else f"Solo unranked · {items}")
     elif screen == F.PVP_INVITE:
         state.texts["room_code"] = f"PM-{(flow.room_code or '0000')[:4]}"
         state.texts["join_typed"] = flow.join_typed.ljust(4, "_")
@@ -1078,19 +1072,15 @@ def _pvp_rows(rows) -> list:
 
 
 # ---- bảng xếp hạng -----------------------------------------------------
-def _board(state, flow, manifest=None, painter=None) -> None:
-    """TASK_accounts_1119 Phase 5: ``flow.history`` is whatever the
-    SIGNED-IN account loaded at sign-in (``V3UI._load_progress``) and
-    updated after each match since — this just reads it; nothing here
-    needs to know an account was ever involved."""
-    best = max([int((flow.last_result or {}).get("score", 0))]
-               + [int(r.get("score", 0)) for r in flow.history.values()])
-    rank = _board_rank(best)
-    state.texts["you_rank"] = str(rank if rank is not None else
-                                  len(SAMPLE_BOARD) + 1)
-    you_name = f"You · {flow.player or 'guest'}"
-    state.texts["you_name"] = _fit_name(manifest, painter, F.BOARD, "you_name", you_name)
-    state.texts["you_score"] = str(best)
+def _board(state, flow, manifest=None, painter=None, accounts=None) -> None:
+    """Real leaderboard: every account on this computer, ranked by lifetime
+    points (``board.py``). Without a manifest (static shots) it keeps the
+    baked sample art."""
+    if manifest is None:
+        return
+    from src.ui_album import board
+
+    board.fill_state(state, flow, manifest, painter, accounts)
 
 
 #: TASK_ui_sakuga_1117 Phase 5: ``tab_Solo`` targets ``F.LEVELS``
@@ -1162,15 +1152,15 @@ def state_for(manifest, painter, flow, game=None, aim=None, accounts=None) -> V3
             state.aim = aim
             state.aim_ready = _aim_ready(game, now)
     elif screen == F.WIN:
-        _result(state, flow, manifest, win=True)
+        _result(state, flow, manifest, win=True, accounts=accounts)
         state.photo = flow.photo
     elif screen == F.LOSE:
-        _result(state, flow, manifest, win=False)
+        _result(state, flow, manifest, win=False, accounts=accounts)
         state.photo = flow.photo
     elif screen in (F.PVP_SEARCH, F.PVP_INVITE, F.PVP_FOUND):
-        _pvp_lobby(state, flow, now, manifest, painter)
+        _pvp_lobby(state, flow, now, manifest, painter, accounts)
     elif screen == F.PVP_RESULT:
         _pvp_result(state, flow, manifest, painter)
     elif screen == F.BOARD:
-        _board(state, flow, manifest, painter)
+        _board(state, flow, manifest, painter, accounts)
     return state

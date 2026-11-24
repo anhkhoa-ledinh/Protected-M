@@ -913,6 +913,19 @@ class V3UI:
             logger.error("Khong luu duoc tien trinh tai khoan", exc_info=True)
             F.say(self.state, "Couldn't save your progress.")
 
+    def dev_sign_in(self, key: str) -> None:
+        """Evidence hooks only (``HCPD_ECONOMY_SIGNIN``, scripted runs on a
+        temp accounts dir): act as signed in as ``key`` without typing the
+        password, then land on the menu."""
+        record = self._account_data["accounts"].get(key)
+        if record is None:
+            logger.error("dev_sign_in: no account %r", key)
+            return
+        self.state.account_key = key
+        self.state.player = record["display"]
+        self._load_progress(key)
+        self.state.go(F.MENU)
+
     def sync_economy(self) -> None:
         """Copy the signed-in account's points into the flow (guest or
         nobody signed in: no wallet)."""

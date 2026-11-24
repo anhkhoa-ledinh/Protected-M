@@ -73,7 +73,7 @@ HOOK_ENV_VARS = (
     "HCPD_UI_SHOTS_1117", "HCPD_AA_BASELINE_1118", "HCPD_V3_LIVE",
     "HCPD_PERF_PROFILE", "HCPD_PVP_AUTO", "HCPD_PVP_SHOTS",
     "HCPD_PROP_PROBE", "HCPD_VIDEO_STATS", "HCPD_HUD_FIX_1119_SHOTS",
-    "HCPD_ALBUM_AUTOWIN", "HCPD_BUG_SEED",
+    "HCPD_ALBUM_AUTOWIN", "HCPD_BUG_SEED", "HCPD_ECONOMY_1124",
 )
 
 #: Bug-placement seed an automatch run uses unless ``HCPD_BUG_SEED`` says
@@ -2436,7 +2436,25 @@ class HcpdApplication:
 
                     from src.account import store as account_store
 
-                    tmp_dir = Path(tempfile.mkdtemp(prefix="hcpd_scripted_run_"))
+                    # TASK_economy_1124: a run may reuse ONE temp dir (restart
+                    # test) and start from a copy of a fixture accounts file.
+                    # Never a dir under the repo's own assets/config.
+                    keep = self._devtools.env("HCPD_ECONOMY_DIR").strip()
+                    if keep and (Path(keep).resolve() / "x").is_relative_to(
+                            (self._root / "assets" / "config").resolve()):
+                        raise SystemExit("HCPD_ECONOMY_DIR must not be assets/config")
+                    if keep:
+                        tmp_dir = Path(keep)
+                        tmp_dir.mkdir(parents=True, exist_ok=True)
+                    else:
+                        tmp_dir = Path(tempfile.mkdtemp(prefix="hcpd_scripted_run_"))
+                    seed = self._devtools.env("HCPD_ECONOMY_SEED").strip()
+                    target = tmp_dir / "assets" / "config" / "accounts.json"
+                    if seed and not target.exists():
+                        import shutil
+
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copyfile(seed, target)       # a COPY; the source is only read
                     self._scripted_run_tmp_dir = tmp_dir
                     account_store.accounts_path = (
                         lambda root: tmp_dir / "assets" / "config" / "accounts.json")
@@ -2444,6 +2462,9 @@ class HcpdApplication:
                         lambda root: tmp_dir / "assets" / "config" / "session.json")
                 self._album = V3UI(self._root, self._shader_dir,
                                    self._album_options, window=self._window)
+                signin = self._devtools.env("HCPD_ECONOMY_SIGNIN").strip()
+                if signin and self._is_scripted_run():
+                    self._album.dev_sign_in(signin)
             self._album.initialize()
             self._bugs = self._build_bug_painter()
             self._renderer.extra_scene_draw = self._draw_album_bugs

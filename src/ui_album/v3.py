@@ -35,6 +35,7 @@ from src.ui_album.v3_screen_draw import (
     _draw_bars,
     _draw_choose_photo_extra,
     _draw_confirm_dialog,
+    _draw_covers,
     _draw_crit_impact,
     _draw_forgot_dialog,
     _draw_hit_markers,
@@ -160,7 +161,7 @@ class V3State:
                  "hover_fx", "aim_kick_scale", "hit_markers", "hp_bars",
                  "crit_impact_alpha", "scene_shake", "scope_zoom",
                  "card_alpha", "hud_hidden_alpha", "recovery_code", "forgot_open",
-                 "forgot_focus", "remember", "caret_index")
+                 "forgot_focus", "remember", "caret_index", "covers")
 
     def __init__(self) -> None:
         #: ``key`` → chuỗi (thay run đầu) hoặc danh sách chuỗi (thay từng run).
@@ -213,6 +214,11 @@ class V3State:
         #: cần ba ô và số dòng thay đổi — chỗ lặp lại nằm ở đây, không phải
         #: trong manifest.
         self.extra: list = []
+        #: Flat shapes drawn right after the art and before every dynamic
+        #: element, to hide sample text baked into ``base.png`` (see
+        #: ``board.py``): ``("rect", rect, hex)``, ``("rounded", rect, radius,
+        #: hex)`` or ``("patch", rect, cache key, RGBA array)``. Design pixels.
+        self.covers: list = []
         #: TASK_ui_sakuga_1117 bug A: ``key`` → ``rect`` đặt chỗ khác cho MỘT
         #: chữ sẵn có trong bản vẽ (khác ``extra``, vốn dùng khi cần NHIỀU
         #: bản của cùng một kiểu chữ). ``check_hint`` cần đúng việc này: dời
@@ -366,6 +372,7 @@ def draw_screen(painter: V3Painter, manifest: V3Manifest, screen: str,
     else:
         painter.layer(full, record.get("top"))
     _draw_scope_vignette(painter, state)
+    _draw_covers(painter, state)
     _draw_bars(painter, record, state, card_map)
     _draw_pips(painter, record, state, card_map)
     _draw_pills(painter, record, state, card_map)

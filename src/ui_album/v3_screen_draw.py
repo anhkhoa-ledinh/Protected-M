@@ -358,6 +358,21 @@ def _joined_text(value) -> str:
     return "" if value is None else str(value)
 
 
+def _draw_covers(painter, state) -> None:
+    """Flat shapes that hide sample text baked into the art."""
+    for cover in state.covers:
+        kind, rect = cover[0], cover[1]
+        if kind == "rect":
+            painter.fill(rect, rgba(cover[2]))
+        elif kind == "rounded":
+            painter.rounded(rect, cover[2], rgba(cover[3]))
+        elif kind == "patch":
+            image = cover[3]
+            entry = painter.pil.get(cover[2], lambda: (image, None))
+            if entry is not None:
+                painter.quad(rect, entry[0])
+
+
 def _draw_bars(painter, record, state, card_map) -> None:
     for bar in record.get("bars", ()):
         key = bar["key"]

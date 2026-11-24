@@ -70,6 +70,8 @@ class DevTools:
         app = self._app
         if app._album_options.shots or app._album_options.ui_shots:
             self._album_shots_step()
+        elif self.env("HCPD_ECONOMY_1124"):
+            self._tick_economy_1124(now)
         elif self.env("HCPD_V3_LIVE") == "1":
             self._tick_v3_live_shots()
         elif self.env("HCPD_UI_SHOTS_1117") == "1":
@@ -114,6 +116,64 @@ class DevTools:
         self._live_index = index
         app._album.game = v3_live.apply(v3_live.ORDER[index],
                                         app._album.state, app._window)
+
+    # ---- TASK_economy_1124: scripted walk over the real screens ------------
+
+    def _tick_economy_1124(self, now: float) -> None:
+        """``HCPD_ECONOMY_1124="step;step;..."`` on a scripted run (temp
+        accounts dir, see ``HCPD_ECONOMY_SEED``/``_DIR``/``_SIGNIN``). Steps:
+        ``go:<screen attr>`` (``F.MENU``...), ``level:N``, ``equip:<Item>``,
+        ``click:<hotspot>`` (same path as a mouse click), ``seg:<name>``,
+        ``shot:<stem>`` (framebuffer -> ``HCPD_ECONOMY_OUT``), ``log:<what>``
+        (account numbers into the log), ``quit``. Each step waits 6 drawn
+        frames AND 4 s so a shot shows the screen the step produced."""
+        from src.ui_album.shots import save_framebuffer
+
+        app = self._app
+        if app._window.is_iconified():
+            return
+        steps = [s.strip() for s in self.env("HCPD_ECONOMY_1124").split(";") if s.strip()]
+        # Art textures decode off-thread; give each step time, not a frame count.
+        self._eco_hold = getattr(self, "_eco_hold", 0) + 1
+        if self._eco_hold < 6 or now - getattr(self, "_eco_last_s", 0.0) < 4.0:
+            return
+        self._eco_hold = 0
+        self._eco_last_s = now
+        index = getattr(self, "_eco_index", 0)
+        if index >= len(steps):
+            return
+        self._eco_index = index + 1
+        step = steps[index]
+        kind, _, arg = step.partition(":")
+        F = app._album.flow
+        state = app._album.state
+        if kind == "go":
+            state.go(getattr(F, arg))
+        elif kind == "level":
+            state.level = int(arg)
+        elif kind == "equip":
+            F.toggle_item(state, arg)
+        elif kind == "click":
+            app._album_action(app._album.activate(arg), now)
+        elif kind == "seg":
+            state.board_seg = arg
+        elif kind == "shot":
+            from OpenGL import GL
+
+            GL.glFinish()
+            out = Path(self.env("HCPD_ECONOMY_OUT") or app._root / "results"
+                       / "economy_1124" / "shots")
+            width, height = app._window.framebuffer_size()
+            save_framebuffer(out / f"{arg}.png", width, height)
+            logger.info("ECONOMY: shot %s (%dx%d) screen=%s msg=%r", arg, width,
+                        height, state.screen, state.message)
+        elif kind == "log":
+            logger.info("ECONOMY: %s wallet=%s earned=%s cleared=%s items=%s",
+                        arg, state.wallet, state.earned_total,
+                        state.levels_cleared, state.items)
+        elif kind == "quit":
+            app._window.request_close()
+        logger.info("ECONOMY: step %d/%d %s", index + 1, len(steps), step)
 
     def _grab_desktop(self, stem: str) -> None:
         """
@@ -489,6 +549,12 @@ class DevTools:
             app._album.game = start_match(1, app._game, "Sung", [])
             logger.info("DEBUG MATCH: dat tay %d bo", len(props))
             return
+        items = [n.strip() for n in self.env("HCPD_AUTOMATCH_ITEMS").split(",")
+                 if n.strip()]
+        for name in items:
+            F.toggle_item(app._album.state, name)
+        if items:
+            logger.info("AUTOMATCH: items %s", app._album.state.items)
         app._start_album_match(now)
         # TASK_hud_fix_1119 Fix 4: the real-click SendInput check needs a
         # SPECIFIC gun (Spread, mag 8) rather than automatch's always-
