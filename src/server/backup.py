@@ -54,6 +54,9 @@ def backup_once(data_dir: Path, backup_dir: Path, keep: int = 7,
     dst = sqlite3.connect(part)
     try:
         src.backup(dst)
+        # The copy inherits WAL mode; a plain single file leaves no -wal/-shm
+        # next to it when it is opened or moved.
+        dst.execute("PRAGMA journal_mode = DELETE")
     finally:
         dst.close()
         src.close()

@@ -27,7 +27,7 @@ def test_backup_keeps_seven_and_restore_roundtrip(tmp_path):
             for i in range(9)]
     left = sorted(p.name for p in bdir.glob("server-*.db"))
     assert len(left) == 7 and left == sorted(p.name for p in made[2:])
-    assert not list(bdir.glob("*.part"))
+    assert sorted(p.suffix for p in bdir.iterdir()) == [".db"] * 7     # no .part, -wal, -shm
     new = tmp_path / "new"
     backup.restore(made[-1], new)
     row = sqlite3.connect(new / DB_NAME).execute(
