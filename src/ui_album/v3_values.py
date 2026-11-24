@@ -965,8 +965,10 @@ def _result(state, flow, manifest, win: bool, accounts=None) -> None:
     _hide_spare_rows(state, manifest, screen, ("row_label", "row_value"),
                      len(rows))
     state.texts["score"] = str(score)
-    if win:
+    if win and not rejected:
         state.colours["score"] = SAFE
+    elif rejected:
+        state.colours["score"] = DANGER
     else:
         state.colours["score"] = DANGER if score < 0 else INK
     from src.ui_album import board
@@ -995,7 +997,7 @@ def _rejected_title(state, reason: str) -> None:
     state.extra.append(([752.0, 118.0, 480.0, 50.0], [title], ["Not saved"], "left"))
     line = _REFUSED.get(reason, "The server did not accept this result.")
     note = board._run(line, "Nunito", 700, 14.0, DANGER)
-    state.extra.append(([752.0, 172.0, 480.0, 20.0], [note], [line], "left"))
+    state.extra.append(([752.0, 232.0, 432.0, 20.0], [note], [line], "left"))
 
 
 def _hide_spare_rows(state, manifest, screen, prefixes, count) -> None:

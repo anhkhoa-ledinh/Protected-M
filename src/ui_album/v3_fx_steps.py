@@ -109,6 +109,8 @@ class FxStepsMixin:
         self._fx_last_tilt_checks = tuple(new_last)
 
     def _step_win_fx(self, state, now: float) -> None:
+        if (self.state.last_result or {}).get("rejected"):
+            return          # the server did not count this win: no celebration
         if not self._fx_win_star_spawned:
             if self.spawn_fx("star_five", *_WIN_SCORE_XY):
                 self._fx_win_star_spawned = True
