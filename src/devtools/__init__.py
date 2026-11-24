@@ -135,7 +135,7 @@ class DevTools:
         steps = [s.strip() for s in self.env("HCPD_ECONOMY_1124").split(";") if s.strip()]
         # Art textures decode off-thread; give each step time, not a frame count.
         self._eco_hold = getattr(self, "_eco_hold", 0) + 1
-        if self._eco_hold < 6 or now - getattr(self, "_eco_last_s", 0.0) < 4.0:
+        if self._eco_hold < 6 or now - getattr(self, "_eco_last_s", 0.0) < getattr(self, "_eco_wait", 4.0):
             return
         self._eco_hold = 0
         self._eco_last_s = now
@@ -145,6 +145,8 @@ class DevTools:
         self._eco_index = index + 1
         step = steps[index]
         kind, _, arg = step.partition(":")
+        # a toast lives 4 s: the shot right after a click/equip must come sooner
+        self._eco_wait = 1.5 if kind in ("equip", "click") else 4.0
         F = app._album.flow
         state = app._album.state
         if kind == "go":
