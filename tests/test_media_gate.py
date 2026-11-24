@@ -20,8 +20,7 @@ from src.content import media_gate as G  # noqa: E402
 
 #: Every attack the gate must refuse in its default mode.
 REJECTED = ["truncated.png", "huge_header.png", "bomb_just_over.png",
-            "text_file.jpg", "polyglot_png_zip.png", "polyglot_jpeg_zip.jpg",
-            "empty.png", "animated.png", "animated.webp", "wrong_extension.txt",
+            "text_file.jpg", "empty.png", "animated.png", "animated.webp", "wrong_extension.txt",
             "folder.png", "fifo.png"]
 
 
@@ -54,6 +53,31 @@ def test_rejected_files_write_nothing(world):
             with pytest.raises(G.PhotoRejected):
                 G.import_photo(samples[name], cache)
     assert _files(tmp) == before          # no clean copy, no temp file left
+
+
+@pytest.mark.parametrize("name", ["polyglot_png_zip.png", "polyglot_jpeg_zip.jpg"])
+def test_extra_bytes_after_the_image_are_dropped_with_a_warning(world, name, caplog):
+    samples, cache, _ = world
+    with caplog.at_level("WARNING", logger="src.content.media_gate"):
+        clean = G.import_photo(samples[name], cache)
+    assert any("extra bytes" in r.getMessage() for r in caplog.records)
+    raw = clean.path.read_bytes()
+    assert b"PK\x03\x04" not in raw and b"payload.txt" not in raw
+    with Image.open(clean.path) as image:
+        assert image.format == "PNG" and image.size == (64, 48)
+    assert G.load_rgb(clean).shape == (48, 64, 3)
+
+
+def test_samsung_style_jpeg_with_trailing_data_loads_clean(tmp_path):
+    path = tmp_path / "motion.jpg"
+    path.write_bytes(M.jpeg_bytes() + b"MotionPhoto_Data" + bytes(range(256)) * 20)
+    clean = G.import_photo(path, tmp_path / "cache")
+    raw = clean.path.read_bytes()
+    assert b"MotionPhoto_Data" not in raw
+    with Image.open(clean.path) as image:
+        assert image.format == "PNG"
+        # the PNG ends exactly at its IEND chunk: nothing trails
+        assert raw.endswith(b"IEND\xaeB`\x82")
 
 
 def test_symlink_that_leaves_the_photo_folder_is_rejected(world):

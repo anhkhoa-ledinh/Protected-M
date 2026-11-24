@@ -186,10 +186,16 @@ def _webp_end(data: bytes) -> int:
     return declared
 
 
-def _check_container(data: bytes, kind: str) -> None:
+def _check_container(data: bytes, kind: str, name: str = "") -> bytes:
+    """Return the image bytes only. Anything after the image end (a phone
+    "motion photo", an appended ZIP) is dropped with a warning; the clean copy
+    is re-encoded from pixels, so none of it can travel on."""
     end = {"png": _png_end, "jpeg": _jpeg_end, "webp": _webp_end}[kind](data)
-    if data[end:].strip(b"\x00\r\n \t"):
-        raise _reject("data after the end of the image")
+    extra = data[end:]
+    if extra.strip(b"\x00\r\n \t"):
+        logger.warning("Photo has %d extra bytes after the image; dropped: %s",
+                       len(extra), name)
+    return data[:end]
 
 
 # ---- 4 + 5: header, one decode, clean PNG -----------------------------------
@@ -282,7 +288,7 @@ def import_photo(path: Path | str, cache_dir: Path | str | None = None, *,
         kind = _sniff(data)
         if strict_extension and kind != kind_by_name:
             raise _reject(f"extension says {kind_by_name}, content is {kind}")
-        _check_container(data, kind)
+        data = _check_container(data, kind, source.name)
         rgb = _cap_side(_decode(data, kind, max_side_px))
         digest = _pixel_hash(rgb)
         height, width = rgb.shape[:2]

@@ -111,7 +111,7 @@ Smaller items: videos go to ffmpeg unchecked (P9); `allow_pickle=False` is not e
 
 | Id | Now |
 |---|---|
-| P1-P3, P5, P6, P7 | Every path ends in `media_gate.import_photo`: regular file, size, magic bytes, nothing after the image end, header pixels before decode, one frame, clean PNG in `assets/cache/photos`. A refused file shows "This file is not a photo we can open" on the album screen. |
+| P1-P3, P5, P6, P7 | Every path ends in `media_gate.import_photo`: regular file, size, magic bytes, extra bytes after the image dropped with a warning, header pixels before decode, one frame, clean PNG in `assets/cache/photos`. A refused file shows "This file is not a photo we can open" on the album screen. |
 | P4 | Start-up photo from `content*.json` goes through the same gate (`ContentPlaneRenderer.load_file`). `content_path` itself is still unrestricted (a user-edited file). |
 | P5 | `verify_photo` runs the gate with the 4096 px rule and `allowed_root` = the shared folder; a refused download is deleted. The format still comes from the remote JSON, but the gate decides by content. |
 | P8, C1, C2, C5 | Open: caches and model files are still trusted by name. |
@@ -121,5 +121,6 @@ Smaller items: videos go to ffmpeg unchecked (P9); `allow_pickle=False` is not e
 | Camera | Enforced by `tests/test_architecture.py`: net, account, shared album and album UI cannot reach `src.camera`/`tracking`/`pose`, and only four known modules write images. |
 
 Known trade-offs of the gate: a JPEG with a `.png` name is accepted (the project's own
-`t21.png` is one; `strict_extension=True` refuses it); a JPEG/PNG with data after its end,
-such as a Samsung motion photo, is refused.
+`t21.png` is one; `strict_extension=True` refuses it); a JPEG/PNG/WebP with data after its end
+(a Samsung motion photo, image+ZIP) is accepted with the extra bytes dropped and a
+warning logged; the clean copy is re-encoded from pixels and carries none of it.
