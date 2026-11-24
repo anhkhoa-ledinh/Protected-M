@@ -120,3 +120,7 @@ results/
 assets/config/central.json
 assets/config/remote_session.json
 assets/config/remote_progress.json
+
+# Server deployment: real settings and certs never go in git
+deploy/.env
+deploy/certs/
