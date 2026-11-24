@@ -238,6 +238,8 @@ def ui(gl_context, monkeypatch, tmp_path):
     monkeypatch.setenv("HCPD_NO_FX", "1")
     from src.ui_album.options import AlbumOptions
     from src.account.service import LocalAccountService
+    from src.services.prefs_service import LocalPrefsService
+    from src.services.shared_album_service import LocalSharedAlbumService
     from src.ui_album.v3_ui import V3UI
 
     monkeypatch.setattr(account_store, "accounts_path",
@@ -246,7 +248,9 @@ def ui(gl_context, monkeypatch, tmp_path):
                         lambda root: tmp_path / "assets" / "config" / "session.json")
     options = AlbumOptions(enabled=True, ui="v3")
     instance = V3UI(ROOT, ROOT / "assets" / "shaders", options,
-                    accounts=LocalAccountService(__import__("tempfile").mkdtemp(prefix="hcpd_acc_")))
+                    accounts=LocalAccountService(__import__("tempfile").mkdtemp(prefix="hcpd_acc_")),
+                    shared_album=LocalSharedAlbumService(),
+                    prefs=LocalPrefsService(ROOT))
     yield instance
     instance.release()
 

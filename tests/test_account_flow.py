@@ -321,11 +321,15 @@ def ui(gl_context, monkeypatch, tmp_path):
     monkeypatch.setenv("HCPD_NO_FX", "1")
     from src.ui_album.options import AlbumOptions
     from src.account.service import LocalAccountService
+    from src.services.prefs_service import LocalPrefsService
+    from src.services.shared_album_service import LocalSharedAlbumService
     from src.ui_album.v3_ui import V3UI
 
     options = AlbumOptions(enabled=True, ui="v3")
     instance = V3UI(ROOT, ROOT / "assets" / "shaders", options,
-                    accounts=LocalAccountService(tmp_path))
+                    accounts=LocalAccountService(tmp_path),
+                    shared_album=LocalSharedAlbumService(),
+                    prefs=LocalPrefsService(ROOT))
     # The accounts live in an ISOLATED temp dir; manifest/shaders still come
     # from the real repo, but accounts.json must never touch the real one.
     yield instance

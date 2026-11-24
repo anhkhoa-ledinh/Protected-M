@@ -366,3 +366,17 @@ def test_ui_album_never_imports_the_account_package():
             if imp == "src.account" or imp.startswith("src.account."):
                 offenders.append(f"{path.relative_to(ROOT)}: {imp}")
     assert offenders == [], offenders
+
+
+def test_ui_album_imports_neither_the_shared_album_nor_prefs_modules():
+    """B3: the UI asks injected services (``src.services``); it never imports
+    ``src.content.shared_album`` or ``src.config.prefs`` itself."""
+    banned = {"src.content.shared_album", "src.config.prefs"}
+    offenders = []
+    for path in _production_py_files():
+        if "src/ui_album/" not in path.as_posix():
+            continue
+        for imp in import_graph.extract_imports(path):
+            if imp in banned or any(imp.startswith(b + ".") for b in banned):
+                offenders.append(f"{path.relative_to(ROOT)}: {imp}")
+    assert offenders == [], offenders

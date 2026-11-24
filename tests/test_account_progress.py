@@ -38,11 +38,15 @@ def _make_ui(monkeypatch):
     monkeypatch.setenv("HCPD_NO_FX", "1")
     from src.ui_album.options import AlbumOptions
     from src.account.service import LocalAccountService
+    from src.services.prefs_service import LocalPrefsService
+    from src.services.shared_album_service import LocalSharedAlbumService
     from src.ui_album.v3_ui import V3UI
 
     options = AlbumOptions(enabled=True, ui="v3")
     return V3UI(ROOT, ROOT / "assets" / "shaders", options,
-                accounts=LocalAccountService(__import__("tempfile").mkdtemp(prefix="hcpd_acc_")))
+                accounts=LocalAccountService(__import__("tempfile").mkdtemp(prefix="hcpd_acc_")),
+                shared_album=LocalSharedAlbumService(),
+                prefs=LocalPrefsService(ROOT))
 
 
 def _wait_until_not_busy(ui, timeout=5.0):

@@ -9,6 +9,10 @@ import time
 from pathlib import Path
 
 from src.account.service import LocalAccountService
+
+from src.services.prefs_service import LocalPrefsService
+
+from src.services.shared_album_service import LocalSharedAlbumService
 from src.ui_album import v3_flow as F
 
 ROOT = Path(".").resolve()
@@ -20,7 +24,9 @@ def _launch(tmp_path, monkeypatch):
     from src.ui_album.v3_ui import V3UI
 
     return V3UI(ROOT, ROOT / "assets" / "shaders", AlbumOptions(enabled=True, ui="v3"),
-                accounts=LocalAccountService(tmp_path))
+                accounts=LocalAccountService(tmp_path),
+                shared_album=LocalSharedAlbumService(),
+                prefs=LocalPrefsService(ROOT))
 
 
 def _wait(ui):

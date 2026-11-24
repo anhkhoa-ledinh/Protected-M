@@ -178,6 +178,11 @@ class V3Flow:
     #: TASK_shared_album_1111: đường dẫn ảnh đang chờ hộp xác nhận chia sẻ
     #: ("" = không hộp nào mở — chỉ việc này điều khiển ``_draw_confirm_dialog``).
     shared_album_pending: str = ""
+    #: Set by ``V3UI`` from its ``SharedAlbumService`` before it routes a click
+    #: or builds the values: the routes and values stay pure functions of state.
+    shared_can_upload: bool = False
+    shared_can_list: bool = False
+    shared_not_configured: str = ""
     #: Tập ảnh đã xác nhận ít nhất một lần (bấm "Share to album" lại với
     #: ảnh này thì khỏi hỏi lại — P2.3 "before the first upload of each photo").
     shared_album_confirmed: set = field(default_factory=set)

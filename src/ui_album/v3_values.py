@@ -18,7 +18,6 @@ from __future__ import annotations
 import time
 
 from src.shared import account_rules
-from src.content import shared_album
 from src.ui_album import v3_flow as F
 from src.game.match import WEAPON_LABEL
 from src.ui_album.v3 import V3State
@@ -389,14 +388,14 @@ def _photos(state, flow) -> None:
         state.texts["damage_text"] = f"{record['eaten']:.0f}% eaten"
     else:
         state.hidden |= {"damage_badge", "damage_text"}
-    can_upload = shared_album.can_upload()
+    can_upload = flow.shared_can_upload
     state.texts["share_to_album_label"] = ("Share to album" if can_upload
-                                           else shared_album.NOT_CONFIGURED)
+                                           else flow.shared_not_configured)
     state.alpha["share_to_album_btn"] = 1.0 if can_upload else 0.55
     # P3: list/random chi can cloud_name+tag, khong can upload_preset.
-    can_list = shared_album.load_config() is not None
+    can_list = flow.shared_can_list
     state.texts["random_from_album_label"] = ("Random from album" if can_list
-                                               else shared_album.NOT_CONFIGURED)
+                                               else flow.shared_not_configured)
     state.alpha["random_from_album_btn"] = 1.0 if can_list else 0.55
 
 

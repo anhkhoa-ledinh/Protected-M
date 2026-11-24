@@ -17,7 +17,6 @@ from pathlib import Path
 from OpenGL import GL
 
 from src.shared import account_rules
-from src.config import prefs as _prefs
 from src.common.stage_profile import stage
 from src.fx.anim import Spring
 from src.fx.library import FxLibrary
@@ -114,7 +113,7 @@ class V3UI:
     """Giao diện v3 gắn vào một cửa sổ GLFW đã có context."""
 
     def __init__(self, root: Path, shader_dir: Path, options, window=None, *,
-                 accounts) -> None:
+                 accounts, shared_album, prefs) -> None:
         self.manifest = V3Manifest(root)
         self.painter = V3Painter(self.manifest, shader_dir)
         self.state = F.V3Flow()
@@ -134,7 +133,7 @@ class V3UI:
         #: TASK_game_feel_1118 P4: crosshair kick/shake/hit marker/crit
         #: impact — survives the whole session, like ``_hover_fx``.
         self._shot_feel = ShotFeel()
-        self._shot_feel.shake_enabled = _prefs.screen_shake_enabled(root)
+        self._shot_feel.shake_enabled = prefs.screen_shake_enabled()
         #: TASK_game_feel_1118 P6: Precision-gun scope — zoom spring,
         #: right-mouse hold, finer-aim crosshair. ``app.py``'s
         #: ``_tick_scope`` drives it via the methods below.
@@ -165,6 +164,7 @@ class V3UI:
         #: The injected ``AccountService`` (``app`` builds it): the UI never
         #: touches the accounts files or the hashing itself.
         self._accounts = accounts
+        self._shared_album = shared_album
         #: ``(kind, holder)`` trong lúc một việc băm đang chạy trên luồng
         #: riêng — ``holder`` là dict mà luồng đó tự điền ``done``/
         #: ``result``/``error`` vào, đọc lại ở ``_poll_account_job``
@@ -205,7 +205,7 @@ class V3UI:
         # TASK_ui_sakuga_1117: tắt qua HCPD_NO_FX hoặc "fx": false trong
         # user_prefs.json (G6) — tắt thì KHÔNG đọc fx.json luôn, không chỉ
         # không vẽ, nên không texture nào của bộ này lên GPU.
-        self._fx_enabled = _prefs.fx_enabled(root)
+        self._fx_enabled = prefs.fx_enabled()
         self._fx_player = None
         self._fx_library = None
         self._fx_screen: str | None = None
@@ -353,6 +353,7 @@ class V3UI:
                      name == v3_routes.primary_button(self.manifest, self.state))
         pre_items = list(self.state.items) if hasattr(self.state, "items") else None
         pre_focus = self.state.forgot_focus if self.state.forgot_open else self.state.focus
+        self._sync_shared_album_flags()
         action = v3_routes.on_click(self.state, name, time.perf_counter(),
                                     self.mouse)
         self.pending = action
@@ -685,6 +686,12 @@ class V3UI:
         one is in flight would start a SECOND concurrent hash for no
         reason, and could race the first one's result application)."""
         return self._account_job is not None
+
+    def _sync_shared_album_flags(self) -> None:
+        flow = self.state
+        flow.shared_can_upload = self._shared_album.can_upload()
+        flow.shared_can_list = self._shared_album.can_list()
+        flow.shared_not_configured = self._shared_album.NOT_CONFIGURED
 
     def pop_account_corrupt_toast(self) -> bool:
         """True exactly once, the first time it's read after a launch
@@ -1045,6 +1052,7 @@ class V3UI:
         if self.options.ui_shots:
             state = shot_state(self.manifest, name)
         else:
+            self._sync_shared_album_flags()
             state = v3_values.state_for(self.manifest, self.painter, self.state,
                                         self.game, self.mouse, accounts=self._accounts.accounts_view())
             state.hover = self.hover()

@@ -2495,10 +2495,14 @@ class HcpdApplication:
                 else:
                     account_root = self._root
                 from src.account.service import LocalAccountService
+                from src.services.prefs_service import LocalPrefsService
+                from src.services.shared_album_service import LocalSharedAlbumService
 
                 self._album = V3UI(self._root, self._shader_dir,
                                    self._album_options, window=self._window,
-                                   accounts=LocalAccountService(account_root))
+                                   accounts=LocalAccountService(account_root),
+                                   shared_album=LocalSharedAlbumService(),
+                                   prefs=LocalPrefsService(self._root))
                 signin = self._devtools.env("HCPD_ECONOMY_SIGNIN").strip()
                 if signin and self._is_scripted_run():
                     self._album.dev_sign_in(signin)

@@ -80,12 +80,16 @@ def ui(gl_context, monkeypatch):
     monkeypatch.setenv("HCPD_NO_FX", "1")
     from src.ui_album.options import AlbumOptions
     from src.account.service import LocalAccountService
+    from src.services.prefs_service import LocalPrefsService
+    from src.services.shared_album_service import LocalSharedAlbumService
     from src.ui_album.v3_ui import V3UI
     from src.ui_album import v3_flow as F
 
     options = AlbumOptions(enabled=True, guest=True, ui="v3")
     instance = V3UI(ROOT, ROOT / "assets" / "shaders", options,
-                    accounts=LocalAccountService(__import__("tempfile").mkdtemp(prefix="hcpd_acc_")))
+                    accounts=LocalAccountService(__import__("tempfile").mkdtemp(prefix="hcpd_acc_")),
+                    shared_album=LocalSharedAlbumService(),
+                    prefs=LocalPrefsService(ROOT))
     instance.initialize()
     instance.painter.set_frame((1280, 720))
     instance.state.go(F.PLAY)

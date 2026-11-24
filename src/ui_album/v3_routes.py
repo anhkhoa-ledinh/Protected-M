@@ -12,7 +12,6 @@ from __future__ import annotations
 import logging
 
 from src.shared import account_rules
-from src.content import shared_album
 from src.ui_album import v3_flow as F
 from src.ui_album import ids as ID
 
@@ -265,7 +264,7 @@ def _forgot_dialog(state, name: str) -> str:
 
 def _solo(state, name: str) -> str:
     if name == ID.BTN_SHARE_TO_ALBUM:
-        if not shared_album.can_upload():
+        if not state.shared_can_upload:
             pass                     # nhãn nút đã nói "not configured"
         elif not state.photo:
             F.say(state, "Choose a photo first.")
@@ -275,7 +274,7 @@ def _solo(state, name: str) -> str:
         else:
             state.shared_album_pending = state.photo
     elif name == ID.BTN_RANDOM_FROM_ALBUM:
-        if shared_album.load_config() is not None:
+        if state.shared_can_list:
             return ACT_RANDOM_FROM_ALBUM  # nhan da noi "not configured" neu khong
     elif name.startswith("level_row_"):
         state.level = int(name.rsplit("_", 1)[1])
