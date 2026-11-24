@@ -457,3 +457,50 @@ def test_devtools_touch_the_app_only_through_dev_hooks():
                     and str(node.args[1].value).startswith("_")):
                 offenders.append(f"{path.relative_to(ROOT)}:{node.lineno} {node.func.id}(app, ...)")
     assert offenders == [], offenders
+
+
+# ---- TASK_platform_1124 C1: the central server stays small and separate -----
+
+_SERVER_ALLOWED_SRC = ("src.server", "src.game", "src.account.crypto",
+                       "src.shared", "src.net.protocol", "src")
+
+
+def test_server_imports_only_its_allowed_layers_and_the_standard_library():
+    offenders = []
+    for path in import_graph.iter_py_files(ROOT / "src" / "server"):
+        rel = str(path.relative_to(ROOT))
+        for imp in _all_top_level_imports(path):
+            root = imp.split(".")[0]
+            if root == "src":
+                ok = any(imp == p or imp.startswith(p + ".")
+                         for p in _SERVER_ALLOWED_SRC)
+                if not ok:
+                    offenders.append((rel, imp))
+            elif root not in sys.stdlib_module_names and root != "__future__":
+                offenders.append((rel, imp))          # a third-party package
+    assert offenders == [], f"src/server reaches outside its layer: {offenders}"
+
+
+def test_net_and_server_share_only_the_protocol_module():
+    offenders = []
+    for path in import_graph.iter_py_files(ROOT / "src" / "net"):
+        for imp in import_graph.extract_imports(path):
+            if imp == "src.server" or imp.startswith("src.server."):
+                offenders.append((str(path.relative_to(ROOT)), imp))
+    for path in import_graph.iter_py_files(ROOT / "src" / "server"):
+        for imp in import_graph.extract_imports(path):
+            if (imp == "src.net" or imp.startswith("src.net.")) \
+                    and imp != "src.net.protocol":
+                offenders.append((str(path.relative_to(ROOT)), imp))
+    assert offenders == [], offenders
+
+
+def test_nothing_else_imports_the_server_package():
+    offenders = []
+    for path in _production_py_files():
+        if "src/server/" in path.as_posix():
+            continue
+        for imp in import_graph.extract_imports(path):
+            if imp == "src.server" or imp.startswith("src.server."):
+                offenders.append(f"{path.relative_to(ROOT)}: {imp}")
+    assert offenders == [], offenders

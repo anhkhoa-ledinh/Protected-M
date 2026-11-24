@@ -94,10 +94,10 @@ def encode(msg: dict) -> bytes:
     return data
 
 
-def decode(line: bytes) -> dict:
+def decode(line: bytes, max_bytes: int = MAX_MESSAGE_BYTES) -> dict:
     """Parse one newline-stripped line into a message dict with a string
     ``"t"``. Never raises anything but :class:`ProtocolError`."""
-    if len(line) > MAX_MESSAGE_BYTES:
+    if len(line) > max_bytes:
         raise ProtocolError(f"message too large: {len(line)} bytes")
     try:
         text = line.decode("utf-8")
@@ -107,6 +107,8 @@ def decode(line: bytes) -> dict:
         msg = json.loads(text)
     except json.JSONDecodeError as exc:
         raise ProtocolError(f"bad json: {exc}") from exc
+    except RecursionError as exc:               # "[[[[..." nested thousands deep
+        raise ProtocolError("json nested too deeply") from exc
     if not isinstance(msg, dict) or not isinstance(msg.get("t"), str):
         raise ProtocolError("message is not an object with a string 't'")
     return msg
@@ -123,14 +125,22 @@ class LineReader:
     untrusted-input rejection in this codebase.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, max_bytes: int = MAX_MESSAGE_BYTES) -> None:
         self._buf = bytearray()
+        #: Per-reader cap (the central server uses a much lower one). Public
+        #: so a server can raise it for one connection state.
+        self.max_bytes = max_bytes
+
+    @property
+    def pending(self) -> int:
+        """Bytes buffered without a newline yet (a half-received line)."""
+        return len(self._buf)
 
     def feed(self, chunk: bytes) -> list[dict]:
         if not chunk:
             return []
         self._buf.extend(chunk)
-        if len(self._buf) > MAX_MESSAGE_BYTES:
+        if len(self._buf) > self.max_bytes:
             raise ProtocolError("buffered line exceeds the size cap")
         messages = []
         while True:
@@ -139,5 +149,5 @@ class LineReader:
                 break
             line = bytes(self._buf[:idx])
             del self._buf[:idx + 1]
-            messages.append(decode(line))
+            messages.append(decode(line, self.max_bytes))
         return messages
