@@ -184,3 +184,114 @@ def test_the_own_file_reader_list_has_no_stale_entries():
     calls = _decoder_calls()
     stale = sorted(m for m in _OWN_FILE_IMAGE_READERS if m not in calls)
     assert stale == [], f"remove from _OWN_FILE_IMAGE_READERS (no decoder call): {stale}"
+
+
+# ---- TASK_hardening_1124: camera data stays local -----------------------------
+
+#: What may hold camera frames or landmarks. ``src.renderer.webcam_preview``
+#: only shows the frame on screen (GL texture).
+_CAMERA_PREFIXES = ("src.camera", "src.tracking", "src.pose",
+                    "src.renderer.webcam_preview")
+#: Code that talks to the network, stores accounts or shows the album UI must
+#: never see a camera frame, directly or through anything it imports.
+_CAMERA_FREE = ("src/net", "src/account", "src/content/shared_album.py",
+                "src/content/shared_album_worker.py", "src/ui_album")
+
+
+def _rel(path: Path) -> str:
+    return str(path.relative_to(ROOT)).replace("\\", "/")
+
+
+def _module_files() -> dict[str, Path]:
+    return {import_graph.module_name(p): p for p in _production_py_files()
+            if p.name != "main.py"}
+
+
+def _is_camera(module: str) -> bool:
+    return any(module == p or module.startswith(p + ".") for p in _CAMERA_PREFIXES)
+
+
+def _resolve(name: str, modules: dict[str, Path]) -> str | None:
+    """``src.a.b.c`` -> the longest prefix that is a real module/package."""
+    parts = name.split(".")
+    while parts:
+        candidate = ".".join(parts)
+        if candidate in modules:
+            return candidate
+        parts.pop()
+    return None
+
+
+def _camera_paths(start: Path, modules: dict[str, Path]) -> list[str]:
+    """The import chain from ``start`` to a camera module, or ``[]``."""
+    first = import_graph.module_name(start)
+    queue, seen = [(first, [first])], {first}
+    while queue:
+        current, chain = queue.pop(0)
+        path = modules.get(current)
+        if path is None:
+            continue
+        for imp in import_graph.extract_imports(path):
+            if _is_camera(imp):
+                return chain + [imp]
+            target = _resolve(imp, modules)
+            if target and target not in seen:
+                seen.add(target)
+                queue.append((target, chain + [target]))
+    return []
+
+
+def test_net_account_shared_album_and_album_ui_never_reach_camera_code():
+    modules = _module_files()
+    offenders = {}
+    for path in _production_py_files():
+        rel = _rel(path)
+        if any(rel == p or rel.startswith(p + "/") for p in _CAMERA_FREE):
+            chain = _camera_paths(path, modules)
+            if chain:
+                offenders[rel] = " -> ".join(chain)
+    assert offenders == {}, f"camera/tracking/pose reachable from: {offenders}"
+
+
+#: Calls that write an image or an array to disk.
+_FRAME_WRITERS = {"cv2.imwrite", "cv2.VideoWriter", "np.save", "np.savez",
+                  "np.savez_compressed", "numpy.save", "imageio.imwrite"}
+#: The only modules that write one, and what they write: baked layers of a
+#: photo (bake, lama_fill), the photo gate's clean copy, F12 screenshots of the
+#: GL framebuffer. ``src/devtools`` is exempt (evidence tooling).
+_FRAME_WRITER_MODULES = {"src/content/bake.py", "src/content/lama_fill.py",
+                         "src/content/media_gate.py", "src/ui_album/shots.py"}
+
+
+def _writer_calls() -> dict[str, set[str]]:
+    import ast as _ast
+
+    found: dict[str, set[str]] = {}
+    for path in _production_py_files():
+        tree = _ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in _ast.walk(tree):
+            if not isinstance(node, _ast.Call):
+                continue
+            name = _dotted(node.func)
+            on_array_image = (isinstance(node.func, _ast.Attribute)
+                              and node.func.attr == "save"
+                              and isinstance(node.func.value, _ast.Call)
+                              and _dotted(node.func.value.func).endswith("fromarray"))
+            if name in _FRAME_WRITERS or on_array_image:
+                found.setdefault(_rel(path), set()).add(name or "Image.fromarray().save")
+    return found
+
+
+def test_only_known_modules_write_images_and_none_outside_devtools_sees_a_camera():
+    outside = {m: c for m, c in _writer_calls().items()
+               if not m.startswith("src/devtools/")}
+    unknown = {m: c for m, c in outside.items() if m not in _FRAME_WRITER_MODULES}
+    assert unknown == {}, f"new image/array writer outside devtools: {unknown}"
+
+    modules = _module_files()
+    touching = {}
+    for module in outside:
+        chain = _camera_paths(ROOT / module, modules)
+        if chain:
+            touching[module] = " -> ".join(chain)
+    assert touching == {}, f"a module that writes images can reach the camera: {touching}"
