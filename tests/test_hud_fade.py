@@ -79,11 +79,13 @@ def test_hide_spring_settles_near_zero_within_about_0_15s():
 def ui(gl_context, monkeypatch):
     monkeypatch.setenv("HCPD_NO_FX", "1")
     from src.ui_album.options import AlbumOptions
+    from src.account.service import LocalAccountService
     from src.ui_album.v3_ui import V3UI
     from src.ui_album import v3_flow as F
 
     options = AlbumOptions(enabled=True, guest=True, ui="v3")
-    instance = V3UI(ROOT, ROOT / "assets" / "shaders", options)
+    instance = V3UI(ROOT, ROOT / "assets" / "shaders", options,
+                    accounts=LocalAccountService(__import__("tempfile").mkdtemp(prefix="hcpd_acc_")))
     instance.initialize()
     instance.painter.set_frame((1280, 720))
     instance.state.go(F.PLAY)

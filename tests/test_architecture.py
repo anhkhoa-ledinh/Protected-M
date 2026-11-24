@@ -353,3 +353,16 @@ def test_no_ui_id_literal_outside_ids_py():
                     and node.value in wanted and id(node) not in docstrings):
                 offenders.append(f"{rel}:{node.lineno} {node.value!r}")
     assert offenders == [], "use src.ui_album.ids instead of the literal:\n" + "\n".join(offenders)
+
+
+def test_ui_album_never_imports_the_account_package():
+    """B2: the UI gets an ``AccountService`` injected; it must not import
+    ``src.account`` (the rules it needs live in ``src.shared.account_rules``)."""
+    offenders = []
+    for path in _production_py_files():
+        if "src/ui_album/" not in path.as_posix():
+            continue
+        for imp in import_graph.extract_imports(path):
+            if imp == "src.account" or imp.startswith("src.account."):
+                offenders.append(f"{path.relative_to(ROOT)}: {imp}")
+    assert offenders == [], offenders

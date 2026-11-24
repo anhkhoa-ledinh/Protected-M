@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from src.account import crypto as account_crypto
+from src.shared import account_rules
 from src.account import store as account_store
 from src.ui_album import v3_flow as F
 from src.ui_album import v3_values
@@ -37,10 +37,12 @@ def isolated_accounts(monkeypatch, tmp_path):
 def _make_ui(monkeypatch):
     monkeypatch.setenv("HCPD_NO_FX", "1")
     from src.ui_album.options import AlbumOptions
+    from src.account.service import LocalAccountService
     from src.ui_album.v3_ui import V3UI
 
     options = AlbumOptions(enabled=True, ui="v3")
-    return V3UI(ROOT, ROOT / "assets" / "shaders", options)
+    return V3UI(ROOT, ROOT / "assets" / "shaders", options,
+                accounts=LocalAccountService(__import__("tempfile").mkdtemp(prefix="hcpd_acc_")))
 
 
 def _wait_until_not_busy(ui, timeout=5.0):
@@ -74,8 +76,8 @@ def test_save_progress_writes_history_recent_and_best_score(ui, isolated_account
     ui.state.recent = ["photo1.jpg"]
     ui.save_progress()
 
-    key = account_crypto.username_key("ProgUser1")
-    progress = account_store.load_progress(ui._account_data, key)
+    key = account_rules.username_key("ProgUser1")
+    progress = account_store.load_progress(ui._accounts._data, key)
     assert progress["history"] == ui.state.history
     assert progress["recent"] == ["photo1.jpg"]
     assert progress["best_score"] == 100.0
@@ -89,24 +91,24 @@ def test_best_score_is_the_max_across_history(ui, isolated_accounts):
         "c.jpg": {"score": 80},
     }
     ui.save_progress()
-    key = account_crypto.username_key("ProgUser2")
-    progress = account_store.load_progress(ui._account_data, key)
+    key = account_rules.username_key("ProgUser2")
+    progress = account_store.load_progress(ui._accounts._data, key)
     assert progress["best_score"] == 120.0
 
 
 def test_save_progress_is_a_noop_for_guest(ui, isolated_accounts):
-    ui.state.account_key = account_crypto.GUEST_KEY
+    ui.state.account_key = account_rules.GUEST_KEY
     ui.state.player = "guest"
     ui.state.history = {"photo1.jpg": {"score": 999}}
     ui.save_progress()
-    assert account_crypto.GUEST_KEY not in ui._account_data["accounts"]
+    assert account_rules.GUEST_KEY not in ui._accounts._data["accounts"]
 
 
 def test_save_progress_is_a_noop_with_no_account_signed_in(ui, isolated_accounts):
     ui.state.account_key = ""
     ui.state.history = {"photo1.jpg": {"score": 999}}
     ui.save_progress()   # must not raise
-    assert ui._account_data["accounts"] == {}
+    assert ui._accounts._data["accounts"] == {}
 
 
 def test_history_does_not_leak_between_accounts(monkeypatch, isolated_accounts, gl_context):
@@ -121,11 +123,11 @@ def test_history_does_not_leak_between_accounts(monkeypatch, isolated_accounts, 
     ui_b.state.history = {"b.jpg": {"score": 20}}
     ui_b.save_progress()
 
-    key_a = account_crypto.username_key("AccA1")
-    progress_a = account_store.load_progress(ui_b._account_data, key_a)
+    key_a = account_rules.username_key("AccA1")
+    progress_a = account_store.load_progress(ui_b._accounts._data, key_a)
     assert progress_a["history"] == {"a.jpg": {"score": 10}}
-    key_b = account_crypto.username_key("AccB1")
-    progress_b = account_store.load_progress(ui_b._account_data, key_b)
+    key_b = account_rules.username_key("AccB1")
+    progress_b = account_store.load_progress(ui_b._accounts._data, key_b)
     assert progress_b["history"] == {"b.jpg": {"score": 20}}
     ui_b.release()
 
@@ -175,7 +177,7 @@ def test_progress_survives_a_full_relaunch(monkeypatch, isolated_accounts, gl_co
 # ---- guest toast -------------------------------------------------------------
 
 def test_guest_gets_a_one_time_toast_on_first_finished_match(ui, isolated_accounts):
-    ui.state.account_key = account_crypto.GUEST_KEY
+    ui.state.account_key = account_rules.GUEST_KEY
     ui.state.player = "guest"
     assert ui._guest_toast_shown is False
     ui.note_match_finished()
@@ -184,7 +186,7 @@ def test_guest_gets_a_one_time_toast_on_first_finished_match(ui, isolated_accoun
 
 
 def test_guest_toast_shows_only_once(ui, isolated_accounts):
-    ui.state.account_key = account_crypto.GUEST_KEY
+    ui.state.account_key = account_rules.GUEST_KEY
     ui.state.player = "guest"
     ui.note_match_finished()
     ui.state.message = ""   # simulate the toast expiring
@@ -219,11 +221,11 @@ def test_a_failed_save_does_not_crash_the_match_result(ui, isolated_accounts, mo
 
 
 def test_guest_history_is_never_persisted_via_note_match_finished(ui, isolated_accounts):
-    ui.state.account_key = account_crypto.GUEST_KEY
+    ui.state.account_key = account_rules.GUEST_KEY
     ui.state.player = "guest"
     ui.state.history = {"g.jpg": {"score": 500}}
     ui.note_match_finished()
-    assert ui._account_data["accounts"] == {}
+    assert ui._accounts._data["accounts"] == {}
 
 
 # ---- guest / sign-out do not leak a previous account's data ----------------
@@ -246,7 +248,7 @@ def test_switching_to_guest_after_sign_out_clears_history(monkeypatch, isolated_
     v3_routes.on_click(ui_instance.state, "link_guest", 0.0)
     assert ui_instance.state.history == {}
     assert ui_instance.state.recent == []
-    assert ui_instance.state.account_key == account_crypto.GUEST_KEY
+    assert ui_instance.state.account_key == account_rules.GUEST_KEY
     ui_instance.release()
 
 

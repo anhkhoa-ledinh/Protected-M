@@ -2471,8 +2471,6 @@ class HcpdApplication:
                     # this machine's account/session state happens to be.
                     import tempfile
 
-                    from src.account import store as account_store
-
                     # TASK_economy_1124: a run may reuse ONE temp dir (restart
                     # test) and start from a copy of a fixture accounts file.
                     # Never a dir under the repo's own assets/config.
@@ -2493,12 +2491,14 @@ class HcpdApplication:
                         target.parent.mkdir(parents=True, exist_ok=True)
                         shutil.copyfile(seed, target)       # a COPY; the source is only read
                     self._scripted_run_tmp_dir = tmp_dir
-                    account_store.accounts_path = (
-                        lambda root: tmp_dir / "assets" / "config" / "accounts.json")
-                    account_store.session_path = (
-                        lambda root: tmp_dir / "assets" / "config" / "session.json")
+                    account_root = tmp_dir
+                else:
+                    account_root = self._root
+                from src.account.service import LocalAccountService
+
                 self._album = V3UI(self._root, self._shader_dir,
-                                   self._album_options, window=self._window)
+                                   self._album_options, window=self._window,
+                                   accounts=LocalAccountService(account_root))
                 signin = self._devtools.env("HCPD_ECONOMY_SIGNIN").strip()
                 if signin and self._is_scripted_run():
                     self._album.dev_sign_in(signin)

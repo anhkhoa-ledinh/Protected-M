@@ -47,7 +47,7 @@ def test_lost_match_adds_nothing(ui):
 
 def test_cannot_equip_without_points(ui):
     _sign_up(ui, "Wally")
-    ui._account_data["accounts"]["wally"]["wallet"] = 20
+    ui._accounts._data["accounts"]["wally"]["wallet"] = 20
     ui.sync_economy()
     F.toggle_item(ui.state, "Flare")              # costs 30
     assert ui.state.items == []

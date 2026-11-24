@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 
-from src.account import crypto as _account_crypto
+from src.shared import account_rules
 from src.content import shared_album
 from src.ui_album import v3_flow as F
 from src.ui_album import ids as ID
@@ -121,10 +121,10 @@ def _sign_in(state, name: str) -> str:
         # Chạm hết ba ô: bấm thẳng nút mà chưa gõ ô nào (vd. chỉ gõ mật
         # khẩu rồi Tab qua nút) vẫn phải thấy đúng gợi ý, không im lặng.
         state.touched |= {ID.FIELD_USER, ID.FIELD_PASS, ID.FIELD_PASS2}
-        display, reason = _account_crypto.validate_username(state.player)
+        display, reason = account_rules.validate_username(state.player)
         if display is None:
             return ""                          # gợi ý đã hiện qua state_for
-        pass_ok, _reason = _account_crypto.validate_password(state.password)
+        pass_ok, _reason = account_rules.validate_password(state.password)
         if not pass_ok or state.password != state.password2:
             return ""
         return ACT_SIGN_UP
@@ -138,7 +138,7 @@ def _sign_in(state, name: str) -> str:
             state.go(F.SIGN_IN)
         else:
             state.player = state.player or "guest"
-            state.account_key = _account_crypto.GUEST_KEY
+            state.account_key = account_rules.GUEST_KEY
             # TASK_accounts_1119 Phase 5: khách không có tiến trình riêng
             # — nếu còn history/recent của tài khoản TRƯỚC đó (đăng xuất
             # rồi vào khách) thì phải dọn, không thì màn chính/bảng xếp
@@ -148,7 +148,7 @@ def _sign_in(state, name: str) -> str:
     elif name == ID.LINK_GUEST:
         state.focus = None
         state.player = state.player or "guest"
-        state.account_key = _account_crypto.GUEST_KEY
+        state.account_key = account_rules.GUEST_KEY
         state.history, state.recent = {}, []
         state.go(F.MENU)
     elif name == ID.LINK_FORGOT:
@@ -243,15 +243,15 @@ def _forgot_dialog(state, name: str) -> str:
     elif name == ID.BTN_FORGOT_SUBMIT:
         state.forgot_touched |= {ID.FIELD_FORGOT_USER, ID.FIELD_FORGOT_CODE,
                                  ID.FIELD_FORGOT_PASS, ID.FIELD_FORGOT_PASS2}
-        display, reason = _account_crypto.validate_username(state.forgot_user)
+        display, reason = account_rules.validate_username(state.forgot_user)
         if display is None:
             state.forgot_error = reason
             return ""
-        code = _account_crypto.normalize_recovery_code(state.forgot_code)
-        if len(code) != _account_crypto.RECOVERY_CODE_CHARS:
+        code = account_rules.normalize_recovery_code(state.forgot_code)
+        if len(code) != account_rules.RECOVERY_CODE_CHARS:
             state.forgot_error = "Enter the 12-character code."
             return ""
-        pass_ok, reason2 = _account_crypto.validate_password(state.forgot_new_pass)
+        pass_ok, reason2 = account_rules.validate_password(state.forgot_new_pass)
         if not pass_ok:
             state.forgot_error = reason2
             return ""

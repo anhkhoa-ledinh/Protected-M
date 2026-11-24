@@ -14,7 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from functools import lru_cache
 
-from src.account import crypto as account_crypto
+from src.shared import account_rules
 from src.ui_album import ids as ID
 
 #: The one switch for every cover below.
@@ -53,7 +53,7 @@ def collect(data: dict | None) -> list[Entry]:
     that never won anything come last."""
     rows = []
     for key, record in ((data or {}).get("accounts") or {}).items():
-        if key == account_crypto.GUEST_KEY or not isinstance(record, dict):
+        if key == account_rules.GUEST_KEY or not isinstance(record, dict):
             continue
         cleared = [int(n) for n in record.get("levels_cleared") or ()
                    if isinstance(n, (int, float))]

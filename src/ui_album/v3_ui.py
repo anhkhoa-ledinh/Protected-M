@@ -16,8 +16,7 @@ from pathlib import Path
 
 from OpenGL import GL
 
-from src.account import crypto as account_crypto
-from src.account import store as account_store
+from src.shared import account_rules
 from src.config import prefs as _prefs
 from src.common.stage_profile import stage
 from src.fx.anim import Spring
@@ -114,7 +113,8 @@ _HUD_HIDDEN_TOAST = "HUD hidden — press H to show"
 class V3UI:
     """Giao diện v3 gắn vào một cửa sổ GLFW đã có context."""
 
-    def __init__(self, root: Path, shader_dir: Path, options, window=None) -> None:
+    def __init__(self, root: Path, shader_dir: Path, options, window=None, *,
+                 accounts) -> None:
         self.manifest = V3Manifest(root)
         self.painter = V3Painter(self.manifest, shader_dir)
         self.state = F.V3Flow()
@@ -161,14 +161,10 @@ class V3UI:
         # giống `_fx_enabled`/`_shot_feel`: thuộc phiên giao diện, không
         # phải trạng thái màn (``V3Flow``). ``app.py`` không tự đọc/ghi
         # file tài khoản — chỉ gọi các phương thức công khai dưới đây.
-        self._account_root = root
-        account_load = account_store.load(root)
-        self._account_data = account_load.data
-        #: True đúng MỘT lần sau khi nạp, nếu cả ``accounts.json`` lẫn
-        #: ``.bak`` đều hỏng — ``app.py`` đọc cờ này ở khung đầu để báo
-        #: toast, rồi tự xoá cờ (xem ``pop_account_corrupt_toast``).
-        self._account_corrupt = account_load.reset
-        self._account_throttle = account_store.FailThrottle()
+        self._root = root
+        #: The injected ``AccountService`` (``app`` builds it): the UI never
+        #: touches the accounts files or the hashing itself.
+        self._accounts = accounts
         #: ``(kind, holder)`` trong lúc một việc băm đang chạy trên luồng
         #: riêng — ``holder`` là dict mà luồng đó tự điền ``done``/
         #: ``result``/``error`` vào, đọc lại ở ``_poll_account_job``
@@ -181,30 +177,26 @@ class V3UI:
         self._guest_toast_shown = False
         if options.guest:
             self.state.player = "guest"
-            self.state.account_key = account_crypto.GUEST_KEY
+            self.state.account_key = account_rules.GUEST_KEY
             self.state.go(F.MENU)
         else:
             # TASK_accounts_1119 Phase 4: a valid "remember me" session
             # signs in STRAIGHT to the menu, no sign-in screen — and
             # refreshes the expiry (a session that's actively used should
             # not quietly expire mid-way through a long play session).
-            resumed_key = account_store.resolve_session(root, self._account_data)
+            resumed_key = self._accounts.resume_session()
             if resumed_key is not None:
-                account_store.start_session(root, self._account_data, resumed_key)
-                account_store.save(root, self._account_data)
                 self.state.account_key = resumed_key
-                self.state.player = self._account_data["accounts"][resumed_key]["display"]
+                self.state.player = self._accounts.display_of(resumed_key)
                 self._load_progress(resumed_key)
                 self.state.go(F.MENU)
             else:
                 # No session: pre-fill the username field with the last
                 # account that signed in on this machine (nothing to
                 # pre-fill if none ever has).
-                last_key = self._account_data.get("last_account")
-                last_account = (self._account_data["accounts"].get(last_key)
-                                if last_key else None)
-                if last_account is not None:
-                    self.state.player = last_account["display"]
+                last_display = self._accounts.last_display()
+                if last_display is not None:
+                    self.state.player = last_display
         # Móc đo: mở thẳng một màn để đếm FPS trên đúng màn đó (vd. màn chơi).
         forced = os.environ.get("HCPD_V3_SCREEN", "").strip()
         if forced and forced in self.manifest.screens:
@@ -700,9 +692,7 @@ class V3UI:
         ``app.py`` shows a toast for this, then it never fires again this
         process (the store already started empty and renamed the bad
         file aside; nothing more to say after the first toast)."""
-        was = self._account_corrupt
-        self._account_corrupt = False
-        return was
+        return self._accounts.take_corrupt_notice()
 
     def _start_account_job(self, kind: str, fn, *args) -> None:
         if self.account_busy:
@@ -744,9 +734,8 @@ class V3UI:
         starting a thread — a name mid-cooldown must never spend a scrypt
         call just to be told to wait."""
         username, password = self.state.player, self.state.password
-        key_guess = account_crypto.username_key(account_crypto.normalize_username(username))
         now = time.perf_counter()
-        remaining = self._account_throttle.cooldown_remaining(key_guess, now)
+        remaining = self._accounts.throttle_remaining(username, now)
         if remaining > 0.0:
             self.state.sign_in_error = f"Too many tries. Wait {int(round(remaining))} s."
             self.state.go(F.SIGN_IN_ERR)
@@ -755,22 +744,15 @@ class V3UI:
                                 username, password)
 
     def _verify_credentials_job(self, username: str, password: str):
-        result = account_store.verify_credentials(self._account_data, username, password)
-        if result[0] == account_store.RESULT_OK:
-            # Only a successful sign-in ever mutates ``data`` (last-signed-
-            # in time, and a rehash if the stored scrypt params were
-            # stale) — no point writing the file back out after a no-op
-            # failed attempt.
-            account_store.save(self._account_root, self._account_data)
-        return result
+        return self._accounts.verify_credentials(username, password)
 
     def _apply_sign_in_result(self, result) -> None:
         outcome, key = result
         now = time.perf_counter()
-        if outcome == account_store.RESULT_OK:
-            self._account_throttle.reset(key)
+        if outcome == account_rules.RESULT_OK:
+            self._accounts.throttle_reset(key)
             self.state.account_key = key
-            self.state.player = self._account_data["accounts"][key]["display"]
+            self.state.player = self._accounts.display_of(key)
             self.state.password = self.state.password2 = ""
             self.state.focus = None
             self._load_progress(key)
@@ -778,11 +760,7 @@ class V3UI:
             # on every sign-in — on means create/refresh a session, off
             # means make sure no stale one from an EARLIER sign-in (with
             # the switch on, since changed) survives this one.
-            if self.state.remember:
-                account_store.start_session(self._account_root, self._account_data, key)
-            else:
-                account_store.clear_session(self._account_root, self._account_data, key)
-            account_store.save(self._account_root, self._account_data)
+            self._accounts.remember(key, bool(self.state.remember))
             self.state.go(F.MENU)
             return
         # RESULT_UNKNOWN has no key (no such account) — throttle on the
@@ -790,13 +768,12 @@ class V3UI:
         # (an unknown name still burns cooldown attempts, matching the
         # task's own "5 failures in a row for one name", not "one
         # account").
-        throttle_key = key or account_crypto.username_key(
-            account_crypto.normalize_username(self.state.player))
-        self._account_throttle.record_failure(throttle_key, now)
-        remaining = self._account_throttle.cooldown_remaining(throttle_key, now)
+        throttle_key = key or self.state.player
+        self._accounts.throttle_failure(throttle_key, now)
+        remaining = self._accounts.throttle_remaining(throttle_key, now)
         if remaining > 0.0:
             self.state.sign_in_error = f"Too many tries. Wait {int(round(remaining))} s."
-        elif outcome == account_store.RESULT_UNKNOWN:
+        elif outcome == account_rules.RESULT_UNKNOWN:
             self.state.sign_in_error = f"No album named {self.state.player}. Create one below."
         else:
             self.state.sign_in_error = "Wrong password. Try again."
@@ -811,11 +788,7 @@ class V3UI:
                                 self.state.player, self.state.password)
 
     def _create_account_job(self, display: str, password: str):
-        if not account_store.is_available(self._account_data, display):
-            return ("taken", None, None)
-        key, code = account_store.create_account(self._account_data, display, password)
-        account_store.save(self._account_root, self._account_data)
-        return ("ok", key, code)
+        return self._accounts.create_account(display, password)
 
     def _apply_sign_up_result(self, result) -> None:
         outcome, key, code = result
@@ -825,7 +798,7 @@ class V3UI:
             self.state.hint_text = "Username already taken"
             return
         self.state.account_key = key
-        self.state.player = self._account_data["accounts"][key]["display"]
+        self.state.player = self._accounts.display_of(key)
         self.state.password = self.state.password2 = ""
         self.state.focus = None
         self.sync_economy()
@@ -841,9 +814,8 @@ class V3UI:
         SAME per-username throttle as a wrong password (task: "wrong
         codes use the same 5-try/30s cooldown")."""
         username = self.state.forgot_user
-        key_guess = account_crypto.username_key(account_crypto.normalize_username(username))
         now = time.perf_counter()
-        remaining = self._account_throttle.cooldown_remaining(key_guess, now)
+        remaining = self._accounts.throttle_remaining(username, now)
         if remaining > 0.0:
             self.state.forgot_error = f"Too many tries. Wait {int(round(remaining))} s."
             return
@@ -851,18 +823,13 @@ class V3UI:
                                 self.state.forgot_code, self.state.forgot_new_pass)
 
     def _verify_recovery_job(self, username: str, code: str, new_password: str):
-        outcome, key = account_store.verify_recovery(self._account_data, username, code)
-        if outcome != account_store.RESULT_OK:
-            return outcome, key, None
-        new_code = account_store.reset_with_recovery(self._account_data, key, new_password)
-        account_store.save(self._account_root, self._account_data)
-        return outcome, key, new_code
+        return self._accounts.recover(username, code, new_password)
 
     def _apply_forgot_result(self, result) -> None:
         outcome, key, new_code = result
         now = time.perf_counter()
-        if outcome == account_store.RESULT_OK:
-            self._account_throttle.reset(key)
+        if outcome == account_rules.RESULT_OK:
+            self._accounts.throttle_reset(key)
             self.state.forgot_open = False
             self.state.forgot_focus = None
             self.state.forgot_user = self.state.forgot_code = ""
@@ -876,13 +843,12 @@ class V3UI:
         # Same "throttle on the typed name" fallback as
         # ``_apply_sign_in_result`` — an unknown name still burns a
         # cooldown attempt.
-        throttle_key = key or account_crypto.username_key(
-            account_crypto.normalize_username(self.state.forgot_user))
-        self._account_throttle.record_failure(throttle_key, now)
-        remaining = self._account_throttle.cooldown_remaining(throttle_key, now)
+        throttle_key = key or self.state.forgot_user
+        self._accounts.throttle_failure(throttle_key, now)
+        remaining = self._accounts.throttle_remaining(throttle_key, now)
         if remaining > 0.0:
             self.state.forgot_error = f"Too many tries. Wait {int(round(remaining))} s."
-        elif outcome == account_store.RESULT_UNKNOWN:
+        elif outcome == account_rules.RESULT_UNKNOWN:
             self.state.forgot_error = f"No album named {self.state.forgot_user}. Create one below."
         else:
             self.state.forgot_error = "Wrong code. Try again."
@@ -901,15 +867,14 @@ class V3UI:
         a no-op for guest (never saved) or no account signed in at all.
         """
         key = self.state.account_key
-        if not key or key == account_crypto.GUEST_KEY:
+        if not key or key == account_rules.GUEST_KEY:
             return
         scores = [float(record.get("score", 0.0)) for record in self.state.history.values()
                  if isinstance(record, dict)]
         best_score = max(scores) if scores else None
         try:
-            account_store.save_progress(self._account_data, key, self.state.history,
-                                        self.state.recent, best_score)
-            account_store.save(self._account_root, self._account_data)
+            self._accounts.save_progress(key, self.state.history,
+                                         self.state.recent, best_score)
         except Exception:
             logger.error("Khong luu duoc tien trinh tai khoan", exc_info=True)
             F.say(self.state, "Couldn't save your progress.")
@@ -918,20 +883,19 @@ class V3UI:
         """Evidence hooks only (``HCPD_ECONOMY_SIGNIN``, scripted runs on a
         temp accounts dir): act as signed in as ``key`` without typing the
         password, then land on the menu."""
-        record = self._account_data["accounts"].get(key)
-        if record is None:
+        display = self._accounts.display_of(key)
+        if display is None:
             logger.error("dev_sign_in: no account %r", key)
             return
         self.state.account_key = key
-        self.state.player = record["display"]
+        self.state.player = display
         self._load_progress(key)
         self.state.go(F.MENU)
 
     def sync_economy(self) -> None:
         """Copy the signed-in account's points into the flow (guest or
         nobody signed in: no wallet)."""
-        eco = account_store.get_economy(self._account_data,
-                                        self.state.account_key)
+        eco = self._accounts.economy(self.state.account_key)
         if eco is None:
             self.state.wallet = None
             self.state.earned_total = 0
@@ -947,9 +911,9 @@ class V3UI:
         taken (the caller keeps the player on the loadout)."""
         cost = self.state.price_total(items)
         key = self.state.account_key
-        if cost <= 0 or account_store.get_economy(self._account_data, key) is None:
+        if cost <= 0 or self._accounts.economy(key) is None:
             return True
-        if not account_store.spend(self._account_data, key, cost):
+        if not self._accounts.spend(key, cost):
             self.sync_economy()
             return False
         self._save_accounts()
@@ -958,7 +922,7 @@ class V3UI:
 
     def _save_accounts(self) -> None:
         try:
-            account_store.save(self._account_root, self._account_data)
+            self._accounts.save()
         except Exception:
             logger.error("Khong luu duoc tai khoan", exc_info=True)
             F.say(self.state, "Couldn't save your points.")
@@ -971,10 +935,9 @@ class V3UI:
         a guest instead gets a ONE-TIME toast (never saved — this IS the
         explanation why)."""
         if won:
-            account_store.record_win(self._account_data, self.state.account_key,
-                                     level, score)
+            self._accounts.record_win(self.state.account_key, level, score)
             self.sync_economy()
-        if self.state.account_key == account_crypto.GUEST_KEY:
+        if self.state.account_key == account_rules.GUEST_KEY:
             if not self._guest_toast_shown:
                 self._guest_toast_shown = True
                 F.say(self.state, "Playing as guest — create an album to keep your scores.")
@@ -987,7 +950,7 @@ class V3UI:
         sign-in at launch, so ``flow.history``/``recent`` reflect what
         THIS account saved last time, not whatever a previous
         guest/account session left in memory."""
-        progress = account_store.load_progress(self._account_data, key)
+        progress = self._accounts.load_progress(key)
         if progress is None:
             return
         self.state.history = progress["history"]
@@ -1003,12 +966,7 @@ class V3UI:
         chance to persist this session's progress before the account
         state about to be wiped by app.py's own "logout" handler."""
         self.save_progress()
-        key = self.state.account_key
-        if key and key != account_crypto.GUEST_KEY:
-            account_store.clear_session(self._account_root, self._account_data, key)
-            account_store.save(self._account_root, self._account_data)
-        else:
-            account_store.clear_session(self._account_root)
+        self._accounts.sign_out(self.state.account_key)
 
     def set_camera_frame(self, frame) -> None:
         """
@@ -1047,7 +1005,7 @@ class V3UI:
         if self._fx_pending is not None and self._fx_pending[0] == wanted:
             return
         try:
-            spec = load_spec(self._account_root, fx_dir=wanted)
+            spec = load_spec(self._root, fx_dir=wanted)
         except (OSError, ValueError) as err:
             logger.warning("V3UI: khong doi duoc sang goi fx %s (%s)", wanted, err)
             return
@@ -1088,7 +1046,7 @@ class V3UI:
             state = shot_state(self.manifest, name)
         else:
             state = v3_values.state_for(self.manifest, self.painter, self.state,
-                                        self.game, self.mouse, accounts=self._account_data)
+                                        self.game, self.mouse, accounts=self._accounts.accounts_view())
             state.hover = self.hover()
             state.pressed = self.mouse_down and state.hover is not None
             state.hover_fx = self._hover_fx

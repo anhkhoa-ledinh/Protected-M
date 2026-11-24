@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from src.account import crypto as account_crypto
+from src.shared import account_rules
 from src.account import store as account_store
 from src.ui_album import v3_flow as F
 
@@ -45,10 +45,12 @@ def isolated_accounts(monkeypatch, tmp_path):
 def _make_ui(monkeypatch):
     monkeypatch.setenv("HCPD_NO_FX", "1")
     from src.ui_album.options import AlbumOptions
+    from src.account.service import LocalAccountService
     from src.ui_album.v3_ui import V3UI
 
     options = AlbumOptions(enabled=True, ui="v3")
-    return V3UI(ROOT, ROOT / "assets" / "shaders", options)
+    return V3UI(ROOT, ROOT / "assets" / "shaders", options,
+                accounts=LocalAccountService(__import__("tempfile").mkdtemp(prefix="hcpd_acc_")))
 
 
 def _wait_until_not_busy(ui, timeout=5.0):
@@ -83,8 +85,8 @@ def test_session_created_on_sign_in_with_remember_on(ui, isolated_accounts):
 
     assert ui.state.screen == F.MENU
     assert account_store.session_path(isolated_accounts).exists()
-    key = account_crypto.username_key("SessUser1")
-    assert ui._account_data["accounts"][key]["session_token_hash"] is not None
+    key = account_rules.username_key("SessUser1")
+    assert ui._accounts._data["accounts"][key]["session_token_hash"] is not None
 
 
 def test_no_session_created_with_remember_off(ui, isolated_accounts):
@@ -148,7 +150,7 @@ def test_auto_sign_in_on_a_fresh_launch_with_a_valid_session(monkeypatch, isolat
     # on MENU, never showing the sign-in screen.
     relaunched = _make_ui(monkeypatch)
     assert relaunched.state.screen == F.MENU
-    assert relaunched.state.account_key == account_crypto.username_key("AutoUser1")
+    assert relaunched.state.account_key == account_rules.username_key("AutoUser1")
     assert relaunched.state.player == "AutoUser1"
     relaunched.release()
 
@@ -165,13 +167,13 @@ def test_auto_sign_in_refreshes_the_expiry(monkeypatch, isolated_accounts, gl_co
     setup_ui.state.remember = True
     setup_ui.sign_in_submit()
     _wait_until_not_busy(setup_ui)
-    key = account_crypto.username_key("RefreshUser1")
-    first_expiry = setup_ui._account_data["accounts"][key]["session_expires_at"]
+    key = account_rules.username_key("RefreshUser1")
+    first_expiry = setup_ui._accounts._data["accounts"][key]["session_expires_at"]
     setup_ui.release()
 
     time.sleep(0.05)
     relaunched = _make_ui(monkeypatch)
-    second_expiry = relaunched._account_data["accounts"][key]["session_expires_at"]
+    second_expiry = relaunched._accounts._data["accounts"][key]["session_expires_at"]
     assert second_expiry > first_expiry
     relaunched.release()
 
@@ -188,9 +190,9 @@ def test_expired_token_does_not_auto_sign_in(monkeypatch, isolated_accounts, gl_
     setup_ui.state.remember = True
     setup_ui.sign_in_submit()
     _wait_until_not_busy(setup_ui)
-    account_key = account_crypto.username_key("ExpiredUser1")
-    setup_ui._account_data["accounts"][account_key]["session_expires_at"] = 1.0  # way in the past
-    account_store.save(isolated_accounts, setup_ui._account_data)
+    account_key = account_rules.username_key("ExpiredUser1")
+    setup_ui._accounts._data["accounts"][account_key]["session_expires_at"] = 1.0  # way in the past
+    account_store.save(isolated_accounts, setup_ui._accounts._data)
     setup_ui.release()
 
     relaunched = _make_ui(monkeypatch)

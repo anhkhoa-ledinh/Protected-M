@@ -34,12 +34,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from src.account import crypto
+from src.shared import account_rules
 
 logger = logging.getLogger(__name__)
 
 ACCOUNTS_NAME = "accounts.json"
 SESSION_NAME = "session.json"
-GUEST_KEY = crypto.GUEST_KEY
+GUEST_KEY = account_rules.GUEST_KEY
 
 #: "Remember me" session lifetime (task's own number) and the sign-in
 #: failure throttle (task's own numbers).
@@ -179,17 +180,17 @@ def find_key(data: dict, username_raw: str) -> str | None:
     """Case-insensitive lookup — returns the storage key, or ``None`` if
     no account has this name (``normalize_username`` + ``username_key``,
     same normalisation ``sign_up``/``sign_in`` use)."""
-    key = crypto.username_key(crypto.normalize_username(username_raw))
+    key = account_rules.username_key(account_rules.normalize_username(username_raw))
     return key if key in data["accounts"] else None
 
 
 def is_available(data: dict, username_raw: str) -> bool:
     """``True`` only when the name is BOTH a valid username AND free —
     exactly the task's ``valid_user`` condition."""
-    display, reason = crypto.validate_username(username_raw)
+    display, reason = account_rules.validate_username(username_raw)
     if display is None:
         return False
-    return crypto.username_key(display) not in data["accounts"]
+    return account_rules.username_key(display) not in data["accounts"]
 
 
 def create_account(data: dict, display: str, password: str,
@@ -201,11 +202,11 @@ def create_account(data: dict, display: str, password: str,
     ``(key, recovery_code)`` — the code is returned ONCE, in plaintext;
     only its hash is ever stored."""
     now = time.perf_counter() if now is None else now
-    display = crypto.normalize_username(display)
-    key = crypto.username_key(display)
-    password_hash = crypto.hash_secret(crypto.normalize_password(password))
+    display = account_rules.normalize_username(display)
+    key = account_rules.username_key(display)
+    password_hash = crypto.hash_secret(account_rules.normalize_password(password))
     recovery_code = crypto.generate_recovery_code()
-    recovery_hash = crypto.hash_secret(crypto.normalize_recovery_code(recovery_code))
+    recovery_hash = crypto.hash_secret(account_rules.normalize_recovery_code(recovery_code))
     data["accounts"][key] = _new_record(display, password_hash, recovery_hash, now)
     data["last_account"] = key
     return key, recovery_code
@@ -213,9 +214,9 @@ def create_account(data: dict, display: str, password: str,
 
 #: ``verify_credentials``'s result — a plain string keeps call sites
 #: simple (``if result == "ok":``) without importing an enum everywhere.
-RESULT_OK = "ok"
-RESULT_UNKNOWN = "unknown"
-RESULT_WRONG = "wrong"
+RESULT_OK = account_rules.RESULT_OK
+RESULT_UNKNOWN = account_rules.RESULT_UNKNOWN
+RESULT_WRONG = account_rules.RESULT_WRONG
 
 
 def verify_credentials(data: dict, username_raw: str, password: str,
@@ -230,7 +231,7 @@ def verify_credentials(data: dict, username_raw: str, password: str,
     if key is None:
         return RESULT_UNKNOWN, None
     record = data["accounts"][key]
-    normalized = crypto.normalize_password(password)
+    normalized = account_rules.normalize_password(password)
     if not crypto.verify_secret(normalized, record["password_hash"]):
         return RESULT_WRONG, key
     if crypto.needs_rehash(record["password_hash"]):
@@ -347,7 +348,7 @@ def verify_recovery(data: dict, username_raw: str, code: str) -> tuple[str, str 
     if key is None:
         return RESULT_UNKNOWN, None
     record = data["accounts"][key]
-    normalized = crypto.normalize_recovery_code(code)
+    normalized = account_rules.normalize_recovery_code(code)
     if not crypto.verify_secret(normalized, record["recovery_hash"]):
         return RESULT_WRONG, key
     return RESULT_OK, key
@@ -359,9 +360,9 @@ def reset_with_recovery(data: dict, key: str, new_password: str) -> str:
     new code in plaintext, once; only its hash is stored. Caller must
     ``save()`` afterwards."""
     record = data["accounts"][key]
-    record["password_hash"] = crypto.hash_secret(crypto.normalize_password(new_password))
+    record["password_hash"] = crypto.hash_secret(account_rules.normalize_password(new_password))
     new_code = crypto.generate_recovery_code()
-    record["recovery_hash"] = crypto.hash_secret(crypto.normalize_recovery_code(new_code))
+    record["recovery_hash"] = crypto.hash_secret(account_rules.normalize_recovery_code(new_code))
     return new_code
 
 

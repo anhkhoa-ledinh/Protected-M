@@ -23,6 +23,9 @@ import re
 import secrets
 import unicodedata
 
+from src.shared.account_rules import (RECOVERY_CODE_CHARS, RECOVERY_GROUP_SIZE,
+                                     normalize_password)
+
 #: Fixed scrypt cost parameters (task's own numbers). Changing these here
 #: makes every EXISTING hash "needs rehash" on next successful sign-in —
 #: see :func:`needs_rehash`.
@@ -116,65 +119,11 @@ def needs_rehash(stored: str) -> bool:
     return (n, r, p, len(digest)) != (SCRYPT_N, SCRYPT_R, SCRYPT_P, SCRYPT_DKLEN)
 
 
-# ---- usernames -------------------------------------------------------------
-
-#: 3-16 chars: Unicode letters/digits/connector-punctuation (\\w under
-#: Python's default UNICODE str matching) plus '.' and '-' explicitly; no
-#: spaces (not in \\w, not added). Emoji/symbols fall outside \\w and are
-#: rejected without a separate check.
-_USERNAME_RE = re.compile(r"^[\w.-]{3,16}$", re.UNICODE)
-
-GUEST_KEY = "guest"
-
-
-def normalize_username(raw: str) -> str:
-    """NFC-normalise, then strip the ends — exactly the task's own two
-    steps, nothing else (case is NOT folded here; that's a SEPARATE step,
-    :func:`username_key`, since the display form must survive as typed)."""
-    return unicodedata.normalize("NFC", raw).strip()
-
-
-def validate_username(raw: str) -> tuple[str | None, str]:
-    """``(display_name, "")`` if valid, else ``(None, reason)``. Does
-    NOT check whether the name is already taken — that needs the store's
-    data, one layer up."""
-    display = normalize_username(raw)
-    if not (3 <= len(display) <= 16):
-        return None, "3-16 characters"
-    if not _USERNAME_RE.match(display):
-        return None, "Letters, digits, '.', '_' and '-' only"
-    if display.casefold() == GUEST_KEY:
-        return None, '"guest" is reserved'
-    return display, ""
-
-
-def username_key(display: str) -> str:
-    """Case-folded form used as the dict key — uniqueness is
-    case-insensitive, but the account remembers the exact typed form
-    separately (the ``"display"`` field in the stored record)."""
-    return display.casefold()
-
-
-# ---- passwords --------------------------------------------------------------
-
-def normalize_password(raw: str) -> str:
-    return unicodedata.normalize("NFC", raw)
-
-
-def validate_password(raw: str) -> tuple[bool, str]:
-    normalized = normalize_password(raw)
-    if not (8 <= len(normalized) <= 64):
-        return False, "8-64 characters"
-    return True, ""
-
-
 # ---- recovery codes ----------------------------------------------------------
 
 #: Crockford base32 — no I/L/O/U, so a handwritten copy can't be misread
 #: as 1/1/0/V.
 _CROCKFORD_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
-RECOVERY_CODE_CHARS = 12
-RECOVERY_GROUP_SIZE = 4
 
 
 def generate_recovery_code() -> str:
@@ -183,14 +132,6 @@ def generate_recovery_code() -> str:
     groups = [raw[i:i + RECOVERY_GROUP_SIZE]
              for i in range(0, RECOVERY_CODE_CHARS, RECOVERY_GROUP_SIZE)]
     return "-".join(groups)
-
-
-def normalize_recovery_code(raw: str) -> str:
-    """Strips dashes/spaces and upper-cases, so ``abcd-efgh-jkmn``,
-    ``ABCD EFGH JKMN`` and ``ABCDEFGHJKMN`` all hash/verify the same —
-    typed input is forgiving about the separators, only the 12 characters
-    themselves matter."""
-    return re.sub(r"[^0-9A-Za-z]", "", raw).upper()
 
 
 # ---- session tokens -----------------------------------------------------------

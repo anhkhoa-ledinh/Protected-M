@@ -11,6 +11,7 @@ import unicodedata
 import pytest
 
 from src.account import crypto
+from src.shared import account_rules
 
 
 # ---- hashing ----------------------------------------------------------------
@@ -79,23 +80,23 @@ USERNAME_CASES = [
 
 @pytest.mark.parametrize("raw,expect_valid", USERNAME_CASES)
 def test_username_validity_table(raw, expect_valid):
-    display, reason = crypto.validate_username(raw)
+    display, reason = account_rules.validate_username(raw)
     assert (display is not None) == expect_valid, reason
 
 
 def test_username_key_is_case_insensitive():
-    assert crypto.username_key("AnhKhoa") == crypto.username_key("anhkhoa")
-    assert crypto.username_key("AnhKhoa") == crypto.username_key("ANHKHOA")
+    assert account_rules.username_key("AnhKhoa") == account_rules.username_key("anhkhoa")
+    assert account_rules.username_key("AnhKhoa") == account_rules.username_key("ANHKHOA")
 
 
 def test_username_display_form_preserved_exactly():
-    display, _ = crypto.validate_username("  AnhKhoa  ")
+    display, _ = account_rules.validate_username("  AnhKhoa  ")
     assert display == "AnhKhoa"
 
 
 def test_username_nfc_normalised():
     nfd = unicodedata.normalize("NFD", "Việt")
-    display, reason = crypto.validate_username(nfd)
+    display, reason = account_rules.validate_username(nfd)
     assert display == unicodedata.normalize("NFC", nfd)
 
 
@@ -106,7 +107,7 @@ def test_username_nfc_normalised():
     ("x" * 65, False), ("", False),
 ])
 def test_password_length_table(raw, expect_valid):
-    ok, reason = crypto.validate_password(raw)
+    ok, reason = account_rules.validate_password(raw)
     assert ok == expect_valid, reason
 
 
@@ -126,9 +127,9 @@ def test_recovery_code_excludes_confusable_letters():
 
 
 def test_normalize_recovery_code_strips_separators_and_upcases():
-    assert crypto.normalize_recovery_code("abcd-efgh-jkmn") == "ABCDEFGHJKMN"
-    assert crypto.normalize_recovery_code("ABCD EFGH JKMN") == "ABCDEFGHJKMN"
-    assert crypto.normalize_recovery_code("ABCDEFGHJKMN") == "ABCDEFGHJKMN"
+    assert account_rules.normalize_recovery_code("abcd-efgh-jkmn") == "ABCDEFGHJKMN"
+    assert account_rules.normalize_recovery_code("ABCD EFGH JKMN") == "ABCDEFGHJKMN"
+    assert account_rules.normalize_recovery_code("ABCDEFGHJKMN") == "ABCDEFGHJKMN"
 
 
 def test_recovery_codes_are_unique_in_practice():

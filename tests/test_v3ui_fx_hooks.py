@@ -29,6 +29,7 @@ import pytest
 
 from src.ui_album import v3_flow as F
 from src.ui_album.options import AlbumOptions
+from src.account.service import LocalAccountService
 from src.ui_album.v3_ui import V3UI
 
 ROOT = Path(".").resolve()
@@ -110,7 +111,8 @@ def _module_gl_window():
 @pytest.fixture(scope="module")
 def _shared_ui(_module_gl_window):
     options = AlbumOptions(enabled=True, guest=True, ui="v3")
-    shared = V3UI(ROOT, ROOT / "assets" / "shaders", options)
+    shared = V3UI(ROOT, ROOT / "assets" / "shaders", options,
+                  accounts=LocalAccountService(__import__("tempfile").mkdtemp(prefix="hcpd_acc_")))
     shared.initialize()
     shared.painter.set_frame((1280, 720))
     # Pay the "wait for preload" cost ONCE for the whole module.
@@ -330,7 +332,8 @@ def test_hcpd_no_fx_disables_everything(_module_gl_window, monkeypatch):
     # other still expected a live context).
     monkeypatch.setenv("HCPD_NO_FX", "1")
     options = AlbumOptions(enabled=True, guest=True, ui="v3")
-    solo_ui = V3UI(ROOT, ROOT / "assets" / "shaders", options)
+    solo_ui = V3UI(ROOT, ROOT / "assets" / "shaders", options,
+                   accounts=LocalAccountService(__import__("tempfile").mkdtemp(prefix="hcpd_acc_")))
     solo_ui.initialize()
     solo_ui.painter.set_frame((1280, 720))
     assert solo_ui.fx_enabled is False
