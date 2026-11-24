@@ -16,7 +16,8 @@ import sqlite3
 
 from src.account.crypto import hash_token
 from src.game.levels import LEVELS
-from src.game.pvp import ITEM_WEIGHT, PVP_MODES, PVP_UNLOCK_LEVELS, item_price  # noqa: F401
+from src.game.pvp import (ITEM_WEIGHT, PVP_MODES, PVP_UNLOCK_LEVELS,  # noqa: F401
+                          item_is_live, item_price)
 from src.game.scoring import OVERTIME_MAX_S, match_score
 from src.server.store import Store
 
@@ -65,7 +66,7 @@ def start_match(store: Store, key: str, mode: str, level: int, items: list[str],
         raise EconomyError("bad_request", "unknown mode or level")
     rules = LEVELS[level]
     if len(items) > rules.slots or len(set(items)) != len(items) \
-            or any(name not in ITEM_WEIGHT for name in items):
+            or any(not item_is_live(name) for name in items):
         raise EconomyError("bad_request", "bad items")
     cost = price(items)
     nonce = secrets.token_urlsafe(16)

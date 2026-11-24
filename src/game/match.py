@@ -14,6 +14,7 @@ import random
 import time
 from dataclasses import dataclass, field
 
+from src.game.pvp import ITEM_EFFECT_S
 from src.game.scoring import OVERTIME_MAX_S, OVERTIME_PENALTY, match_score  # noqa: F401
 from src.game.levels import (LEVELS, WEAPON_DAMAGE, WEAPONS_SPEC, DamageSpec,
                              WeaponSpec, hit_damage)
@@ -145,6 +146,8 @@ class AlbumMatch:
     mag_size: int = 10
     rounds_left: int = -1
     reload_until_s: float = 0.0
+    #: item name -> time its effect ends (see ``use_item``)
+    item_until_s: dict = field(default_factory=dict)
     #: Nhịp bắn: giây tối thiểu giữa hai phát. 0 = bắn nhanh tuỳ tay.
     fire_interval_s: float = 0.0
     reload_s: float = RELOAD_S
@@ -291,6 +294,22 @@ class AlbumMatch:
             self.reload_until_s = 0.0
             self.rounds_left = int(self.mag_size)
             logger.info("Reload end: %d/%d", self.rounds_left, self.mag_size)
+
+    def use_item(self, item: str, now: float) -> bool:
+        """Use an equipped item once: its effect runs for ``ITEM_EFFECT_S[item]``
+        seconds and ``used`` counts it (the score formula and the server read
+        ``used``). ``False`` = not equipped, not a working item, or spent."""
+        seconds = ITEM_EFFECT_S.get(item)
+        if seconds is None or item not in self.items or self.used.get(item, 0) >= 1 \
+                or self.ended:
+            return False
+        self.used[item] = self.used.get(item, 0) + 1
+        self.item_until_s[item] = now + seconds
+        logger.info("Item used: %s for %.1f s (used=%s)", item, seconds, self.used)
+        return True
+
+    def item_active(self, item: str, now: float) -> bool:
+        return now < self.item_until_s.get(item, 0.0)
 
     def start_reload(self, now: float) -> bool:
         """Reload on request (the R key): only when the magazine is not full

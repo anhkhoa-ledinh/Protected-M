@@ -16,6 +16,7 @@ _READ_WRITE = ("game", "game_planes", "game_layers_revision")
 #: App methods the devtools call.
 _METHODS = ("tick_scope", "album_draw_guarded", "try_load_media", "save_album_shot",
             "v3_field_focused", "start_album_match", "pvp_action", "album_shoot",
+            "use_item_slot",
             "album_action")
 
 

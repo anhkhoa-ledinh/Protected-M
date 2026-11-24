@@ -93,6 +93,8 @@ class SceneRenderer:
         #: album), gọi sau pass cảnh và TRƯỚC các lớp — đúng chỗ của quả cầu
         #: cũ, nên cơ chế lớp-che-bọ không đổi.
         self.extra_scene_draw = None
+        #: drawn after the photo layers, depth test off (the thermal marks)
+        self.post_layer_draw = None
         # Chẩn đoán C2, tắt mặc định: HCPD_PROP_PROBE=1 in state depth thật.
         self._probe = os.environ.get("HCPD_PROP_PROBE") == "1"
         self._probe_logged = 0
@@ -416,6 +418,10 @@ class SceneRenderer:
                 self._video_plane.draw(view_flat, proj_flat)
         if probe:
             self._log_depth_state("sau layer")
+        if self.post_layer_draw is not None:
+            with stage("bugs_heat"):
+                self.post_layer_draw(view_flat, proj_flat)
+            self._shader.use()
 
         self._debug.begin_frame()
         if self._debug.visible:

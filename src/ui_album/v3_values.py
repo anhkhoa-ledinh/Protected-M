@@ -468,7 +468,20 @@ def _loadout_stickers(state, flow, manifest) -> None:
     placed = manifest.sprite(screen, "sticker_placed")
     label = _spec(manifest, screen, "sticker_placed_label")
     rects = manifest.screens[screen].get("sticker_rects", {})
+    soon_label = _spec(manifest, screen, "sticker_placed_label")
     for item in F.ITEM_WEIGHT:
+        if not F.item_is_live(item):
+            # shown, not sold: dimmed, with a label in the middle of the card
+            state.sprites[f"sticker:{item}"] = True
+            state.alpha[f"sticker:{item}"] = 0.3
+            anchor = rects.get(item)
+            if soon_label is not None and anchor is not None:
+                rect = list(soon_label["rect"])
+                rect[0], rect[1] = float(anchor[0]), float(anchor[1]) + 56.0
+                rect[2] = float(anchor[2])
+                state.extra.append((rect, soon_label["runs"], ["Coming soon"],
+                                    "center"))
+            continue
         if item not in flow.items:
             state.sprites[f"sticker:{item}"] = True
             continue
@@ -535,7 +548,7 @@ def _loadout_slots(state, flow, manifest, painter) -> None:
         _slot_line(state, manifest, screen, "slot_sub", slot_rect,
                    layout.get("sub"),
                    f"key {number} · {F.item_price(item)} pts"
-                   + ("" if F.ITEMS_HAVE_EFFECT else " · no effect yet"))
+                   f" · {F.ITEM_EFFECT_S.get(item, 0):g} s")
     _ = painter
 
 

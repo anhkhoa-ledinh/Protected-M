@@ -89,12 +89,14 @@ def test_a_match_charges_and_the_server_scores_it(srv, tmp_path):
     assert score == 130 * 1 - 3 == 127
     assert svc.economy("alice") == {"wallet": 70 + 127, "earned_total": 127,
                                     "levels_cleared": [1]}
-    four = ["Thermal scan", "Smoke bomb", "Antidote", "Acid shield"]      # 230 > 197
-    assert svc.begin_match("alice", 4, four, 230) == "no_funds"
-    assert svc.economy("alice")["wallet"] == 197
+    for _ in range(3):                                                       # 197 -> 107
+        assert svc.begin_match("alice", 1, ["Flare"], 30) == "ok"
+    both = ["Thermal scan", "Flare"]                                         # 110 > 107
+    assert svc.begin_match("alice", 4, both, 110) == "no_funds"
+    assert svc.economy("alice")["wallet"] == 107
     assert svc.begin_match("alice", 1, [], 0) == "ok"                       # free match still gets a ticket
     assert svc.end_match("alice", 1, False, {}, 10) == 0
-    assert svc.spend("alice", 5) is False and svc.economy("alice")["wallet"] == 197
+    assert svc.spend("alice", 5) is False and svc.economy("alice")["wallet"] == 107
 
 
 def test_a_dropped_connection_signs_itself_in_again(srv, tmp_path):

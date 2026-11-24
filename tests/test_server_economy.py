@@ -80,13 +80,22 @@ def test_the_formula_is_the_games_own():
 
 def test_start_charges_the_items_and_returns_a_ticket(env):
     st = env.player()
-    r = env.call(st, "start_match", level=1, items=[FLARE, "Compass"])
-    cost = item_price(FLARE) + item_price("Compass")
+    r = env.call(st, "start_match", level=1, items=[FLARE])
+    cost = item_price(FLARE)
     assert r["t"] == "ok" and r["cost"] == cost and r["wallet"] == 100 - cost
     assert r["started_at"] == env.now and r["seconds"] == LEVELS[1].seconds
     assert len(r["ticket"]) >= 20 and env.wallet(st) == 100 - cost
     stored = env.store.connect().execute("SELECT nonce_hash FROM tickets").fetchone()[0]
     assert stored != r["ticket"]                                          # hashed at rest
+
+
+@pytest.mark.parametrize("item", ["Compass", "Antidote", "Acid shield", "Filter lens",
+                                  "Energy drink", "Smoke bomb"])
+def test_coming_soon_items_are_refused_and_never_charged(env, item):
+    st = env.player()
+    r = env.call(st, "start_match", level=1, items=[item])
+    assert r["code"] == "bad_request" and env.wallet(st) == 100
+    assert env.store.connect().execute("SELECT COUNT(*) FROM tickets").fetchone()[0] == 0
 
 
 def test_not_enough_points_charges_nothing_and_gives_no_ticket(env):

@@ -115,3 +115,40 @@ the ticket works once and expires, the time part of the score comes from the **s
 the items were charged at `start_match`, and the wallet moves in SQLite transactions. A modified
 client can still claim a win; the damage is bounded by the minimum play time per level and by
 what a win pays. Anti-cheat beyond that (replaying hits server-side) is out of scope.
+
+## Items (D1)
+
+Only `Flare` and `Thermal scan` work (`src/game/pvp.py: ITEM_EFFECT_S`, seconds of effect);
+the other six are "Coming soon": the loadout shows them dimmed, cannot equip them, and
+`start_match` refuses them (`bad_request`), so they are never charged. A used item counts once
+per match in `used`, which the score formula and `finish_match(items_used)` both read.
+The server only checks that a used item was bought for that ticket and the count is sane; it
+cannot know the item was really *used* in the game.
+
+## Open risks (24/11, end of TASK_platform_1124)
+
+1. **PvP in-match play is not on the central server.** C5 put sign-in, rooms, the photo relay and
+   its limits on the server, but the match itself (hit, killed, tick, end, queue, item relay)
+   still runs on the old LAN server (`src/net/server.py`) that the game's PvP client uses. So
+   PvP scores, the PvP tabs of the leaderboard and PvP wallet effects are not server-authoritative.
+2. **A win is the client's word** (see above). The server rejects a win faster than
+   1 s per bug (`too_fast`) or later than the level time (`time`); a client that lies within
+   those bounds is accepted.
+3. **The result screen trusts the client first.** When the server refuses a win (`too_fast`),
+   the screen still says "Memory saved" and lists the time bonus, while SCORE shows the server's
+   number (0). The server is right; the screen is misleading. Not changed in this task.
+4. **Progress and play history stay on the player's computer** (`remote_progress.json`); only
+   wallet, earned points, levels cleared and scores are on the server.
+5. **Certificate pinning is a file the user copies by hand.** No rotation or revocation; a new
+   certificate means every player must get the new file. Self-signed dev certs are for LAN use.
+6. **Leaderboard**: only the Solo tab is served; the screen subtitle still reads "Accounts on this
+   computer" in remote mode.
+7. **No log of requests on the server** (by design: nothing from a message body is logged), so a
+   run is matched to the server only by the database (`scores`, `tickets`) and connection lines.
+8. **Offline resume**: with a remembered session and the server down, the game opens on the
+   sign-in screen (name filled in, no message); the explicit "Can't reach the server" appears
+   only after pressing Sign in.
+9. **Account copies**: importing `accounts.json` is an admin CLI command; hashes move as hashes,
+   the scrypt parameters must match.
+10. **One process, one SQLite file, no backup job.** Fine for a LAN; a cloud VM needs a backup
+    and a firewall rule (only the server port).

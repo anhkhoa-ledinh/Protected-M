@@ -151,7 +151,7 @@ class DevTools:
         step = steps[index]
         kind, _, arg = step.partition(":")
         # a toast lives 4 s: the shot right after a click/equip must come sooner
-        self._eco_wait = 1.5 if kind in ("equip", "click") else 4.0
+        self._eco_wait = 1.5 if kind in ("equip", "click", "item") else 4.0
         F = app.album.flow
         state = app.album.state
         if kind == "go":
@@ -162,6 +162,11 @@ class DevTools:
             F.toggle_item(state, arg)
         elif kind == "click":
             app.album_action(app.album.activate(arg), now)
+        elif kind == "item":                       # same call as number key N
+            app.use_item_slot(int(arg), now)
+        elif kind == "type":
+            for char in arg:                       # the same path as a key press
+                app.album.key(char)
         elif kind == "seg":
             state.board_seg = arg
         elif kind == "shot":
@@ -756,7 +761,13 @@ class DevTools:
             return
         if now < getattr(self, "_autowin_next_s", 0.0):
             return
-        self._autowin_next_s = now + 0.1
+        # ``HCPD_ALBUM_AUTOWIN_GAP_S``: a slower pace, so the central server's
+        # own "too fast to be human" check (MIN_WIN_S_PER_BUG) can be passed.
+        try:
+            gap = float(self.env("HCPD_ALBUM_AUTOWIN_GAP_S") or 0.1)
+        except ValueError:
+            gap = 0.1
+        self._autowin_next_s = now + max(0.1, gap)
         for index, found in enumerate(match.state.found):
             if found:
                 continue

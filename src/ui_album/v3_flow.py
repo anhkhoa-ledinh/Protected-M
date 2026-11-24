@@ -20,8 +20,8 @@ import random
 import time
 from dataclasses import dataclass, field
 
-from src.game.view import (ITEM_WEIGHT, ITEMS_HAVE_EFFECT, LEVEL_TABLE,
-                          PVP_MODES, PVP_UNLOCK_LEVELS, item_price)
+from src.game.view import (ITEM_EFFECT_S, ITEM_WEIGHT, LEVEL_TABLE,  # noqa: F401
+                          PVP_MODES, PVP_UNLOCK_LEVELS, item_is_live, item_price)
 from src.ui_album.ids import (BOARD, LEVELS, LOADING, LOADING_READY, LOADOUT,  # noqa: F401
                                 LOSE, MENU, OFFLINE, PHOTOS, PLAY, PVP_FOUND,
                                 PVP_HIDE, PVP_HUNT, PVP_INVITE, PVP_MODE,
@@ -550,6 +550,9 @@ def toggle_item(flow: V3Flow, item: str) -> None:
     """Gắn/bỏ một vật phẩm. Hết ô hoặc hết điểm thì báo, không im lặng bỏ qua."""
     if item in flow.items:
         flow.items.remove(item)
+        return
+    if not item_is_live(item):
+        say(flow, f"{item} is coming soon.")
         return
     if len(flow.items) >= flow.slots():
         say(flow, f"All {flow.slots()} item slots are full.")

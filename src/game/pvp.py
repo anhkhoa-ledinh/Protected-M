@@ -34,9 +34,14 @@ def item_price(item: str) -> int:
     return ITEM_WEIGHT.get(item, 0) * ITEM_PRICE_PER_WEIGHT
 
 
-#: No item changes a match yet (nothing consumes ``used``); the loadout says
-#: so instead of hiding the fact.
-ITEMS_HAVE_EFFECT = False
+#: The items that really work, and for how many seconds one use lasts: the one
+#: table. Every other item in ``ITEM_WEIGHT`` is "Coming soon": shown on the
+#: loadout, never equippable, never charged.
+ITEM_EFFECT_S = {"Flare": 8.0, "Thermal scan": 6.0}
+
+
+def item_is_live(item: str) -> bool:
+    return item in ITEM_EFFECT_S
 
 PVP_MODES = ("Competitive", "Hunt & Hide")
 

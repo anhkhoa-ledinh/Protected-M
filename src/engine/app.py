@@ -491,15 +491,40 @@ class HcpdApplication:
         notice = self._renderer.take_content_notice()
         self._renderer.show_toast(msg if notice is None else f"{msg} — {notice}")
 
+    def _use_item_slot(self, number: int, now: float) -> None:
+        """Number key N in a match = use the item in slot N (once per match)."""
+        match = self._album.game
+        index = number - 1
+        if match is None or not 0 <= index < len(match.items):
+            return
+        item = match.items[index]
+        if match.use_item(item, now):
+            self._album.flow.say(self._album.state, f"{item} on")
+        else:
+            logger.info("Item %s not used (spent, not working, or match over)", item)
+
     def _draw_album_bugs(self, view_flat, proj_flat) -> None:
         """Vẽ bọ của ván đang chơi (F3). Không có ván thì không vẽ gì."""
         if self._game is None or not self._game.props:
             return
         if self._bugs is None:
             return
+        match = self._album.game
+        now = time.perf_counter()
         self._bugs.draw(view_flat, proj_flat, self._game.props,
                         self._game.found, self._album.state.level,
-                        self._album.bug_theme)
+                        self._album.bug_theme,
+                        flare=match is not None and match.item_active("Flare", now))
+
+    def _draw_album_heat(self, view_flat, proj_flat) -> None:
+        """Thermal scan marks, after the photo layers (see ``BugPainter.draw_heat``)."""
+        match = self._album.game
+        if (self._game is None or not self._game.props or self._bugs is None
+                or match is None
+                or not match.item_active("Thermal scan", time.perf_counter())):
+            return
+        self._bugs.draw_heat(view_flat, proj_flat, self._game.props,
+                             self._album.state.level)
 
     def _tick_album(self, input_state, now: float) -> None:
         """
@@ -761,6 +786,9 @@ class HcpdApplication:
                 self._album_action(album.activate(ID.BTN_RANDOM_FROM_ALBUM), now)
         if input_state.item_slot and not self._v3_field_focused():
             state.slot_selected = int(input_state.item_slot)
+            if (state.screen in (album.flow.PLAY, album.flow.PVP_HUNT)
+                    and album.game is not None):
+                self._use_item_slot(int(input_state.item_slot), now)
         if input_state.share_to_album and state.screen == album.flow.PHOTOS:
             self._album_action(album.activate(ID.BTN_SHARE_TO_ALBUM), now)
         if (input_state.hud_hide_toggle and not self._v3_field_focused()
@@ -2533,6 +2561,7 @@ class HcpdApplication:
             self._album.initialize()
             self._bugs = self._build_bug_painter()
             self._renderer.extra_scene_draw = self._draw_album_bugs
+            self._renderer.post_layer_draw = self._draw_album_heat
             if self._album_options.is_v3:
                 # D2: từ đây, dời hoặc đổi cỡ cửa sổ là dời tấm kính thật.
                 self._window.set_geometry_listener(self._refresh_window_plane)
@@ -2876,7 +2905,8 @@ class HcpdApplication:
             self._renderer.release()
         self._window.destroy()
         tmp_dir = getattr(self, "_scripted_run_tmp_dir", None)
-        if tmp_dir is not None:
+        if tmp_dir is not None and not self._devtools.env("HCPD_ECONOMY_DIR").strip():
+            # a dir the run was GIVEN (restart test) is the caller's to remove
             import shutil
 
             shutil.rmtree(tmp_dir, ignore_errors=True)

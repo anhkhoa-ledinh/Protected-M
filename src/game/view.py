@@ -15,8 +15,8 @@ from typing import Any
 from src.game.hit import SpriteMask  # noqa: F401  (UI-facing surface)
 from src.game.levels import LEGACY_CAMO  # noqa: F401
 from src.game.match import WEAPON_LABEL  # noqa: F401
-from src.game.pvp import (ITEM_WEIGHT, ITEMS_HAVE_EFFECT, LEVEL_TABLE,  # noqa: F401
-                          PVP_MODES, PVP_UNLOCK_LEVELS, item_price)
+from src.game.pvp import (ITEM_EFFECT_S, ITEM_WEIGHT, LEVEL_TABLE,  # noqa: F401
+                          PVP_MODES, PVP_UNLOCK_LEVELS, item_is_live, item_price)
 from src.game.viewport_filter import DESIGN_SIZE, project_to_design  # noqa: F401
 
 
