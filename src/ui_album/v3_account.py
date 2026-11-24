@@ -9,6 +9,7 @@ from pathlib import Path
 from src.shared import account_rules
 from src.ui_album import v3_flow as F
 from src.ui_album import ids as ID
+from src.ui_album.v3_consts import OFFLINE_SIGN_IN
 
 logger = logging.getLogger("src.ui_album.v3_ui")
 
@@ -88,7 +89,7 @@ class AccountMixin:
         outcome, key = result
         now = time.perf_counter()
         if outcome == account_rules.RESULT_OFFLINE:
-            self.state.sign_in_error = "Can't reach the server. Try again, or play as guest."
+            self.state.sign_in_error = OFFLINE_SIGN_IN
             self.state.go(F.SIGN_IN_ERR)
             return
         if outcome == account_rules.RESULT_OK:
@@ -295,11 +296,11 @@ class AccountMixin:
         a guest instead gets a ONE-TIME toast (never saved — this IS the
         explanation why)."""
         key = self.state.account_key
-        if self._accounts.economy(key) is not None:
         self.match_verdict = None
+        if self._accounts.economy(key) is not None:
             score = self._accounts.end_match(key, level, won, dict(used or {}), score)
-            self.sync_economy()
             self.match_verdict = self._accounts.take_verdict()
+            self.sync_economy()
         if key == account_rules.GUEST_KEY:
             if not self._guest_toast_shown:
                 self._guest_toast_shown = True

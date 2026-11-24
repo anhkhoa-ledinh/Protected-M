@@ -15,6 +15,9 @@ logger = logging.getLogger("src.ui_album.v3_ui")
 #: visible gain.
 FX_WIDE_THRESHOLD_PX = 1920
 
+#: Sign-in screen line when the central server does not answer.
+OFFLINE_SIGN_IN = "Can't reach the server — play as guest or try again"
+
 #: TASK_ui_sakuga_1117 Phase 6 — hotspot names/prefixes that get a plain
 #: ``ui_tap`` on click (the PRIMARY button of the screen gets
 #: ``ui_confirm`` instead; anything not listed here gets nothing —

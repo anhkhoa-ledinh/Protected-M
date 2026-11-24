@@ -86,3 +86,29 @@ def test_server_name_comes_from_central_json_and_defaults_to_the_host(srv, tmp_p
     assert build_account_service(tmp_path / "r1", cfg).accounts_view()["server"] == "Home Pi"
     cfg.write_text(json.dumps(base))
     assert build_account_service(tmp_path / "r2", cfg).accounts_view()["server"] == "127.0.0.1"
+
+
+def test_remembered_session_with_the_server_down_says_so_at_once(
+        gl_context, monkeypatch, tmp_path):
+    from src.account import remote
+    from src.services.prefs_service import LocalPrefsService
+    from src.services.shared_album_service import LocalSharedAlbumService
+    from src.ui_album.options import AlbumOptions
+    from src.ui_album.v3_consts import OFFLINE_SIGN_IN
+    from src.ui_album.v3_ui import V3UI
+
+    monkeypatch.setenv("HCPD_NO_FX", "1")
+    cert, _ = make_cert(tmp_path / "pki")
+    root = tmp_path / "r"
+    root.mkdir()
+    (root / remote.SESSION_NAME).write_text(json.dumps({"token": "x" * 40, "display": "Alice"}))
+    svc = RemoteAccountService(root, CentralClient("127.0.0.1", 1, cert, timeout=1))
+    ui = V3UI(ROOT, ROOT / "assets" / "shaders", AlbumOptions(enabled=True, ui="v3"),
+              accounts=svc, shared_album=LocalSharedAlbumService(),
+              prefs=LocalPrefsService(ROOT))
+    try:
+        assert ui.state.screen == F.SIGN_IN_ERR
+        assert ui.state.sign_in_error == OFFLINE_SIGN_IN
+        assert ui.state.player == "Alice"
+    finally:
+        ui.release()

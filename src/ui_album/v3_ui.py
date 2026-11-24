@@ -35,7 +35,7 @@ from src.ui_album import ids as ID
 from src.ui_album.v3_account import AccountMixin
 from src.ui_album.v3_click_geometry import ClickGeometryMixin
 from src.ui_album.v3_fx_steps import FxStepsMixin
-from src.ui_album.v3_consts import (_HUD_FADE_GROW_PX, _HUD_FADE_PROXIMITY_ALPHA, _HUD_FADE_SPRING_D, _HUD_FADE_SPRING_K, _HUD_HIDDEN_TOAST, _HUD_HIDE_SPRING_D, _HUD_HIDE_SPRING_K)
+from src.ui_album.v3_consts import (OFFLINE_SIGN_IN, _HUD_FADE_GROW_PX, _HUD_FADE_PROXIMITY_ALPHA, _HUD_FADE_SPRING_D, _HUD_FADE_SPRING_K, _HUD_HIDDEN_TOAST, _HUD_HIDE_SPRING_D, _HUD_HIDE_SPRING_K)
 
 logger = logging.getLogger(__name__)
 class V3UI(AccountMixin, FxStepsMixin, ClickGeometryMixin):
@@ -132,6 +132,11 @@ class V3UI(AccountMixin, FxStepsMixin, ClickGeometryMixin):
                 last_display = self._accounts.last_display()
                 if last_display is not None:
                     self.state.player = last_display
+                if self._accounts.offline_notice:
+                    # A remembered session, but the server is down: say so
+                    # now, not only after the player presses Sign in.
+                    self.state.sign_in_error = OFFLINE_SIGN_IN
+                    self.state.go(F.SIGN_IN_ERR)
         # Móc đo: mở thẳng một màn để đếm FPS trên đúng màn đó (vd. màn chơi).
         forced = os.environ.get("HCPD_V3_SCREEN", "").strip()
         if forced and forced in self.manifest.screens:
