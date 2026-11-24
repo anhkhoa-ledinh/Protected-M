@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Dev tool: float the game window at an exact size and position on Hyprland.
 
-    python tools/pin_window.py [--size 1091x613] [--pos 107,100] [--wait 60]
+    python tools/pin_window.py [--size 1091x613] [--pos 107,100] [--wait 60] [--hold]
 
 Start it BEFORE (or while) the game launches: it installs a window rule
 (Hyprland 0.57 Lua, via ``hyprctl eval``) for the game's window class, then
@@ -45,11 +45,11 @@ def install_rule(w: int, h: int, x: int, y: int) -> None:
 
 
 def nudge(client: dict, w: int, h: int, x: int, y: int) -> None:
-    addr = f"address:{client['address']}"
+    addr = f'window = "address:{client["address"]}"'
     if not client.get("floating"):
-        hypr("dispatch", "setfloating", addr)
-    hypr("dispatch", "resizewindowpixel", f"exact {w} {h},{addr}")
-    hypr("dispatch", "movewindowpixel", f"exact {x} {y},{addr}")
+        hypr("eval", f"hl.dispatch(hl.dsp.window.float({{ action = \"enable\", {addr} }}))")
+    hypr("eval", f"hl.dispatch(hl.dsp.window.resize({{ x = {w}, y = {h}, exact = true, {addr} }}))")
+    hypr("eval", f"hl.dispatch(hl.dsp.window.move({{ x = {x}, y = {y}, {addr} }}))")
 
 
 def main() -> int:
@@ -57,18 +57,28 @@ def main() -> int:
     parser.add_argument("--size", default="1091x613")
     parser.add_argument("--pos", default="107,100")
     parser.add_argument("--wait", type=float, default=60.0)
+    parser.add_argument("--hold", action="store_true",
+                        help="keep the geometry until killed (the game restores "
+                             "its saved window rect a moment after start)")
     args = parser.parse_args()
     w, h = (int(v) for v in args.size.lower().split("x"))
     x, y = (int(v) for v in args.pos.split(","))
     install_rule(w, h, x, y)
-    deadline, last_nudge = time.time() + args.wait, 0.0
+    deadline, last_nudge, reported = time.time() + args.wait, 0.0, False
     while time.time() < deadline:
         client = find_client()
         if client is not None:
             at, size = client["at"], client["size"]
             if at == [x, y] and size == [w, h] and client.get("floating"):
-                print(json.dumps({"at": at, "size": size, "floating": True}))
-                return 0
+                if not args.hold:
+                    print(json.dumps({"at": at, "size": size, "floating": True}))
+                    return 0
+                if not reported:
+                    print(json.dumps({"at": at, "size": size, "floating": True}),
+                          flush=True)
+                    reported = True
+                time.sleep(0.2)
+                continue
             if time.time() - last_nudge > 1.0:
                 nudge(client, w, h, x, y)
                 last_nudge = time.time()
