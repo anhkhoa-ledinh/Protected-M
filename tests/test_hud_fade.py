@@ -62,7 +62,7 @@ def test_hide_spring_settles_near_zero_within_about_0_15s():
     """TASK_hud_fix_1119 Fix 2: the task's own "~0.15s" -- k=600/d=40
     reaches within 2% of target by t=0.15s (and stays there, negligible
     overshoot)."""
-    from src.ui_album.v3_ui import _HUD_HIDE_SPRING_D, _HUD_HIDE_SPRING_K
+    from src.ui_album.v3_consts import _HUD_HIDE_SPRING_D, _HUD_HIDE_SPRING_K
 
     spring = Spring(1.0, _HUD_HIDE_SPRING_K, _HUD_HIDE_SPRING_D)
     spring.to = 0.0

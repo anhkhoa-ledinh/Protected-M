@@ -13,7 +13,8 @@ from src.ui_album.options import AlbumOptions
 from src.account.service import LocalAccountService
 from src.services.prefs_service import LocalPrefsService
 from src.services.shared_album_service import LocalSharedAlbumService
-from src.ui_album.v3_ui import FX_WIDE_THRESHOLD_PX, V3UI
+from src.ui_album.v3_consts import FX_WIDE_THRESHOLD_PX
+from src.ui_album.v3_ui import V3UI
 
 ROOT = Path(".").resolve()
 

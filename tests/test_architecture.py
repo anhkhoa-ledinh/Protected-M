@@ -393,3 +393,42 @@ def test_ui_album_imports_only_game_view_from_src_game():
             if (imp == "src.game" or imp.startswith("src.game.")) and imp != "src.game.view":
                 offenders.append(f"{path.relative_to(ROOT)}: {imp}")
     assert offenders == [], offenders
+
+
+_WRITE_CALLS = {"write_text", "write_bytes", "dump", "replace"}
+
+
+def test_ui_album_writes_no_files():
+    """B5: the UI persists nothing itself (accounts, prefs and photos are written
+    by services and ``app``). Flags ``open(..., "w"/"a"/"x")``, ``write_text``,
+    ``write_bytes``, ``json.dump`` and ``os.replace``."""
+    import ast
+
+    offenders = []
+    for path in _production_py_files():
+        if "src/ui_album/" not in path.as_posix():
+            continue
+        for node in ast.walk(ast.parse(path.read_text("utf-8"))):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", "")
+            if name in _WRITE_CALLS and not (name == "replace" and not (
+                    isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name)
+                    and func.value.id == "os")):
+                offenders.append(f"{path.relative_to(ROOT)}:{node.lineno} {name}")
+            if name == "open":
+                mode = ""
+                if len(node.args) > 1 and isinstance(node.args[1], ast.Constant):
+                    mode = str(node.args[1].value)
+                for kw in node.keywords:
+                    if kw.arg == "mode" and isinstance(kw.value, ast.Constant):
+                        mode = str(kw.value.value)
+                if any(c in mode for c in "wax+"):
+                    offenders.append(f"{path.relative_to(ROOT)}:{node.lineno} open({mode!r})")
+    assert offenders == [], offenders
+
+
+def test_v3_ui_stays_small():
+    lines = (ROOT / "src/ui_album/v3_ui.py").read_text("utf-8").count("\n")
+    assert lines <= 760, f"v3_ui.py is {lines} lines; move work out of V3UI"

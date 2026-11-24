@@ -1227,72 +1227,83 @@ class HcpdApplication:
             camera.scope_active = False
 
     def _album_action(self, action: str, now: float) -> None:
-        """Thực hiện một hành động mà giao diện album yêu cầu."""
-        F = self._album.flow
+        """Run an action the album UI asks for: the UI's own ``dispatch``
+        forwards it to the handler registered below (or to its account
+        controller)."""
+        self._album.dispatch(action, now)
 
+    def _register_album_actions(self) -> None:
+        """B5: the callbacks ``V3UI.dispatch`` forwards to. Each one is the
+        body of one branch of the old ``_album_action`` if-chain, unchanged."""
+        album = self._album
+        album.register_handler("pick_file", self._act_pick_file)
+        album.register_handler("start_pipeline", self._act_start_pipeline)
+        album.register_handler("rest_eye", lambda action, now: self._begin_rest_measure(now))
+        album.register_handler("start_game", lambda action, now: self._start_album_match(now))
+        album.register_handler("next_level", self._act_next_level)
+        album.register_handler("logout", self._act_logout)
+        album.register_handler("copy_code", self._act_copy_code)
+        album.register_handler("share_confirmed", self._act_share_confirmed)
+        album.register_handler("random_from_album", lambda action, now: self._start_random_photo())
+        for mode_action in (ID.DISPLAY_FULL, ID.DISPLAY_WINDOW):
+            album.register_handler(mode_action, self._act_display_mode)
+        album.register_prefix_handler("pvp_", self._pvp_action)
+
+    def _act_pick_file(self, action: str, now: float) -> None:
         state = self._album.state
-        if action == "pick_file":
-            picked = pick_media_file()
-            # Hộp thoại vừa đóng: cửa sổ game đang bị thu nhỏ, kéo nó về NGAY
-            # (kể cả khi người dùng bấm Huỷ) rồi mới làm gì tiếp.
-            self._window.restore_and_focus()
-            if picked is not None:
-                state.photo = picked
-                if picked not in state.recent:
-                    state.recent.insert(0, picked)
-                    del state.recent[4:]
-                # Chọn xong là chạy luôn bước tách lớp: trước đây app đứng
-                # yên ở màn chọn ảnh, người dùng tưởng nó không nhận ảnh.
-                self._album_action("start_pipeline", now)
-        elif action == "start_pipeline":
-            if state.photo is None:
-                state.photo = self._content.resolved_media_path(self._root)
-            self._try_load_media(Path(state.photo), now)
-            state.pipeline_pct = 0.0
-            self._album_pipeline_started_s = now
-            state.go(F.PIPE0)
-        elif action == "rest_eye":
-            self._begin_rest_measure(now)
-        elif action == "start_game":
-            self._start_album_match(now)
-        elif action == "next_level":
-            state.level = min(5, state.level + 1)
-            state.go(F.LOADOUT)
-        elif action == "logout":
-            # TASK_accounts_1119 Phase 4: a "remember me" session (if any)
-            # must not outlive a deliberate sign-out.
-            if self._album_options.is_v3:
-                self._album.sign_out()
-            state.player = state.password = state.password2 = ""
-            state.account_key = ""
-            if self._album_options.is_v3:
-                self._album.sync_economy()
-            state.focus = None
-            state.go(F.SIGN_IN if hasattr(F, "SIGN_IN") else F.LOGIN)
-        elif action == "copy_code":
-            self._window.set_clipboard(f"PM-{state.room_code[:4] or '0000'}")
-            F.say(state, "Code copied")
-        elif action == "share_confirmed":
-            path = state.shared_album_upload_path
-            state.shared_album_upload_path = ""
-            self._start_share_upload(path)
-        elif action == "random_from_album":
-            self._start_random_photo()
-        elif action in (ID.DISPLAY_FULL, ID.DISPLAY_WINDOW):
-            mode = "fullscreen" if action == ID.DISPLAY_FULL else "window"
-            if self._window.set_display_mode(mode):
-                self._apply_display_mode(mode)
-        elif action.startswith("pvp_"):
-            self._pvp_action(action, now)
-        elif action == "account_sign_in":
-            self._album.sign_in_submit()
-        elif action == "account_sign_up":
-            self._album.sign_up_submit()
-        elif action == "account_forgot_submit":
-            self._album.forgot_submit()
-        elif action == "account_copy_recovery_code":
-            self._album.copy_recovery_code()
-            F.say(state, "Code copied")
+        picked = pick_media_file()
+        # Hộp thoại vừa đóng: cửa sổ game đang bị thu nhỏ, kéo nó về NGAY
+        # (kể cả khi người dùng bấm Huỷ) rồi mới làm gì tiếp.
+        self._window.restore_and_focus()
+        if picked is not None:
+            state.photo = picked
+            if picked not in state.recent:
+                state.recent.insert(0, picked)
+                del state.recent[4:]
+            # Chọn xong là chạy luôn bước tách lớp: trước đây app đứng
+            # yên ở màn chọn ảnh, người dùng tưởng nó không nhận ảnh.
+            self._album_action("start_pipeline", now)
+
+    def _act_start_pipeline(self, action: str, now: float) -> None:
+        state = self._album.state
+        if state.photo is None:
+            state.photo = self._content.resolved_media_path(self._root)
+        self._try_load_media(Path(state.photo), now)
+        state.pipeline_pct = 0.0
+        self._album_pipeline_started_s = now
+        state.go(self._album.flow.PIPE0)
+
+    def _act_next_level(self, action: str, now: float) -> None:
+        state = self._album.state
+        state.level = min(5, state.level + 1)
+        state.go(self._album.flow.LOADOUT)
+
+    def _act_logout(self, action: str, now: float) -> None:
+        # TASK_accounts_1119 Phase 4: a "remember me" session (if any)
+        # must not outlive a deliberate sign-out.
+        F, state = self._album.flow, self._album.state
+        self._album.sign_out()
+        state.player = state.password = state.password2 = ""
+        state.account_key = ""
+        self._album.sync_economy()
+        state.focus = None
+        state.go(F.SIGN_IN)
+
+    def _act_copy_code(self, action: str, now: float) -> None:
+        state = self._album.state
+        self._window.set_clipboard(f"PM-{state.room_code[:4] or '0000'}")
+        self._album.flow.say(state, "Code copied")
+
+    def _act_share_confirmed(self, action: str, now: float) -> None:
+        state = self._album.state
+        path = state.shared_album_upload_path
+        state.shared_album_upload_path = ""
+        self._start_share_upload(path)
+
+    def _act_display_mode(self, action: str, now: float) -> None:
+        mode = "fullscreen" if action == ID.DISPLAY_FULL else "window"
+        if self._window.set_display_mode(mode):
+            self._apply_display_mode(mode)
 
     def _tick_album_match(self, now: float) -> None:
         """Nhịp của màn tách lớp và của ván đang chơi."""
@@ -2503,6 +2514,7 @@ class HcpdApplication:
                                    accounts=LocalAccountService(account_root),
                                    shared_album=LocalSharedAlbumService(),
                                    prefs=LocalPrefsService(self._root))
+                self._register_album_actions()
                 signin = self._devtools.env("HCPD_ECONOMY_SIGNIN").strip()
                 if signin and self._is_scripted_run():
                     self._album.dev_sign_in(signin)

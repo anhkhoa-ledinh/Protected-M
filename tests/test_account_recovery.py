@@ -500,7 +500,7 @@ def test_cooldown_check_happens_before_any_hashing_no_thread_started(ui, monkeyp
     synchronous check in memory, same as ``sign_in_submit``."""
     import threading
 
-    import src.ui_album.v3_ui as v3_ui_module
+    import src.ui_album.v3_account as v3_ui_module  # the account jobs live here now
 
     code = _sign_up(ui, "NoThreadUser1")
     wrong_code = "Z" * 12 if code.replace("-", "") != "Z" * 12 else "Y" * 12

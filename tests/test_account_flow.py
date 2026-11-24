@@ -445,7 +445,7 @@ def test_repeat_clicks_while_busy_start_only_one_job(ui, monkeypatch):
     wrapper (which fires every time regardless of the guard)."""
     import threading
 
-    import src.ui_album.v3_ui as v3_ui_module
+    import src.ui_album.v3_account as v3_ui_module  # the account jobs live here now
 
     threads_started = []
     real_thread = threading.Thread

@@ -6,7 +6,7 @@ from __future__ import annotations
 from src.fx.layout import point_in_rect, rects_intersect, word_cue_aabb
 from src.fx.spec import load_spec
 from src.ui_album.v3 import V3Manifest
-from src.ui_album.v3_ui import _WIN_SCORE_XY
+from src.ui_album.v3_consts import _WIN_SCORE_XY
 
 
 def test_rects_intersect_overlapping():
