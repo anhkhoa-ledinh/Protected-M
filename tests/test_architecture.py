@@ -139,8 +139,8 @@ _OWN_FILE_IMAGE_READERS = {
     "src/content/bake.py", "src/content/lama_fill.py",
 }
 _GATE = "src/content/media_gate.py"
-_IMAGE_DECODERS = {"cv2.imread", "cv2.imdecode", "Image.open", "Image.frombytes",
-                   "PILImage.open"}
+_IMAGE_DECODERS = {"cv2.imread", "cv2.imdecode", "PIL.Image.open",
+                   "PIL.Image.frombytes", "PIL.Image.frombuffer"}
 
 
 def _dotted(node) -> str:
@@ -155,16 +155,43 @@ def _dotted(node) -> str:
     return ".".join(reversed(parts))
 
 
+def _aliases(tree) -> dict[str, str]:
+    """``import numpy as np`` -> {"np": "numpy"}; ``from cv2 import imwrite
+    as w`` -> {"w": "cv2.imwrite"}. A call is judged by what it really is,
+    not by the local name."""
+    import ast as _ast
+
+    out: dict[str, str] = {}
+    for node in _ast.walk(tree):
+        if isinstance(node, _ast.Import):
+            for alias in node.names:
+                out[(alias.asname or alias.name).split(".")[0]] = (
+                    alias.name if alias.asname else alias.name.split(".")[0])
+        elif isinstance(node, _ast.ImportFrom) and node.module and not node.level:
+            for alias in node.names:
+                out[alias.asname or alias.name] = f"{node.module}.{alias.name}"
+    return out
+
+
+def _canonical(node, aliases: dict[str, str]) -> str:
+    name = _dotted(node)
+    head, _, rest = name.partition(".")
+    full = aliases.get(head, head)
+    return f"{full}.{rest}" if rest else full
+
+
 def _decoder_calls() -> dict[str, set[str]]:
     import ast as _ast
 
     found: dict[str, set[str]] = {}
     for path in _production_py_files():
         tree = _ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        aliases = _aliases(tree)
         for node in _ast.walk(tree):
-            if isinstance(node, _ast.Call) and _dotted(node.func) in _IMAGE_DECODERS:
+            if (isinstance(node, _ast.Call)
+                    and _canonical(node.func, aliases) in _IMAGE_DECODERS):
                 found.setdefault(str(path.relative_to(ROOT)).replace("\\", "/"),
-                                 set()).add(_dotted(node.func))
+                                 set()).add(_canonical(node.func, aliases))
     return found
 
 
@@ -254,8 +281,8 @@ def test_net_account_shared_album_and_album_ui_never_reach_camera_code():
 
 
 #: Calls that write an image or an array to disk.
-_FRAME_WRITERS = {"cv2.imwrite", "cv2.VideoWriter", "np.save", "np.savez",
-                  "np.savez_compressed", "numpy.save", "imageio.imwrite"}
+_FRAME_WRITERS = {"cv2.imwrite", "cv2.VideoWriter", "numpy.save", "numpy.savez",
+                  "numpy.savez_compressed", "imageio.imwrite", "imageio.v3.imwrite"}
 #: The only modules that write one, and what they write: baked layers of a
 #: photo (bake, lama_fill), the photo gate's clean copy, F12 screenshots of the
 #: GL framebuffer. ``src/devtools`` is exempt (evidence tooling).
@@ -269,14 +296,16 @@ def _writer_calls() -> dict[str, set[str]]:
     found: dict[str, set[str]] = {}
     for path in _production_py_files():
         tree = _ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        aliases = _aliases(tree)
         for node in _ast.walk(tree):
             if not isinstance(node, _ast.Call):
                 continue
-            name = _dotted(node.func)
+            name = _canonical(node.func, aliases)
             on_array_image = (isinstance(node.func, _ast.Attribute)
                               and node.func.attr == "save"
                               and isinstance(node.func.value, _ast.Call)
-                              and _dotted(node.func.value.func).endswith("fromarray"))
+                              and _canonical(node.func.value.func, aliases)
+                              .endswith("fromarray"))
             if name in _FRAME_WRITERS or on_array_image:
                 found.setdefault(_rel(path), set()).add(name or "Image.fromarray().save")
     return found
