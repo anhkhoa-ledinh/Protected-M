@@ -74,7 +74,7 @@ HOOK_ENV_VARS = (
     "HCPD_PERF_PROFILE", "HCPD_PVP_AUTO", "HCPD_PVP_SHOTS",
     "HCPD_PROP_PROBE", "HCPD_VIDEO_STATS", "HCPD_HUD_FIX_1119_SHOTS",
     "HCPD_ALBUM_AUTOWIN", "HCPD_BUG_SEED", "HCPD_ECONOMY_1124",
-    "HCPD_HARDENING_1124_SHOTS", "HCPD_BAD_PHOTO_1124", "HCPD_DISPLAY_MODE",
+    "HCPD_HARDENING_1124_SHOTS", "HCPD_BAD_PHOTO_1124", "HCPD_DISPLAY_MODE", "HCPD_RELOAD_1124",
 )
 
 #: Bug-placement seed an automatch run uses unless ``HCPD_BUG_SEED`` says
@@ -743,6 +743,10 @@ class HcpdApplication:
         if input_state.replay:
             if state.screen in (album.flow.WIN, album.flow.LOSE):
                 state.go(album.flow.TILT)
+            elif (state.screen in (album.flow.PLAY, album.flow.PVP_HUNT)
+                  and album.game is not None and not self._v3_field_focused()):
+                # Reload to a full magazine at any time (solo and PvP hunter).
+                album.game.start_reload(now)
             elif state.screen == album.flow.PHOTOS:
                 # TASK_shared_album_1111 P3: cung phim R, nghia khac theo man —
                 # y het Enter (album.submit()) da doi nghia theo man tu truoc.

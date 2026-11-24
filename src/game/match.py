@@ -283,6 +283,19 @@ class AlbumMatch:
         if self.reload_until_s and now >= self.reload_until_s:
             self.reload_until_s = 0.0
             self.rounds_left = int(self.mag_size)
+            logger.info("Reload end: %d/%d", self.rounds_left, self.mag_size)
+
+    def start_reload(self, now: float) -> bool:
+        """Reload on request (the R key): only when the magazine is not full
+        and no reload is running. Takes the gun's normal ``reload_s`` and
+        fills the magazine, same as the automatic reload on an empty one."""
+        self.tick_reload(now)
+        if self.reloading(now) or self.rounds_left >= self.mag_size:
+            return False
+        self.reload_until_s = now + self.reload_s
+        logger.info("Reload start: %d/%d, %.1f s", max(0, self.rounds_left),
+                    self.mag_size, self.reload_s)
+        return True
 
     @property
     def seconds(self) -> float:

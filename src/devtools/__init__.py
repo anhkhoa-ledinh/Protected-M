@@ -59,6 +59,7 @@ class DevTools:
         self._tick_evidence_1118(now)
         self._tick_hud_fix_1119_shots(now)
         self._tick_hardening_1124_shots(now)
+        self._tick_reload_1124(now)
 
     def tick_pvp(self, now: float) -> None:
         """Replaces, in the SAME order, the two devtools ticks that used
@@ -563,6 +564,36 @@ class DevTools:
                             {k: round(v, 3) for k, v in app._album.hud_card_alpha.items()})
             self._h24_step += 1
             self._h24_t = now
+
+    def _tick_reload_1124(self, now: float) -> None:
+        """``HCPD_RELOAD_1124=1`` (with automatch): fire 10 rounds, then press
+        R through the window's real key flag, then close once the reload is
+        over. The numbers come from the ``Reload start/end`` log lines."""
+        app = self._app
+        if self.env("HCPD_RELOAD_1124") != "1":
+            return
+        match = app._album.game
+        if match is None or app._album.state.screen != app._album.flow.PLAY:
+            return
+        if not hasattr(self, "_rl_phase"):
+            if not self._measurement_ready():
+                return
+            self._rl_phase, self._rl_fired = "fire", 0
+            return
+        if self._rl_phase == "fire":
+            if match.ready_to_fire(now) and match.take_round(now):
+                self._rl_fired += 1
+            if self._rl_fired >= 10:
+                logger.info("RELOAD_1124: fired 10, rounds %d/%d, pressing R",
+                            match.rounds_left, match.mag_size)
+                app._window._replay_requested = True   # what the R key sets
+                self._rl_phase, self._rl_t = "wait", now
+        elif self._rl_phase == "wait":
+            if now - self._rl_t > match.reload_s + 1.5:
+                logger.info("RELOAD_1124: after, rounds %d/%d",
+                            match.rounds_left, match.mag_size)
+                app._window.request_close()
+                self._rl_phase = "done"
 
     def _build_hardening_1124_steps(self) -> list:
         def crosshair(xy):
