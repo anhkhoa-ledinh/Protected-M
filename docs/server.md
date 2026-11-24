@@ -38,7 +38,7 @@ registered handler and fails if one has no row (and if a row has no handler).
 | `sign_up`, `sign_in`, `recover`, `resume` | anonymous | C2 |
 | `logout`, `me` | player | C2 |
 | `start_match`, `begin_play`, `finish_match`, `leaderboard` | player | C3 |
-| `create_room`, `join_room`, `queue`, `photo`, `bugs`, `ready`, `hit`, `killed`, `used_item`, `eye`, `relocate`, `end`, `rematch`, `cancel`, `rejoin` | player | C5 |
+| `create_room`, `join_room`, `leave_room`, `photo` | player | C5 |
 
 ## Data model (SQLite, `server.db` in the data dir)
 
@@ -85,6 +85,27 @@ path inside it). Created with mode 0700.
   later than the level time + 10 s (`time`; level 5 also gets its 30 s overtime).
 - `leaderboard`: top 20 by `earned_total`, ties share a rank, then name; plus the caller's rank
   (`null` while they have won nothing). PvP boards stay "No matches yet".
+
+## PvP rooms (C5)
+
+Every room message is a `player` row: no token, no room. `create_room {mode}` / `join_room
+{room}` need levels 1-5 cleared (the same lock as the game); a room has two seats, an account is
+in one room at a time, the number of rooms is capped (`max_rooms`, default 50, so at most 100
+players), and a room ends when its host leaves or either player's connection drops (the other
+gets `{"t":"peer_left"}`). The server pushes to a peer through a bounded queue; a peer that never
+reads is disconnected.
+
+`photo {jpeg_b64, sha1}` is relayed only to the other player in the room, after: base64 and sha1
+check, at most 4 MiB, JPEG/PNG/WebP magic, and the width/height read from the header (no
+decoding on the server): longest side 16384, at most 64,000,000 pixels (equal to
+`media_gate.MAX_PIXELS`, kept equal by a test). Any refusal ends the room. The line cap is 64 KiB
+for everyone; a player inside a room may send one photo-sized line (6 MiB), and a big line that
+is not a `photo` closes the connection. The receiving game still runs its media gate.
+
+**Not ported yet:** the in-match messages of the LAN protocol (`ready`, `start`, `bugs`, `hit`,
+`killed`, `used_item`, `eye`, `relocate`, `tick`, `end`, `rematch`, matchmaking `queue`). The game's
+PvP client still plays over the LAN server in `src/net`; rooms on the central server today give
+the signed-in access control, the room and player caps and the photo relay, not a full match.
 
 ## What the server cannot verify
 

@@ -16,7 +16,7 @@ import sqlite3
 
 from src.account.crypto import hash_token
 from src.game.levels import LEVELS
-from src.game.pvp import ITEM_WEIGHT, PVP_MODES, PVP_UNLOCK_LEVELS, item_price
+from src.game.pvp import ITEM_WEIGHT, PVP_MODES, PVP_UNLOCK_LEVELS, item_price  # noqa: F401
 from src.game.scoring import OVERTIME_MAX_S, match_score
 from src.server.store import Store
 

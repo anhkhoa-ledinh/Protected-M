@@ -3,13 +3,18 @@ role each needs is in ``permissions.PERMISSIONS`` (one table, not here)."""
 
 from __future__ import annotations
 
+import base64
+import binascii
+import hashlib
 import math
+import re
 
 from src.account.crypto import hash_token
-from src.server import accounts, economy
+from src.server import accounts, economy, photo_check
 from src.server.config import PROTO_VERSION
 from src.server.dispatch import ConnState, RequestError
 from src.server.permissions import ANONYMOUS, PLAYER
+from src.server.rooms import RoomError
 from src.shared import account_rules as rules
 
 MAX_NAME_LEN = 24
@@ -200,6 +205,72 @@ def leaderboard(ctx, state: ConnState, msg: dict) -> dict:
     return economy.leaderboard(ctx.store, state.account)
 
 
+# ---- PvP rooms (C5) --------------------------------------------------------------------
+
+_SHA1 = re.compile(r"^[0-9a-f]{40}$")
+_PHOTO_B64_MAX = photo_check.MAX_PHOTO_BYTES * 4 // 3 + 8
+
+
+def _room_call(fn, *args):
+    try:
+        return fn(*args)
+    except RoomError as exc:
+        raise RequestError(exc.code, exc.msg) from None
+
+
+def create_room(ctx, state: ConnState, msg: dict) -> dict:
+    mode = msg.get("mode", "Competitive")
+    if mode not in economy.PVP_MODES:
+        raise RequestError("bad_request", "bad mode")
+    me = _profile(ctx, state.account)
+    if not set(economy.PVP_UNLOCK_LEVELS) <= set(me["levels_cleared"]):
+        raise RequestError("locked_mode", "win levels 1-5 to unlock PvP")
+    code = _room_call(ctx.rooms.create, state, mode)
+    return {"room": code, "mode": mode}
+
+
+def join_room(ctx, state: ConnState, msg: dict) -> dict:
+    code = _text(msg, "room", 16).upper()
+    me = _profile(ctx, state.account)
+    if not set(economy.PVP_UNLOCK_LEVELS) <= set(me["levels_cleared"]):
+        raise RequestError("locked_mode", "win levels 1-5 to unlock PvP")
+    host, mode = _room_call(ctx.rooms.join, state, code)
+    host_name = _profile(ctx, host.account)["display"]
+    if host.push is not None:
+        host.push({"t": "peer_joined", "name": me["display"]})
+    return {"room": code, "mode": mode, "host": host_name}
+
+
+def leave_room(ctx, state: ConnState, msg: dict) -> dict:
+    other = ctx.rooms.leave(state)
+    if other is not None and other.push is not None:
+        other.push({"t": "peer_left"})
+    return {}
+
+
+def photo(ctx, state: ConnState, msg: dict) -> dict:
+    peer = ctx.rooms.peer_of(state)
+    if peer is None:
+        raise RequestError("no_peer", "nobody to send it to")
+    b64, sha1 = msg.get("jpeg_b64"), msg.get("sha1")
+    if not isinstance(b64, str) or len(b64) > _PHOTO_B64_MAX \
+            or not isinstance(sha1, str) or not _SHA1.match(sha1):
+        raise RequestError("bad_photo", "bad photo message")
+    try:
+        data = base64.b64decode(b64, validate=True)
+        if hashlib.sha1(data).hexdigest() != sha1:
+            raise photo_check.PhotoRefused("sha1")
+        photo_check.check(data)
+    except (binascii.Error, photo_check.PhotoRefused):
+        other = ctx.rooms.leave(state)             # a bad photo ends the room
+        if other is not None and other.push is not None:
+            other.push({"t": "peer_left"})
+        raise RequestError("bad_photo", "photo refused") from None
+    if peer.push is not None:
+        peer.push({"t": "photo", "jpeg_b64": b64, "sha1": sha1})
+    return {}
+
+
 HANDLERS = {
     "hello": hello,
     "ping": ping,
@@ -213,4 +284,8 @@ HANDLERS = {
     "begin_play": begin_play,
     "finish_match": finish_match,
     "leaderboard": leaderboard,
+    "create_room": create_room,
+    "join_room": join_room,
+    "leave_room": leave_room,
+    "photo": photo,
 }

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import ipaddress
+import json
 import logging
 import ssl
 import time
@@ -16,6 +17,7 @@ from src.server.dispatch import ConnState, Dispatcher, ProtocolViolation
 from src.server.handlers import HANDLERS
 from src.server.limits import IpLimiter
 from src.server.permissions import PERMISSIONS
+from src.server.rooms import Rooms
 from src.server.store import Store
 
 log = logging.getLogger("hcpd.server")
@@ -31,6 +33,7 @@ class Context:
         self.config = config
         self.store = store
         self.clock = clock
+        self.rooms = Rooms(config.max_rooms)
         self.heavy = IpLimiter(config.max_conns_per_ip, config.heavy_rate_per_s,
                                config.heavy_burst, config.connects_per_min_per_ip)
 
@@ -129,6 +132,33 @@ class CentralServer:
         loop = asyncio.get_running_loop()
         lines = LineReader(cfg.max_message_bytes)
         state = ConnState(ip=ip)
+        outbox: asyncio.Queue = asyncio.Queue(maxsize=16)
+
+        def _enqueue(msg: dict) -> None:
+            try:
+                outbox.put_nowait(msg)
+            except asyncio.QueueFull:              # a peer that never reads
+                writer.transport.abort()
+
+        state.push = lambda msg: loop.call_soon_threadsafe(_enqueue, msg)
+        pump = asyncio.create_task(self._pump(writer, outbox))
+        try:
+            return await self._serve_loop(reader, writer, state, lines, loop, ip)
+        finally:
+            pump.cancel()
+            other = self.ctx.rooms.leave(state)    # a dropped player leaves the room
+            if other is not None and other.push is not None:
+                other.push({"t": "peer_left"})
+
+    async def _pump(self, writer, outbox: asyncio.Queue) -> None:
+        while True:
+            msg = await outbox.get()
+            if not await self._send(writer, msg):
+                writer.transport.abort()
+                return
+
+    async def _serve_loop(self, reader, writer, state, lines, loop, ip: str) -> str:
+        cfg = self.config
         line_started: float | None = None
         while True:
             if lines.pending and line_started is not None:
@@ -156,11 +186,17 @@ class CentralServer:
                     await self._send(writer, {"t": "error", "code": "rate_limited",
                                               "msg": "too many requests"})
                     return "rate limited"
+                if lines.max_bytes > cfg.max_message_bytes and msg["t"] != "photo" \
+                        and len(json.dumps(msg, separators=(",", ":"))) > cfg.max_message_bytes:
+                    return "violation: big message that is not a photo"
                 try:
                     reply = await loop.run_in_executor(
                         self._pool, self.dispatcher.handle, state, msg)
                 except ProtocolViolation as exc:
                     return f"violation: {str(exc)[:60]}"
+                # Only a player in a room may send a photo-sized line.
+                lines.max_bytes = (cfg.photo_line_bytes if state.room
+                                   else cfg.max_message_bytes)
                 if not await self._send(writer, reply):
                     return "write failed"
 

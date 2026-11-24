@@ -29,6 +29,11 @@ PERMISSIONS: dict[str, str] = {
     "begin_play": PLAYER,
     "finish_match": PLAYER,
     "leaderboard": PLAYER,
+    # C5: PvP rooms (a signed-in player only)
+    "create_room": PLAYER,
+    "join_room": PLAYER,
+    "leave_room": PLAYER,
+    "photo": PLAYER,
 }
 
 

@@ -43,6 +43,8 @@ class ServerConfig:
     heavy_rate_per_s: float = 1.0
     heavy_burst: int = 5
     max_accounts: int = 100_000
+    max_rooms: int = 50          # two players each
+    photo_line_bytes: int = 6 * 1024 * 1024   # line cap while in a room (photo)
 
     def validate(self) -> None:
         if not (0 <= self.port < 65536):   # 0 = pick a free port (tests)

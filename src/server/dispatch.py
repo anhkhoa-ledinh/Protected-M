@@ -36,6 +36,8 @@ class ConnState:
     account: str | None = None      # case-folded account key, set by sign-in
     greeted: bool = False
     token_hash: str | None = None   # SHA-256 of this connection's session token
+    room: str | None = None         # PvP room code while in one
+    push = None                     # callable(dict): send to this peer (set by the server)
 
 
 #: handler(ctx, state, msg) -> dict of extra reply fields
