@@ -480,7 +480,8 @@ def test_no_reconnect_within_window_forfeits_the_match_to_the_remaining_player(s
 
 def test_rejoin_within_window_resumes_the_match(server):
     host, guest, ma, mb = _join_competitive(server)
-    token = ma["token"]
+    # Alice may be seated as host OR guest; take the token of the seat we drop.
+    token = (ma if ma["role"] == "host" else mb)["token"]
     host.close()
     guest.recv_type(proto.ERROR, timeout=2.0)  # opponent_offline
 
@@ -503,7 +504,7 @@ def test_rejoin_window_counts_from_the_disconnect_not_the_last_message():
     srv.start()
     try:
         host, guest, ma, mb = _join_competitive(srv)
-        token = ma["token"]
+        token = (ma if ma["role"] == "host" else mb)["token"]
         (match,) = srv._matches.values()
         match.host.last_seen = time.monotonic() - 10.0  # quiet for 5x the window
         host.close()
