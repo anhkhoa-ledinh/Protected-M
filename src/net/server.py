@@ -403,11 +403,14 @@ class Server:
             # in every phase, not just "hunt" (a player can vanish in lobby
             # or Hunt & Hide setup too).
             for conn in match.players():
-                if not conn.alive and now - conn.last_seen > self._reconnect_s:
+                # The window runs from the disconnect, not from the last message
+                # (None: the reader has not reported the drop yet).
+                gone_for = (now - conn.disconnected_at
+                            if conn.disconnected_at is not None else 0.0)
+                if not conn.alive and gone_for > self._reconnect_s:
                     logger.info("pvp server: forfeit %s in match %s: now-last_seen=%.2fs, "
                                 "since disconnect=%.2fs",
-                                conn.name, match.id, now - conn.last_seen,
-                                now - (conn.disconnected_at or now))
+                                conn.name, match.id, now - conn.last_seen, gone_for)
                     self._end_match(match, reason="opponent_disconnected",
                                      winner=match.other(conn))
                     return

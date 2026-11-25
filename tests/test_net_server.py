@@ -493,6 +493,35 @@ def test_rejoin_within_window_resumes_the_match(server):
     guest.close()
 
 
+def test_rejoin_window_counts_from_the_disconnect_not_the_last_message():
+    """The window starts at the disconnect. A seat that was quiet for longer
+    than ``reconnect_s`` before it dropped must still get its full window.
+    The heartbeat is parked and the tick is driven by hand, so no timing
+    luck is involved."""
+    srv = Server("127.0.0.1", 0, beacon=False, heartbeat_interval_s=3600.0,
+                 timeout_s=3600.0, reconnect_s=2.0)
+    srv.start()
+    try:
+        host, guest, ma, mb = _join_competitive(srv)
+        token = ma["token"]
+        (match,) = srv._matches.values()
+        match.host.last_seen = time.monotonic() - 10.0  # quiet for 5x the window
+        host.close()
+        guest.recv_type(proto.ERROR, timeout=2.0)  # opponent_offline
+
+        srv._tick_match(match, time.monotonic())  # the next heartbeat tick
+        assert not match.ended, "forfeited at once: the window ignored the disconnect"
+
+        new_host = FakeClient(srv.port, "Alice")
+        new_host.send({"t": proto.REJOIN, "token": token})
+        resumed = new_host.recv_type(proto.MATCHED, timeout=2.0)
+        assert resumed["resumed"] is True and resumed["role"] == "host"
+        new_host.close()
+        guest.close()
+    finally:
+        srv.stop()
+
+
 # ---- rematch swaps Hunt & Hide roles --------------------------------------
 
 def test_rematch_swaps_hunter_and_hider(server):
