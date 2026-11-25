@@ -65,6 +65,32 @@ def is_private(path) -> bool:
     return (path.stat().st_mode & 0o077) == 0
 
 
+def acl_report(path) -> str:
+    """Describe the permissions of ``path`` for a failing assertion. Never raises."""
+    try:
+        path = Path(path)
+        if not _is_windows():
+            return f"{path}: mode {oct(path.stat().st_mode & 0o7777)}"
+        parts = [f"{path}:"]
+        try:
+            done = subprocess.run(["icacls", str(path)], capture_output=True,
+                                  text=True, timeout=30)
+            parts.append(f"icacls rc={done.returncode}\n{done.stdout}{done.stderr}")
+        except Exception as exc:
+            parts.append(f"icacls could not run: {exc!r}")
+        try:
+            parts.append(f"parsed: {_aces(path, _icacls([str(path)]))}")
+        except Exception as exc:
+            parts.append(f"parsed: error {exc!r}")
+        try:
+            parts.append(f"user: {_current_user()}")
+        except Exception as exc:
+            parts.append(f"user: error {exc!r}")
+        return "\n".join(parts)
+    except Exception as exc:
+        return f"acl_report failed: {exc!r}"
+
+
 # ---- Windows: parse `icacls <path>` -------------------------------------------
 
 _ACE = re.compile(r"^(?P<who>.+?):(?P<flags>(?:\([^)]*\))+)\s*$")

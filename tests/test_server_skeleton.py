@@ -25,7 +25,7 @@ from src.server.config import ConfigError, ServerConfig
 from src.server.dispatch import (ConnState, Dispatcher, ProtocolViolation)
 from src.server.limits import IpLimiter
 from src.server.store import MIGRATIONS, Store
-from src.shared.private_files import is_private
+from src.shared.private_files import acl_report, is_private
 
 ROOT = Path(__file__).resolve().parents[1]
 CERT_TOOL = ROOT / "tools" / "make_dev_cert.py"
@@ -162,7 +162,7 @@ def test_cert_tool_makes_a_usable_pair_with_a_private_key(tmp_path):
     done = run_cert_tool(tmp_path / "pki", "10.1.2.3", "box.lan")
     assert done.returncode == 0, done.stderr
     cert, key = tmp_path / "pki" / "cert.pem", tmp_path / "pki" / "key.pem"
-    assert is_private(key)
+    assert is_private(key), acl_report(key)
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     ctx.load_cert_chain(cert, key)                  # the two belong together
     assert "IP:10.1.2.3,DNS:box.lan" in done.stdout
@@ -175,7 +175,7 @@ def test_cert_tool_makes_a_usable_pair_with_a_private_key(tmp_path):
 def test_store_creates_a_private_dir_and_migrates_once(tmp_path):
     store = Store(tmp_path / "d")
     assert store.schema_version() == len(MIGRATIONS)
-    assert is_private(tmp_path / "d")
+    assert is_private(tmp_path / "d"), acl_report(tmp_path / "d")
     store.close()
     again = Store(tmp_path / "d")                 # second open: no re-migration
     rows = again.connect().execute("SELECT COUNT(*) FROM meta").fetchone()[0]

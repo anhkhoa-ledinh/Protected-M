@@ -23,14 +23,14 @@ def test_a_file_made_private_is_private(tmp_path):
     f = tmp_path / "secret.json"
     f.write_text("{}")
     pf.make_private(f)
-    assert pf.is_private(f)
+    assert pf.is_private(f), pf.acl_report(f)
 
 
 def test_a_folder_made_private_is_private(tmp_path):
     d = tmp_path / "data"
     d.mkdir()
     pf.make_private(d)
-    assert pf.is_private(d)
+    assert pf.is_private(d), pf.acl_report(d)
 
 
 # ---- a widened file is not private, then it is again ------------------------------
@@ -49,9 +49,9 @@ def test_widening_breaks_privacy_and_make_private_restores_it(tmp_path, kind):
     target = tmp_path / "t"
     target.mkdir() if kind == "folder" else target.write_text("x")
     _widen(target)
-    assert not pf.is_private(target)
+    assert not pf.is_private(target), pf.acl_report(target)
     pf.make_private(target)
-    assert pf.is_private(target)
+    assert pf.is_private(target), pf.acl_report(target)
 
 
 # ---- Windows branch, with a fake icacls (runs on any OS) -----------------------
@@ -113,36 +113,36 @@ def _listing(path: Path, *aces: str) -> str:
 def test_windows_only_me_is_private(win, tmp_path):
     f = tmp_path / "f"
     win(_listing(f, f"{USER}:(F)"))
-    assert pf.is_private(f)
+    assert pf.is_private(f), pf.acl_report(f)
 
 
 def test_windows_inherited_entries_are_not_private(win, tmp_path):
     f = tmp_path / "f"
     win(_listing(f, f"{USER}:(I)(F)"))
-    assert not pf.is_private(f)
+    assert not pf.is_private(f), pf.acl_report(f)
 
 
 def test_windows_other_principals_are_not_private(win, tmp_path):
     f = tmp_path / "f"
     win(_listing(f, f"{USER}:(F)", "BUILTIN\\Users:(R)"))
-    assert not pf.is_private(f)
+    assert not pf.is_private(f), pf.acl_report(f)
     win(_listing(f, f"{USER}:(F)", "NT AUTHORITY\\SYSTEM:(F)"))
-    assert not pf.is_private(f)
+    assert not pf.is_private(f), pf.acl_report(f)
 
 
 def test_windows_the_default_unprotected_acl_is_not_private(win, tmp_path):
     f = tmp_path / "f"
     win(_listing(f, "NT AUTHORITY\\SYSTEM:(I)(F)", "BUILTIN\\Administrators:(I)(F)",
                  f"{USER}:(I)(F)"))
-    assert not pf.is_private(f)
+    assert not pf.is_private(f), pf.acl_report(f)
 
 
 def test_windows_an_empty_listing_is_not_private(win, tmp_path):
     f = tmp_path / "f"
     win("Successfully processed 1 files; Failed processing 0 files\n")
-    assert not pf.is_private(f)
+    assert not pf.is_private(f), pf.acl_report(f)
 
 
 def test_windows_folder_flags_are_parsed(win, tmp_path):
     win(_listing(tmp_path, f"{USER}:(OI)(CI)(F)"))
-    assert pf.is_private(tmp_path)
+    assert pf.is_private(tmp_path), pf.acl_report(tmp_path)
