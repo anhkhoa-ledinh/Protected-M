@@ -10,6 +10,7 @@ import shutil
 import socket
 import ssl
 import subprocess
+import sys
 import threading
 import time
 from dataclasses import replace
@@ -27,7 +28,7 @@ from src.server.store import MIGRATIONS, Store
 from src.shared.private_files import is_private
 
 ROOT = Path(__file__).resolve().parents[1]
-CERT_TOOL = ROOT / "tools" / "make_dev_cert.sh"
+CERT_TOOL = ROOT / "tools" / "make_dev_cert.py"
 
 
 # ---- helpers ---------------------------------------------------------------
@@ -41,16 +42,6 @@ def make_cert(out: Path, which: str = "a") -> tuple[Path, Path]:
     for kind in ("cert", "key"):
         shutil.copyfile(PKI / f"{which}_{kind}.pem", out / f"{kind}.pem")
     return out / "cert.pem", out / "key.pem"
-
-
-def real_bash_and_openssl() -> bool:
-    """False on the Windows WSL stub, which is a `bash` that cannot run anything."""
-    try:
-        done = subprocess.run(["bash", "-c", "openssl version"],
-                              capture_output=True, text=True, timeout=20)
-    except (OSError, subprocess.SubprocessError):
-        return False
-    return done.returncode == 0 and "openssl" in done.stdout.lower()
 
 
 class Running:
@@ -155,13 +146,28 @@ def test_data_dir_inside_the_repo_is_refused():
             ServerConfig(data_dir=inside, insecure_localhost=True).validate()
 
 
-def test_cert_tool_refuses_to_write_inside_the_repo():
-    if not real_bash_and_openssl():
-        pytest.skip("needs a working bash and openssl (not the Windows WSL stub)")
-    done = subprocess.run(["bash", str(CERT_TOOL), str(ROOT / "tmp_pki")],
+def run_cert_tool(*args):
+    return subprocess.run([sys.executable, str(CERT_TOOL), *map(str, args)],
                           capture_output=True, text=True)
-    assert done.returncode != 0 and "inside the repo" in done.stderr
+
+
+def test_cert_tool_refuses_to_write_inside_the_repo():
+    done = run_cert_tool(ROOT / "tmp_pki")
+    assert done.returncode == 2 and "inside the repo" in done.stderr
     assert not (ROOT / "tmp_pki").exists()
+
+
+def test_cert_tool_makes_a_usable_pair_with_a_private_key(tmp_path):
+    # No skip: a machine without openssl must fail here.
+    done = run_cert_tool(tmp_path / "pki", "10.1.2.3", "box.lan")
+    assert done.returncode == 0, done.stderr
+    cert, key = tmp_path / "pki" / "cert.pem", tmp_path / "pki" / "key.pem"
+    assert is_private(key)
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    ctx.load_cert_chain(cert, key)                  # the two belong together
+    assert "IP:10.1.2.3,DNS:box.lan" in done.stdout
+    again = run_cert_tool(tmp_path / "pki")
+    assert again.returncode == 2 and "already exists" in again.stderr
 
 
 # ---- store ------------------------------------------------------------------

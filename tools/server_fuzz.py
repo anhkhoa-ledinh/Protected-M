@@ -115,7 +115,7 @@ def main() -> int:
         cert, port, proc = args.cert, args.target_port, None
         rss_start = container_hwm_mb(args.container)
     else:
-        subprocess.run(["bash", str(ROOT / "tools" / "make_dev_cert.sh"),
+        subprocess.run([sys.executable, str(ROOT / "tools" / "make_dev_cert.py"),
                         str(work / "pki")], check=True, capture_output=True)
         cert, key = work / "pki" / "cert.pem", work / "pki" / "key.pem"
         port = free_port()

@@ -114,7 +114,7 @@ cmd_setup() {
     if [ -f "$CERT_DIR/cert.pem" ] && [ -f "$CERT_DIR/key.pem" ]; then
         say "keeping the existing certificate in $CERT_DIR"
     else
-        bash "$ROOT/tools/make_dev_cert.sh" "$CERT_DIR" "$@" || die "could not make the certificate"
+        "${PYTHON:-python3}" "$ROOT/tools/make_dev_cert.py" "$CERT_DIR" "$@" || die "could not make the certificate"
         say "made cert.pem and key.pem in $CERT_DIR (key.pem is secret: never send it)"
     fi
     say "building the image ..."

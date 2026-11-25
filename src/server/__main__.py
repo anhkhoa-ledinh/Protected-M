@@ -78,7 +78,7 @@ def main(argv=None) -> int:
         return 2
     if not cfg.insecure_localhost and cfg.cert and is_test_cert(cfg.cert):
         print("refused: this is a public test certificate (tests/data/pki); "
-              "make your own with tools/make_dev_cert.sh", file=sys.stderr)
+              "make your own with tools/make_dev_cert.py", file=sys.stderr)
         return 2
     asyncio.run(_run(cfg, args))
     return 0

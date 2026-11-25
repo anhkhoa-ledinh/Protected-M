@@ -7,7 +7,7 @@ Students). Code: `src/server/`. It may import `src.game` (rules), `src.account.c
 content or the rest of `src.net` (checked by `tests/test_architecture.py`).
 
 Run: `python -m src.server --data-dir <dir outside the repo> --cert c.pem --key k.pem`.
-Dev certificate: `bash tools/make_dev_cert.sh <dir>` (needs the system `openssl`).
+Dev certificate: `python tools/make_dev_cert.py <dir>` (needs `openssl` on PATH).
 Admin: `python -m src.server.admin --data-dir <dir> ...` on the server machine only.
 
 ## Wire format

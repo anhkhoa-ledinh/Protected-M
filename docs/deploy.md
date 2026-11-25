@@ -17,7 +17,7 @@ bash deploy/server.sh setup
 bash deploy/server.sh start
 ```
 
-`setup` tạo `deploy/.env` (từ `.env.example`), làm cert + key trong `~/hcpd-certs`, build image, nạp
+`setup` tạo `deploy/.env` (từ `.env.example`), làm cert + key trong `~/hcpd-certs` (bằng `python3 tools/make_dev_cert.py`, cần `openssl` trên PATH), build image, nạp
 cert vào volume. `start` chạy server, đợi đến khi khoẻ, rồi in địa chỉ và đường dẫn `cert.pem`.
 Mặc định server chỉ nghe trên `127.0.0.1` (chính máy này). `key.pem` là bí mật, không bao giờ gửi đi.
 

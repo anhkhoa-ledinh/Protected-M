@@ -601,7 +601,7 @@ scripts/                Measurement and report tools used for the thesis
                         (pvp_bot.py — headless PvP test client)
 tests/                  pytest suite
 tools/                  pin_window.py (fixed window for measurements),
-                        make_dev_cert.sh, research launchers
+                        make_dev_cert.py, research launchers
 docs/                   Technical documentation: security.md, server.md,
                         deploy.md (Vietnamese), KY_THUAT_HE_THONG.md (Vietnamese)
 ```
