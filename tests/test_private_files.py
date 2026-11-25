@@ -186,10 +186,27 @@ def test_no_win32_call_bypasses_the_table():
 
 
 def test_linux_never_loads_a_windows_dll(monkeypatch, tmp_path):
+    # The POSIX branch is simulated, so its mode bits are faked too: a real
+    # chmod/stat on an NTFS host cannot show 0o600.
     monkeypatch.setattr(pf, "_is_windows", lambda: False)
     f = tmp_path / "f"
     f.write_text("x")
     monkeypatch.setattr(pf, "_dlls", {})
+
+    chmod_calls = {}
+    monkeypatch.setattr(pf.os, "chmod", lambda p, mode: chmod_calls.update({p: mode}))
     pf.make_private(f)
-    assert pf.is_private(f)
+    assert chmod_calls == {f: 0o600}
+
+    class _Stat:
+        def __init__(self, mode):
+            self.st_mode = mode
+
+    with monkeypatch.context() as m:
+        m.setattr(Path, "stat", lambda self, *a, **k: _Stat(0o100600))
+        assert pf.is_private(f)
+    with monkeypatch.context() as m:
+        m.setattr(Path, "stat", lambda self, *a, **k: _Stat(0o100644))
+        assert not pf.is_private(f)
+
     assert pf._dlls == {}
