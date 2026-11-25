@@ -75,7 +75,7 @@ def test_background_thread_backs_up_and_survives_failure(tmp_path, monkeypatch, 
     monkeypatch.setattr(backup, "_check", check)
     caplog.set_level(logging.INFO, logger="hcpd.backup")
     stop = threading.Event()
-    th = backup.start_background(store.data_dir, bdir, 50, 0.2, stop)
+    th = backup.start_background(store.data_dir, bdir, 3, 0.2, stop)
     try:
         deadline = time.time() + 5
         while not list(bdir.glob("server-*.db")) and time.time() < deadline:
@@ -102,6 +102,7 @@ def test_background_thread_backs_up_and_survives_failure(tmp_path, monkeypatch, 
         th.join(2)
     assert not th.is_alive()
     assert not list(bdir.glob("*.part"))
+    assert 1 <= len(list(bdir.glob("server-*.db"))) <= 3
 
 
 def test_failed_check_leaves_no_file_and_keeps_old_backups(tmp_path):
