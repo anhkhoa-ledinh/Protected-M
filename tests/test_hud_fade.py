@@ -62,7 +62,7 @@ def test_hide_spring_settles_near_zero_within_about_0_15s():
     """TASK_hud_fix_1119 Fix 2: the task's own "~0.15s" -- k=600/d=40
     reaches within 2% of target by t=0.15s (and stays there, negligible
     overshoot)."""
-    from src.ui_album.v3_ui import _HUD_HIDE_SPRING_D, _HUD_HIDE_SPRING_K
+    from src.ui_album.v3_consts import _HUD_HIDE_SPRING_D, _HUD_HIDE_SPRING_K
 
     spring = Spring(1.0, _HUD_HIDE_SPRING_K, _HUD_HIDE_SPRING_D)
     spring.to = 0.0
@@ -79,11 +79,17 @@ def test_hide_spring_settles_near_zero_within_about_0_15s():
 def ui(gl_context, monkeypatch):
     monkeypatch.setenv("HCPD_NO_FX", "1")
     from src.ui_album.options import AlbumOptions
+    from src.account.service import LocalAccountService
+    from src.services.prefs_service import LocalPrefsService
+    from src.services.shared_album_service import LocalSharedAlbumService
     from src.ui_album.v3_ui import V3UI
     from src.ui_album import v3_flow as F
 
     options = AlbumOptions(enabled=True, guest=True, ui="v3")
-    instance = V3UI(ROOT, ROOT / "assets" / "shaders", options)
+    instance = V3UI(ROOT, ROOT / "assets" / "shaders", options,
+                    accounts=LocalAccountService(__import__("tempfile").mkdtemp(prefix="hcpd_acc_")),
+                    shared_album=LocalSharedAlbumService(),
+                    prefs=LocalPrefsService(ROOT))
     instance.initialize()
     instance.painter.set_frame((1280, 720))
     instance.state.go(F.PLAY)
@@ -297,3 +303,55 @@ def test_toggle_and_tick_hud_fade_never_touch_game_state():
     instance._tick_hud_fade(1 / 60)
     instance._tick_hud_hidden(1 / 60)
     assert instance.game is sentinel
+
+
+# ---- item slots are a fadeable card like the others -----------------------
+
+def _slot_card(ui):
+    from src.ui_album import v3_flow as F
+    from src.ui_album.hud_cards import cards_for_screen, item_slot_card_index
+
+    cards = cards_for_screen(ui.manifest, F.PLAY)
+    index = item_slot_card_index(cards)
+    assert index is not None and cards[index].fades and not cards[index].art
+    x, y, w, h = cards[index].rect
+    return index, (x + w * 0.5, y + h * 0.5)
+
+
+def test_crosshair_on_the_item_slots_fades_them_like_any_card(ui):
+    slot_index, centre = _slot_card(ui)
+    health_index, _ = _first_fadeable_card_centre(ui)
+    ui.mouse = centre
+    _settle_fade(ui)
+    near = ui.hud_card_alpha[slot_index]
+    assert near == pytest.approx(0.22, abs=0.02)
+    # Same alpha as a normal card under the crosshair.
+    ui.mouse = _first_fadeable_card_centre(ui)[1]
+    _settle_fade(ui)
+    assert ui.hud_card_alpha[health_index] == pytest.approx(near, abs=0.02)
+    assert ui.hud_card_alpha[slot_index] == pytest.approx(1.0, abs=0.02)
+
+
+def test_scope_fades_the_item_slots_to_zero(ui):
+    slot_index, _ = _slot_card(ui)
+    ui.mouse = (-500.0, -500.0)
+    ui._scope.enter(ui.mouse)
+    ui._scope.zoom.x = 2.0
+    _settle_fade(ui)
+    assert ui.hud_card_alpha[slot_index] == pytest.approx(0.0, abs=0.02)
+
+
+def test_slot_art_and_text_are_tagged_to_fade_with_the_slot_card(ui):
+    from src.ui_album import v3_flow as F
+    from src.ui_album.v3 import V3State
+    from src.ui_album.v3_values import _hud_items
+
+    ui.state.items = list(F.ITEM_WEIGHT)[:2]
+    state = V3State()
+    _hud_items(state, ui.state, None, ui.manifest, F.PLAY)
+    assert state.slot_extra
+    on_slots = [lbl for lbl in state.borrowed if lbl.split("#")[0] in
+                ("islot", "ikey", "islot_icon", "iused")]
+    assert on_slots and set(on_slots) <= state.slot_labels
+    # Slot texts no longer ride in ``extra`` (which does not fade).
+    assert not state.extra

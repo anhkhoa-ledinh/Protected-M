@@ -33,6 +33,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from layer_review import PROFILES, review_set  # noqa: E402
 from src.config.schema import ContentSettings  # noqa: E402
 from src.content.bake import bake  # noqa: E402
+from src.content.media_gate import import_photo  # noqa: E402
 from src.content.layer_clustering import assign_layer_z  # noqa: E402
 from src.renderer.content_plane import (SCREEN_Z_MM,  # noqa: E402
                                         ContentPlaneRenderer, layer_geometry,
@@ -88,7 +89,7 @@ def world_pos_mm(content: ContentSettings, plane_z_m: float, layer_z_m: float,
 def reg_offsets_for(image_path: Path, content: ContentSettings,
                     screen_w_mm: float, screen_h_mm: float):
     """Danh sách khoảng cách (px thiết kế) của mọi điểm biên, mọi cặp lớp kề."""
-    result = bake(image_path, content, ROOT)
+    result = bake(import_photo(image_path), content, ROOT)
     layers = result.layers
     count = len(layers)
     for rank, layer in enumerate(layers):

@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from src.account import crypto as account_crypto
+from src.shared import account_rules
 from src.account import store as account_store
 from src.ui_album import v3_flow as F
 from src.ui_album import v3_routes
@@ -85,12 +85,12 @@ def test_sign_up_click_with_everything_valid_returns_the_async_action():
 def test_guest_links_set_the_guest_account_key():
     flow = _flow(F.SIGN_IN)
     v3_routes.on_click(flow, "link_guest", 0.0)
-    assert flow.account_key == account_crypto.GUEST_KEY
+    assert flow.account_key == account_rules.GUEST_KEY
     assert flow.screen == F.MENU
 
     flow2 = _flow(F.SIGN_IN_ERR)
     v3_routes.on_click(flow2, "footer_link", 0.0)
-    assert flow2.account_key == account_crypto.GUEST_KEY
+    assert flow2.account_key == account_rules.GUEST_KEY
 
 
 def test_field_focus_still_works():
@@ -320,16 +320,18 @@ def test_network_supplied_opponent_name_is_fitted_in_the_real_flow(manifest, rea
 def ui(gl_context, monkeypatch, tmp_path):
     monkeypatch.setenv("HCPD_NO_FX", "1")
     from src.ui_album.options import AlbumOptions
+    from src.account.service import LocalAccountService
+    from src.services.prefs_service import LocalPrefsService
+    from src.services.shared_album_service import LocalSharedAlbumService
     from src.ui_album.v3_ui import V3UI
 
     options = AlbumOptions(enabled=True, ui="v3")
-    instance = V3UI(ROOT, ROOT / "assets" / "shaders", options)
-    # Redirect account I/O to an ISOLATED temp dir — manifest/shaders
-    # still come from the real repo (no GL needed just to read JSON/read
-    # font files), but accounts.json must never touch the real one.
-    instance._account_root = tmp_path
-    instance._account_data = account_store.load(tmp_path).data
-    instance._account_corrupt = False
+    instance = V3UI(ROOT, ROOT / "assets" / "shaders", options,
+                    accounts=LocalAccountService(tmp_path),
+                    shared_album=LocalSharedAlbumService(),
+                    prefs=LocalPrefsService(ROOT))
+    # The accounts live in an ISOLATED temp dir; manifest/shaders still come
+    # from the real repo, but accounts.json must never touch the real one.
     yield instance
     instance.release()
 
@@ -351,7 +353,7 @@ def test_sign_up_success_goes_to_menu_creates_the_account(ui):
     _wait_until_not_busy(ui)
     assert ui.state.screen == F.MENU
     assert ui.state.account_key == "newplayer1"
-    assert "newplayer1" in ui._account_data["accounts"]
+    assert "newplayer1" in ui._accounts._data["accounts"]
 
 
 def test_sign_in_unknown_name(ui):
@@ -408,8 +410,8 @@ def test_five_failures_trigger_the_cooldown_then_it_ends(ui):
         _wait_until_not_busy(ui)
     assert "Too many tries" in ui.state.sign_in_error
 
-    key = account_crypto.username_key("ThrottleMe1")
-    assert ui._account_throttle.cooldown_remaining(key, time.perf_counter()) > 0.0
+    key = account_rules.username_key("ThrottleMe1")
+    assert ui._accounts._throttle.cooldown_remaining(key, time.perf_counter()) > 0.0
 
 
 def test_successful_sign_in_resets_the_failure_counter(ui):
@@ -431,8 +433,8 @@ def test_successful_sign_in_resets_the_failure_counter(ui):
     _wait_until_not_busy(ui)
     assert ui.state.screen == F.MENU
 
-    key = account_crypto.username_key("ResetMe1")
-    assert ui._account_throttle.cooldown_remaining(key, time.perf_counter()) == 0.0
+    key = account_rules.username_key("ResetMe1")
+    assert ui._accounts._throttle.cooldown_remaining(key, time.perf_counter()) == 0.0
 
 
 def test_repeat_clicks_while_busy_start_only_one_job(ui, monkeypatch):
@@ -443,7 +445,7 @@ def test_repeat_clicks_while_busy_start_only_one_job(ui, monkeypatch):
     wrapper (which fires every time regardless of the guard)."""
     import threading
 
-    import src.ui_album.v3_ui as v3_ui_module
+    import src.ui_album.v3_account as v3_ui_module  # the account jobs live here now
 
     threads_started = []
     real_thread = threading.Thread
@@ -469,7 +471,7 @@ def test_sign_up_taken_name_race_falls_back_to_hint(ui):
     """Format-level checks in v3_routes pass, but the account was taken
     by the time the async job actually ran (simulated here by seeding
     the store directly, bypassing the UI)."""
-    account_store.create_account(ui._account_data, "RaceUser1", "password123")
+    account_store.create_account(ui._accounts._data, "RaceUser1", "password123")
     ui.state.go(F.SIGN_UP)
     ui.state.player = "RaceUser1"
     ui.state.password = ui.state.password2 = "differentpass1"

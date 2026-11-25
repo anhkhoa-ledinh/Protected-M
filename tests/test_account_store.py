@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 
 from src.account import crypto, store
+from src.shared import account_rules
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -132,7 +133,7 @@ def test_create_account_returns_a_recovery_code_only_its_hash_is_stored(tmp_path
     key, code = store.create_account(data, "Dave", "hunter2222")
     record = data["accounts"][key]
     assert code not in json.dumps(record)
-    assert crypto.verify_secret(crypto.normalize_recovery_code(code),
+    assert crypto.verify_secret(account_rules.normalize_recovery_code(code),
                                 record["recovery_hash"])
 
 

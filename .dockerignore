@@ -1,0 +1,28 @@
+# Allow-list: nothing goes into the build context unless re-included below.
+*
+!src/__init__.py
+!src/account/__init__.py
+!src/account/crypto.py
+!src/game/__init__.py
+!src/game/levels.py
+!src/game/pvp.py
+!src/game/scoring.py
+!src/net/__init__.py
+!src/net/protocol.py
+!src/server/
+!src/shared/
+!deploy/entrypoint.sh
+
+# Never, even if the list above grows by mistake.
+assets/config/
+assets/models/
+logs/
+results/
+.venv/
+.git/
+**/__pycache__/
+**/*.pyc
+.pytest_cache/
+*.pem
+*.db
+.env

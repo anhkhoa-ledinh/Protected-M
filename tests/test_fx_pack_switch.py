@@ -10,7 +10,11 @@ from pathlib import Path
 import pytest
 
 from src.ui_album.options import AlbumOptions
-from src.ui_album.v3_ui import FX_WIDE_THRESHOLD_PX, V3UI
+from src.account.service import LocalAccountService
+from src.services.prefs_service import LocalPrefsService
+from src.services.shared_album_service import LocalSharedAlbumService
+from src.ui_album.v3_consts import FX_WIDE_THRESHOLD_PX
+from src.ui_album.v3_ui import V3UI
 
 ROOT = Path(".").resolve()
 
@@ -18,7 +22,10 @@ ROOT = Path(".").resolve()
 @pytest.fixture
 def ui(gl_context, monkeypatch):
     monkeypatch.delenv("HCPD_NO_FX", raising=False)
-    instance = V3UI(ROOT, ROOT / "assets" / "shaders", AlbumOptions(enabled=True, ui="v3"))
+    instance = V3UI(ROOT, ROOT / "assets" / "shaders", AlbumOptions(enabled=True, ui="v3"),
+                    accounts=LocalAccountService(__import__("tempfile").mkdtemp(prefix="hcpd_acc_")),
+                    shared_album=LocalSharedAlbumService(),
+                    prefs=LocalPrefsService(ROOT))
     instance.initialize()
     yield instance
     instance.release()

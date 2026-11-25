@@ -10,15 +10,12 @@ from __future__ import annotations
 
 import logging
 import os
-import threading
 import time
 from pathlib import Path
 
 from OpenGL import GL
 
-from src.account import crypto as account_crypto
-from src.account import store as account_store
-from src.config import prefs as _prefs
+from src.shared import account_rules
 from src.common.stage_profile import stage
 from src.fx.anim import Spring
 from src.fx.library import FxLibrary
@@ -34,86 +31,18 @@ from src.ui_album.v3 import V3Manifest, draw_screen, shot_state
 from src.ui_album.v3_hit import hit_test
 from src.ui_album.v3_painter import V3Painter
 from src.ui_album.v3_hover import HoverFx, cursor_for
+from src.ui_album import ids as ID
+from src.ui_album.v3_account import AccountMixin
+from src.ui_album.v3_click_geometry import ClickGeometryMixin
+from src.ui_album.v3_fx_steps import FxStepsMixin
+from src.ui_album.v3_consts import (OFFLINE_SIGN_IN, _HUD_FADE_GROW_PX, _HUD_FADE_PROXIMITY_ALPHA, _HUD_FADE_SPRING_D, _HUD_FADE_SPRING_K, _HUD_HIDDEN_TOAST, _HUD_HIDE_SPRING_D, _HUD_HIDE_SPRING_K)
 
 logger = logging.getLogger(__name__)
-
-#: TASK_perf_textures_1119 Fix 4: framebuffer width above which the fx@2x
-#: pack (baked at ``image_scale=2``, 2560 basis) looks better than the
-#: 1.5x default — below it, fx@2x is wasted decode/upload/GPU-RAM for no
-#: visible gain.
-FX_WIDE_THRESHOLD_PX = 1920
-
-#: TASK_ui_sakuga_1117 Phase 6 — hotspot names/prefixes that get a plain
-#: ``ui_tap`` on click (the PRIMARY button of the screen gets
-#: ``ui_confirm`` instead; anything not listed here gets nothing —
-#: fields/slider/dropdown/dropzone/switch/links/icons/recent_memory
-#: already have Phase 5's hover/press feedback, a tap on top would be
-#: noise on a text-entry/drag control).
-_UI_TAP_PREFIXES = ("btn_", "tab_", "seg_", "mode_", "display_", "theme_",
-                    "level_row_", "weapon_", "sticker_", "slot_")
-_UI_TAP_EXACT = frozenset({"leave", "continue"})
-#: A tap on something this tall/wide shows at the CLICK point, not the
-#: hotspot centre (a 300px-wide ``mode_`` card, or the full-screen
-#: ``continue`` hotspot) — centred would land far from where the player
-#: actually looked.
-_UI_TAP_BIG_HEIGHT_PX, _UI_TAP_BIG_WIDTH_PX = 100.0, 360.0
-
-#: "kills" counter text per screen, the wordless star_pop's anchor on
-#: every kill. ``PVP_HIDE`` has none — the hider doesn't shoot.
-_KILL_STAR_TEXT = {F.PLAY: "kills", F.PVP_HUNT: "kills_you"}
-
-#: Loading screen (``_step_loading_fx``): the progress bar's own design-px
-#: span, so the edge/word effects track the fill exactly.
-_LOAD_BAR_X0, _LOAD_BAR_W, _LOAD_BAR_Y = 48.0, 1184.0, 665.0
-_LOAD_EDGE_INTERVAL_S = 0.25
-_LOAD_DONE_XY = (1232.0, 665.0)
-_GOGO_X_RANGE = (200.0, 1080.0)
-_GOGO_Y = 600.0
-_STEP_DOT_X = (53.0, 349.0, 645.0, 941.0)
-_STEP_DOT_Y = 687.0
-
-#: Tilt checklist marker centres (Phase 2's ``CHECK_ROWS_Y`` is the row's
-#: TEXT baseline; this is the task's own, slightly different, marker-glyph
-#: centre — kept as its own constant rather than reusing one for the other).
-_TILT_STAR_X, _TILT_STAR_Y0, _TILT_STAR_DY = 783.0, 497.0, 32.0
-
-#: TASK_game_feel_1118 P3: the OLD anchor, (1084, 370), was the exact
-#: centre of the ``score`` text rect ((984, 308, 200, 125) on
-#: v3_09a_result_win) — the burst's "pon" word always landed right on
-#: the score digits. Moved straight up, clear of both the score rect AND
-#: the row_value text just above it — checked with
-#: ``src/fx/layout.py``'s rect-intersection helpers (see
-#: ``tests/test_fx_layout.py``), not eyeballed.
-_WIN_SCORE_XY = (1084.0, 220.0)
-_PVP_CROWN_XY = (640.0, 50.0)
-_RANK_UP_DELAY_S = 0.5
-
-_TOAST_XY = (640.0, 648.0)
-_TOAST_PHOTOS_XY = (640.0, 596.0)
-
-#: TASK_game_feel_fix_1118 Fix 10.2/10.3: HUD card fade — unscoped
-#: proximity (crosshair within a card's rect, grown by this much) drops
-#: that one card to this alpha; scoped drops EVERY fadeable card to 0.
-#: Spring constants are the task's own numbers, shared by both targets —
-#: only ``.to`` differs.
-_HUD_FADE_GROW_PX = 48.0
-_HUD_FADE_PROXIMITY_ALPHA = 0.22
-_HUD_FADE_SPRING_K, _HUD_FADE_SPRING_D = 420.0, 26.0
-
-#: TASK_hud_fix_1119 Fix 2: H hide/show — a single Spring (not per-card;
-#: this one drives ``state.hud_hidden_alpha``, the multiplier every card
-#: and "free" HUD element fades with) tuned to settle in ~0.15s: k=600,
-#: d=40 reaches within 2% of its target at t≈0.15s (simulated directly
-#: against ``Spring.step``, 1/60s substeps), with negligible overshoot
-#: (<0.005 past 0 or 1).
-_HUD_HIDE_SPRING_K, _HUD_HIDE_SPRING_D = 600.0, 40.0
-_HUD_HIDDEN_TOAST = "HUD hidden — press H to show"
-
-
-class V3UI:
+class V3UI(AccountMixin, FxStepsMixin, ClickGeometryMixin):
     """Giao diện v3 gắn vào một cửa sổ GLFW đã có context."""
 
-    def __init__(self, root: Path, shader_dir: Path, options, window=None) -> None:
+    def __init__(self, root: Path, shader_dir: Path, options, window=None, *,
+                 accounts, shared_album, prefs) -> None:
         self.manifest = V3Manifest(root)
         self.painter = V3Painter(self.manifest, shader_dir)
         self.state = F.V3Flow()
@@ -133,7 +62,7 @@ class V3UI:
         #: TASK_game_feel_1118 P4: crosshair kick/shake/hit marker/crit
         #: impact — survives the whole session, like ``_hover_fx``.
         self._shot_feel = ShotFeel()
-        self._shot_feel.shake_enabled = _prefs.screen_shake_enabled(root)
+        self._shot_feel.shake_enabled = prefs.screen_shake_enabled()
         #: TASK_game_feel_1118 P6: Precision-gun scope — zoom spring,
         #: right-mouse hold, finer-aim crosshair. ``app.py``'s
         #: ``_tick_scope`` drives it via the methods below.
@@ -160,14 +89,14 @@ class V3UI:
         # giống `_fx_enabled`/`_shot_feel`: thuộc phiên giao diện, không
         # phải trạng thái màn (``V3Flow``). ``app.py`` không tự đọc/ghi
         # file tài khoản — chỉ gọi các phương thức công khai dưới đây.
-        self._account_root = root
-        account_load = account_store.load(root)
-        self._account_data = account_load.data
-        #: True đúng MỘT lần sau khi nạp, nếu cả ``accounts.json`` lẫn
-        #: ``.bak`` đều hỏng — ``app.py`` đọc cờ này ở khung đầu để báo
-        #: toast, rồi tự xoá cờ (xem ``pop_account_corrupt_toast``).
-        self._account_corrupt = account_load.reset
-        self._account_throttle = account_store.FailThrottle()
+        self._root = root
+        #: The injected ``AccountService`` (``app`` builds it): the UI never
+        #: touches the accounts files or the hashing itself.
+        self._accounts = accounts
+        self._handlers: dict = {}
+        self._prefix_handlers: list = []
+        self._register_account_handlers()
+        self._shared_album = shared_album
         #: ``(kind, holder)`` trong lúc một việc băm đang chạy trên luồng
         #: riêng — ``holder`` là dict mà luồng đó tự điền ``done``/
         #: ``result``/``error`` vào, đọc lại ở ``_poll_account_job``
@@ -178,32 +107,36 @@ class V3UI:
         #: per PROCESS (not persisted — guest never persists anything),
         #: the first time a guest match actually finishes.
         self._guest_toast_shown = False
+        #: Why the server refused the last finished match (``None`` = it
+        #: counted, or local play); set by ``note_match_finished``.
+        self.match_verdict: str | None = None
         if options.guest:
             self.state.player = "guest"
-            self.state.account_key = account_crypto.GUEST_KEY
+            self.state.account_key = account_rules.GUEST_KEY
             self.state.go(F.MENU)
         else:
             # TASK_accounts_1119 Phase 4: a valid "remember me" session
             # signs in STRAIGHT to the menu, no sign-in screen — and
             # refreshes the expiry (a session that's actively used should
             # not quietly expire mid-way through a long play session).
-            resumed_key = account_store.resolve_session(root, self._account_data)
+            resumed_key = self._accounts.resume_session()
             if resumed_key is not None:
-                account_store.start_session(root, self._account_data, resumed_key)
-                account_store.save(root, self._account_data)
                 self.state.account_key = resumed_key
-                self.state.player = self._account_data["accounts"][resumed_key]["display"]
+                self.state.player = self._accounts.display_of(resumed_key)
                 self._load_progress(resumed_key)
                 self.state.go(F.MENU)
             else:
                 # No session: pre-fill the username field with the last
                 # account that signed in on this machine (nothing to
                 # pre-fill if none ever has).
-                last_key = self._account_data.get("last_account")
-                last_account = (self._account_data["accounts"].get(last_key)
-                                if last_key else None)
-                if last_account is not None:
-                    self.state.player = last_account["display"]
+                last_display = self._accounts.last_display()
+                if last_display is not None:
+                    self.state.player = last_display
+                if self._accounts.offline_notice:
+                    # A remembered session, but the server is down: say so
+                    # now, not only after the player presses Sign in.
+                    self.state.sign_in_error = OFFLINE_SIGN_IN
+                    self.state.go(F.SIGN_IN_ERR)
         # Móc đo: mở thẳng một màn để đếm FPS trên đúng màn đó (vd. màn chơi).
         forced = os.environ.get("HCPD_V3_SCREEN", "").strip()
         if forced and forced in self.manifest.screens:
@@ -212,7 +145,7 @@ class V3UI:
         # TASK_ui_sakuga_1117: tắt qua HCPD_NO_FX hoặc "fx": false trong
         # user_prefs.json (G6) — tắt thì KHÔNG đọc fx.json luôn, không chỉ
         # không vẽ, nên không texture nào của bộ này lên GPU.
-        self._fx_enabled = _prefs.fx_enabled(root)
+        self._fx_enabled = prefs.fx_enabled()
         self._fx_player = None
         self._fx_library = None
         self._fx_screen: str | None = None
@@ -288,46 +221,6 @@ class V3UI:
             return self._forgot_hover(*self.mouse)
         return hit_test(self.manifest, self.state.screen, *self.mouse)
 
-    def _dialog_hover(self, x: float, y: float) -> str | None:
-        """Hộp xác nhận chia sẻ che cả màn — hai nút của nó, không gì khác."""
-        from src.ui_album.v3_screen_draw import CONFIRM_NO_RECT, CONFIRM_YES_RECT
-
-        for name, rect in (("btn_confirm_yes", CONFIRM_YES_RECT),
-                          ("btn_confirm_no", CONFIRM_NO_RECT)):
-            rx, ry, rw, rh = rect
-            if rx <= x <= rx + rw and ry <= y <= ry + rh:
-                return name
-        return None
-
-    def _recovery_hover(self, x: float, y: float) -> str | None:
-        """TASK_accounts_1119 Phase 6: the recovery-code dialog's own two
-        buttons, same "covers the whole screen, nothing else" rule as
-        the share-confirm dialog."""
-        from src.ui_album.v3_screen_draw import RECOVERY_COPY_RECT, RECOVERY_SAVED_RECT
-
-        for name, rect in (("btn_recovery_copy", RECOVERY_COPY_RECT),
-                          ("btn_recovery_saved", RECOVERY_SAVED_RECT)):
-            rx, ry, rw, rh = rect
-            if rx <= x <= rx + rw and ry <= y <= ry + rh:
-                return name
-        return None
-
-    def _forgot_hover(self, x: float, y: float) -> str | None:
-        """The forgot-password dialog's four fields + Reset/Cancel."""
-        from src.ui_album.v3_screen_draw import (FORGOT_CANCEL_RECT, FORGOT_FIELD_H,
-                                     FORGOT_FIELD_W, FORGOT_FIELD_X,
-                                     FORGOT_FIELDS, FORGOT_SUBMIT_RECT)
-
-        for name, _label, field_y, _masked in FORGOT_FIELDS:
-            if (FORGOT_FIELD_X <= x <= FORGOT_FIELD_X + FORGOT_FIELD_W
-                    and field_y <= y <= field_y + FORGOT_FIELD_H):
-                return name
-        for name, rect in (("btn_forgot_submit", FORGOT_SUBMIT_RECT),
-                          ("btn_forgot_cancel", FORGOT_CANCEL_RECT)):
-            rx, ry, rw, rh = rect
-            if rx <= x <= rx + rw and ry <= y <= ry + rh:
-                return name
-        return None
 
     def click(self) -> str:
         """Bấm chuột trái tại vị trí hiện tại; trả hành động cho app."""
@@ -360,6 +253,7 @@ class V3UI:
                      name == v3_routes.primary_button(self.manifest, self.state))
         pre_items = list(self.state.items) if hasattr(self.state, "items") else None
         pre_focus = self.state.forgot_focus if self.state.forgot_open else self.state.focus
+        self._sync_shared_album_flags()
         action = v3_routes.on_click(self.state, name, time.perf_counter(),
                                     self.mouse)
         self.pending = action
@@ -367,146 +261,6 @@ class V3UI:
         self._spawn_click_fx(name, screen, rect, in_dialog, is_primary, pre_items)
         return action
 
-    # ---- TASK_small_fixes_1120: caret -------------------------------------
-    def _sync_caret_after_click(self, name: str, pre_focus: str | None,
-                                from_pointer: bool) -> None:
-        """A click can move the caret two different ways: clicking the
-        ALREADY-focused field repositions the caret under the mouse;
-        clicking anything else that happens to leave a field focused
-        (``link_forgot`` prefilling+focusing ``field_forgot_user``, Tab
-        is handled separately in ``focus_next``) puts the caret at that
-        field's END, same as a fresh focus always has."""
-        focused = self.state.forgot_focus if self.state.forgot_open else self.state.focus
-        if focused is None:
-            return
-        geometry = self._field_caret_geometry(focused)
-        if geometry is None:
-            return
-        rect, run, text = geometry
-        if from_pointer and name == focused:
-            was_focused = (pre_focus == focused)
-            old_caret = self.state.caret_index if was_focused else None
-            self.state.caret_index = self._caret_index_for_click(rect, run, text,
-                                                                 old_caret)
-        else:
-            self.state.caret_index = len(text)
-
-    def _field_caret_geometry(self, name: str):
-        """``(value_rect, run, display_text)`` for ``name``'s caret math —
-        the SAME rect/run/text ``v3.py`` draws it with, so click
-        positioning and rendering never disagree. ``None`` for anything
-        that isn't one of the caret-bearing fields (``field_join`` keeps
-        its own append/backspace-last model, out of this task's scope)."""
-        from src.ui_album.v3_screen_draw import _FIELD_VALUE_FONT, FORGOT_FIELDS
-        from src.ui_album.v3_text_field import _field_box_rect, forgot_field_value_rect
-
-        if name in F.FORGOT_FIELD_ATTR:
-            for fname, _label, field_y, masked in FORGOT_FIELDS:
-                if fname != name:
-                    continue
-                raw = F.field_value(self.state, name)
-                value = "•" * len(raw) if masked else raw
-                return forgot_field_value_rect(field_y), _FIELD_VALUE_FONT, value
-            return None
-        key = {"field_user": "user", "field_pass": "pass",
-              "field_pass2": "pass2"}.get(name)
-        if key is None:
-            return None
-        spec = self.manifest.text(self.state.screen, key)
-        if spec is None:
-            return None
-        raw = F.field_value(self.state, name)
-        masked = name in ("field_pass", "field_pass2") and not self.state.show_password
-        value = "•" * len(raw) if masked else raw
-        rect = _field_box_rect(self.manifest, self.state.screen, key,
-                              [float(v) for v in spec["rect"]])
-        return rect, spec["runs"][0], value
-
-    def _caret_index_for_click(self, rect, run: dict, text: str,
-                               old_caret: int | None) -> int:
-        """Nearest character boundary (0..len(text)) to ``self.mouse``'s
-        x inside ``rect`` — accounting for the SAME scroll the field was
-        drawn with a moment ago (``old_caret`` is this field's caret
-        index from the frame BEFORE this click, or ``None`` if it wasn't
-        the focused field yet, meaning it was drawn unscrolled)."""
-        offsets = self.painter.caret_offsets(run, text)
-        total = offsets[-1] if offsets else 0.0
-        box_w = float(rect[2])
-        if old_caret is None:
-            scroll = 0.0
-        else:
-            caret_clamped = max(0, min(len(text), old_caret))
-            scroll = max(0.0, offsets[caret_clamped] - box_w)
-            scroll = min(scroll, max(0.0, total - box_w))
-        click_x = float(self.mouse[0]) - float(rect[0]) + scroll
-        best_i, best_d = 0, abs(offsets[0] - click_x)
-        for index, offset in enumerate(offsets):
-            dist = abs(offset - click_x)
-            if dist < best_d:
-                best_d, best_i = dist, index
-        return best_i
-
-    def _click_rect(self, screen: str, name: str, in_dialog: bool):
-        if in_dialog:
-            from src.ui_album.v3_screen_draw import (
-                CONFIRM_NO_RECT, CONFIRM_YES_RECT,
-                FORGOT_CANCEL_RECT, FORGOT_FIELD_H,
-                FORGOT_FIELD_W, FORGOT_FIELD_X,
-                FORGOT_FIELDS, FORGOT_SUBMIT_RECT,
-                RECOVERY_COPY_RECT, RECOVERY_SAVED_RECT)
-
-            rects = {"btn_confirm_yes": CONFIRM_YES_RECT, "btn_confirm_no": CONFIRM_NO_RECT,
-                    "btn_recovery_copy": RECOVERY_COPY_RECT,
-                    "btn_recovery_saved": RECOVERY_SAVED_RECT,
-                    "btn_forgot_submit": FORGOT_SUBMIT_RECT,
-                    "btn_forgot_cancel": FORGOT_CANCEL_RECT}
-            for field_name, _label, field_y, _masked in FORGOT_FIELDS:
-                rects[field_name] = (FORGOT_FIELD_X, field_y, FORGOT_FIELD_W, FORGOT_FIELD_H)
-            return rects.get(name)
-        from src.ui_album.v3_hit import hotspot_rect
-
-        for hotspot in self.manifest.screens[screen].get("hotspots", ()):
-            if hotspot["n"] == name:
-                return hotspot_rect(screen, hotspot)
-        return None
-
-    def _slot_rect(self, screen: str, index: int):
-        name = f"slot_empty_{index + 1}"
-        for hotspot in self.manifest.screens[screen].get("hotspots", ()):
-            if hotspot["n"] == name:
-                return hotspot["rect"]
-        return None
-
-    def _spawn_click_fx(self, name: str, screen: str, rect, in_dialog: bool,
-                        is_primary: bool, pre_items) -> None:
-        if not self._fx_enabled:
-            return
-        if in_dialog:
-            if name in ("btn_confirm_yes", "btn_confirm_no") and rect is not None:
-                self.spawn_fx("ui_tap", rect[0] + rect[2] * 0.5,
-                             rect[1] + rect[3] * 0.5)
-            return
-        if rect is not None:
-            cx, cy = rect[0] + rect[2] * 0.5, rect[1] + rect[3] * 0.5
-            if is_primary:
-                self.spawn_fx("ui_confirm", cx, cy)
-            elif name in _UI_TAP_EXACT or any(
-                    name.startswith(p) for p in _UI_TAP_PREFIXES):
-                big = (rect[3] > _UI_TAP_BIG_HEIGHT_PX or
-                      rect[2] > _UI_TAP_BIG_WIDTH_PX)
-                x, y = self.mouse if big else (cx, cy)
-                self.spawn_fx("ui_tap", x, y)
-        # Vật phẩm vừa được GẮN (không phải BỎ RA) vào một ô loadout — sao
-        # bật ở Ô NÓ VỪA VÀO, không phải ở chính con sticker đã bấm.
-        if name.startswith("sticker_") and pre_items is not None:
-            item = name[len("sticker_"):]
-            if item not in pre_items and item in self.state.items:
-                index = self.state.items.index(item)
-                slot_rect = self._slot_rect(screen, index)
-                if slot_rect is not None:
-                    sx = slot_rect[0] + slot_rect[2] * 0.5
-                    sy = slot_rect[1] + slot_rect[3] * 0.5
-                    self.spawn_fx("star_pop", sx, sy, words=False)
 
     def key(self, char: str) -> None:
         # TASK_accounts_1119 Phase 6: the forgot dialog has its OWN four
@@ -551,9 +305,9 @@ class V3UI:
         """Enter = nút chính của màn đang mở (U2: "Enter = the primary
         button") — or of whichever dialog is open, if one is."""
         if self.state.recovery_code_shown:
-            return self._click("btn_recovery_saved")
+            return self._click(ID.BTN_RECOVERY_SAVED)
         if self.state.forgot_open:
-            return self._click("btn_forgot_submit")
+            return self._click(ID.BTN_FORGOT_SUBMIT)
         name = v3_routes.primary_button(self.manifest, self.state)
         if not name:
             return ""
@@ -683,275 +437,45 @@ class V3UI:
             F.say(self.state, _HUD_HIDDEN_TOAST)
         return self._hud_hidden
 
-    # ---- TASK_accounts_1119: accounts — local store, no server -----------
-    @property
-    def account_busy(self) -> bool:
-        """True while a sign-in/sign-up hash job is running on its own
-        thread — the primary button must ignore repeat clicks during this
-        window (scrypt takes tens to hundreds of ms; a second click while
-        one is in flight would start a SECOND concurrent hash for no
-        reason, and could race the first one's result application)."""
-        return self._account_job is not None
 
-    def pop_account_corrupt_toast(self) -> bool:
-        """True exactly once, the first time it's read after a launch
-        where ``accounts.json`` AND its ``.bak`` were both unreadable —
-        ``app.py`` shows a toast for this, then it never fires again this
-        process (the store already started empty and renamed the bad
-        file aside; nothing more to say after the first toast)."""
-        was = self._account_corrupt
-        self._account_corrupt = False
-        return was
+    # ---- B5: actions go through one door -------------------------------
+    def register_handler(self, action: str, handler) -> None:
+        """``handler(action, now)`` runs when ``dispatch(action, now)`` is called."""
+        self._handlers[action] = handler
 
-    def _start_account_job(self, kind: str, fn, *args) -> None:
-        if self.account_busy:
-            return
-        holder: dict = {}
-        self._account_job = (kind, holder)
+    def register_prefix_handler(self, prefix: str, handler) -> None:
+        self._prefix_handlers.append((prefix, handler))
 
-        def worker() -> None:
-            try:
-                holder["result"] = fn(*args)
-            except Exception as exc:                          # noqa: BLE001
-                holder["error"] = exc
-            finally:
-                holder["done"] = True
+    def dispatch(self, action: str, now: float) -> bool:
+        """Forward an action name (``routes`` returns these) to the callback
+        ``app`` registered for it, or to the account controller. ``False`` =
+        nobody handles it (the empty action is not an error)."""
+        handler = self._handlers.get(action)
+        if handler is None:
+            handler = next((h for prefix, h in self._prefix_handlers
+                            if action.startswith(prefix)), None)
+        if handler is None:
+            return False
+        handler(action, now)
+        return True
 
-        threading.Thread(target=worker, name=f"account-{kind}", daemon=True).start()
+    def _register_account_handlers(self) -> None:
+        self.register_handler("account_sign_in", lambda action, now: self.sign_in_submit())
+        self.register_handler("account_sign_up", lambda action, now: self.sign_up_submit())
+        self.register_handler("account_forgot_submit",
+                              lambda action, now: self.forgot_submit())
+        self.register_handler("account_copy_recovery_code", self._copy_recovery_code_handler)
 
-    def _poll_account_job(self) -> None:
-        if self._account_job is None:
-            return
-        kind, holder = self._account_job
-        if not holder.get("done"):
-            return
-        self._account_job = None
-        if "error" in holder:
-            logger.exception("TASK_accounts_1119: viec '%s' loi", kind,
-                             exc_info=holder["error"])
-            F.say(self.state, "Something went wrong. Try again.")
-            return
-        {
-            "sign_in": self._apply_sign_in_result,
-            "sign_up": self._apply_sign_up_result,
-            "forgot": self._apply_forgot_result,
-        }[kind](holder["result"])
+    def _copy_recovery_code_handler(self, action: str, now: float) -> None:
+        self.copy_recovery_code()
+        F.say(self.state, "Code copied")
 
-    def sign_in_submit(self) -> None:
-        """``ACT_SIGN_IN`` (``app.py``): the cooldown check is cheap and
-        synchronous (in-memory, no hashing) and happens HERE, before even
-        starting a thread — a name mid-cooldown must never spend a scrypt
-        call just to be told to wait."""
-        username, password = self.state.player, self.state.password
-        key_guess = account_crypto.username_key(account_crypto.normalize_username(username))
-        now = time.perf_counter()
-        remaining = self._account_throttle.cooldown_remaining(key_guess, now)
-        if remaining > 0.0:
-            self.state.sign_in_error = f"Too many tries. Wait {int(round(remaining))} s."
-            self.state.go(F.SIGN_IN_ERR)
-            return
-        self._start_account_job("sign_in", self._verify_credentials_job,
-                                username, password)
+    def _sync_shared_album_flags(self) -> None:
+        flow = self.state
+        flow.shared_can_upload = self._shared_album.can_upload()
+        flow.shared_can_list = self._shared_album.can_list()
+        flow.shared_not_configured = self._shared_album.NOT_CONFIGURED
 
-    def _verify_credentials_job(self, username: str, password: str):
-        result = account_store.verify_credentials(self._account_data, username, password)
-        if result[0] == account_store.RESULT_OK:
-            # Only a successful sign-in ever mutates ``data`` (last-signed-
-            # in time, and a rehash if the stored scrypt params were
-            # stale) — no point writing the file back out after a no-op
-            # failed attempt.
-            account_store.save(self._account_root, self._account_data)
-        return result
-
-    def _apply_sign_in_result(self, result) -> None:
-        outcome, key = result
-        now = time.perf_counter()
-        if outcome == account_store.RESULT_OK:
-            self._account_throttle.reset(key)
-            self.state.account_key = key
-            self.state.player = self._account_data["accounts"][key]["display"]
-            self.state.password = self.state.password2 = ""
-            self.state.focus = None
-            self._load_progress(key)
-            # TASK_accounts_1119 Phase 4: the switch's CURRENT state wins
-            # on every sign-in — on means create/refresh a session, off
-            # means make sure no stale one from an EARLIER sign-in (with
-            # the switch on, since changed) survives this one.
-            if self.state.remember:
-                account_store.start_session(self._account_root, self._account_data, key)
-            else:
-                account_store.clear_session(self._account_root, self._account_data, key)
-            account_store.save(self._account_root, self._account_data)
-            self.state.go(F.MENU)
-            return
-        # RESULT_UNKNOWN has no key (no such account) — throttle on the
-        # NAME the user actually typed, same as RESULT_WRONG's real key
-        # (an unknown name still burns cooldown attempts, matching the
-        # task's own "5 failures in a row for one name", not "one
-        # account").
-        throttle_key = key or account_crypto.username_key(
-            account_crypto.normalize_username(self.state.player))
-        self._account_throttle.record_failure(throttle_key, now)
-        remaining = self._account_throttle.cooldown_remaining(throttle_key, now)
-        if remaining > 0.0:
-            self.state.sign_in_error = f"Too many tries. Wait {int(round(remaining))} s."
-        elif outcome == account_store.RESULT_UNKNOWN:
-            self.state.sign_in_error = f"No album named {self.state.player}. Create one below."
-        else:
-            self.state.sign_in_error = "Wrong password. Try again."
-        self.state.go(F.SIGN_IN_ERR)
-
-    def sign_up_submit(self) -> None:
-        """``ACT_SIGN_UP`` — ``v3_routes`` already checked the FORMAT
-        (name shape, password length/match) synchronously; this does the
-        one check that needs the store (name actually free) plus the
-        hashing, both off-thread."""
-        self._start_account_job("sign_up", self._create_account_job,
-                                self.state.player, self.state.password)
-
-    def _create_account_job(self, display: str, password: str):
-        if not account_store.is_available(self._account_data, display):
-            return ("taken", None, None)
-        key, code = account_store.create_account(self._account_data, display, password)
-        account_store.save(self._account_root, self._account_data)
-        return ("ok", key, code)
-
-    def _apply_sign_up_result(self, result) -> None:
-        outcome, key, code = result
-        if outcome == "taken":
-            self.state.touched.add("field_user")
-            self.state.hint_bad = True
-            self.state.hint_text = "Username already taken"
-            return
-        self.state.account_key = key
-        self.state.player = self._account_data["accounts"][key]["display"]
-        self.state.password = self.state.password2 = ""
-        self.state.focus = None
-        self.state.go(F.MENU)
-        # TASK_accounts_1119 Phase 6: shown exactly once, right now — the
-        # recovery dialog overlays whatever screen is current (MENU,
-        # just set above), same as the share-album confirm dialog does.
-        self.state.recovery_code_shown = code
-
-    def forgot_submit(self) -> None:
-        """``ACT_FORGOT_SUBMIT`` (``app.py``): same cooldown-before-thread
-        pattern as ``sign_in_submit`` — a wrong recovery code burns the
-        SAME per-username throttle as a wrong password (task: "wrong
-        codes use the same 5-try/30s cooldown")."""
-        username = self.state.forgot_user
-        key_guess = account_crypto.username_key(account_crypto.normalize_username(username))
-        now = time.perf_counter()
-        remaining = self._account_throttle.cooldown_remaining(key_guess, now)
-        if remaining > 0.0:
-            self.state.forgot_error = f"Too many tries. Wait {int(round(remaining))} s."
-            return
-        self._start_account_job("forgot", self._verify_recovery_job, username,
-                                self.state.forgot_code, self.state.forgot_new_pass)
-
-    def _verify_recovery_job(self, username: str, code: str, new_password: str):
-        outcome, key = account_store.verify_recovery(self._account_data, username, code)
-        if outcome != account_store.RESULT_OK:
-            return outcome, key, None
-        new_code = account_store.reset_with_recovery(self._account_data, key, new_password)
-        account_store.save(self._account_root, self._account_data)
-        return outcome, key, new_code
-
-    def _apply_forgot_result(self, result) -> None:
-        outcome, key, new_code = result
-        now = time.perf_counter()
-        if outcome == account_store.RESULT_OK:
-            self._account_throttle.reset(key)
-            self.state.forgot_open = False
-            self.state.forgot_focus = None
-            self.state.forgot_user = self.state.forgot_code = ""
-            self.state.forgot_new_pass = self.state.forgot_new_pass2 = ""
-            self.state.forgot_error = ""
-            # TASK_accounts_1119 Phase 6: the old code is used up the
-            # moment it verifies — show the SAME recovery-code dialog
-            # again with the new one, once.
-            self.state.recovery_code_shown = new_code
-            return
-        # Same "throttle on the typed name" fallback as
-        # ``_apply_sign_in_result`` — an unknown name still burns a
-        # cooldown attempt.
-        throttle_key = key or account_crypto.username_key(
-            account_crypto.normalize_username(self.state.forgot_user))
-        self._account_throttle.record_failure(throttle_key, now)
-        remaining = self._account_throttle.cooldown_remaining(throttle_key, now)
-        if remaining > 0.0:
-            self.state.forgot_error = f"Too many tries. Wait {int(round(remaining))} s."
-        elif outcome == account_store.RESULT_UNKNOWN:
-            self.state.forgot_error = f"No album named {self.state.forgot_user}. Create one below."
-        else:
-            self.state.forgot_error = "Wrong code. Try again."
-
-    def copy_recovery_code(self) -> None:
-        """``ACT_COPY_RECOVERY_CODE`` — clipboard copy, same mechanism as
-        the PvP room-code "Copy" button (``app.py``)."""
-        if self._window is not None:
-            self._window.set_clipboard(self.state.recovery_code_shown)
-
-    def save_progress(self) -> None:
-        """TASK_accounts_1119 Phase 5: ``history``/``recent``/the best
-        score (derived from ``history``), so the leaderboard "you" row
-        and the menu photo caption/damage survive a restart. Called
-        after every match result, on sign-out and on exit (``app.py``) —
-        a no-op for guest (never saved) or no account signed in at all.
-        """
-        key = self.state.account_key
-        if not key or key == account_crypto.GUEST_KEY:
-            return
-        scores = [float(record.get("score", 0.0)) for record in self.state.history.values()
-                 if isinstance(record, dict)]
-        best_score = max(scores) if scores else None
-        try:
-            account_store.save_progress(self._account_data, key, self.state.history,
-                                        self.state.recent, best_score)
-            account_store.save(self._account_root, self._account_data)
-        except Exception:
-            logger.error("Khong luu duoc tien trinh tai khoan", exc_info=True)
-            F.say(self.state, "Couldn't save your progress.")
-
-    def note_match_finished(self) -> None:
-        """TASK_accounts_1119 Phase 5: call once right after a match
-        result is written into ``state.history`` (``app.py``'s
-        ``_tick_album_match``). A signed-in account saves immediately;
-        a guest instead gets a ONE-TIME toast (never saved — this IS the
-        explanation why)."""
-        if self.state.account_key == account_crypto.GUEST_KEY:
-            if not self._guest_toast_shown:
-                self._guest_toast_shown = True
-                F.say(self.state, "Playing as guest — create an album to keep your scores.")
-            return
-        self.save_progress()
-
-    def _load_progress(self, key: str) -> None:
-        """The other half of ``save_progress`` — called right after a
-        successful sign-in (``_apply_sign_in_result``) and on auto
-        sign-in at launch, so ``flow.history``/``recent`` reflect what
-        THIS account saved last time, not whatever a previous
-        guest/account session left in memory."""
-        progress = account_store.load_progress(self._account_data, key)
-        if progress is None:
-            return
-        self.state.history = progress["history"]
-        self.state.recent = [Path(p) for p in progress["recent"]]
-
-    def sign_out(self) -> None:
-        """TASK_accounts_1119 Phase 4: a deliberate sign-out must not
-        leave a "remember me" session alive — same ``clear_session`` the
-        switch's OFF path uses on a sign-in. Guest "sessions" never had
-        one to begin with, but clearing ``session.json`` unconditionally
-        is still correct (and cheap) either way. Phase 5: also the LAST
-        chance to persist this session's progress before the account
-        state about to be wiped by app.py's own "logout" handler."""
-        self.save_progress()
-        key = self.state.account_key
-        if key and key != account_crypto.GUEST_KEY:
-            account_store.clear_session(self._account_root, self._account_data, key)
-            account_store.save(self._account_root, self._account_data)
-        else:
-            account_store.clear_session(self._account_root)
 
     def set_camera_frame(self, frame) -> None:
         """
@@ -976,49 +500,6 @@ class V3UI:
         return any(p.get("kind") == "viewport" for p in
                    self.manifest.screens[self.state.screen].get("photos", ()))
 
-    # ---- fx: 1.5x vs 2x pack (TASK_perf_textures_1119 Fix 4) --------------
-    def _ensure_fx_pack(self, width: int) -> None:
-        """Starts loading the pack ``width`` wants, in the BACKGROUND, if
-        it isn't already the active or in-progress one. Never touches
-        the currently-drawing pack — ``_poll_fx_pack_switch`` swaps over
-        only once the new one has finished preloading."""
-        if not self._fx_enabled:
-            return
-        wanted = "fx@2x" if width > FX_WIDE_THRESHOLD_PX else "fx"
-        if wanted == self._fx_dir:
-            return
-        if self._fx_pending is not None and self._fx_pending[0] == wanted:
-            return
-        try:
-            spec = load_spec(self._account_root, fx_dir=wanted)
-        except (OSError, ValueError) as err:
-            logger.warning("V3UI: khong doi duoc sang goi fx %s (%s)", wanted, err)
-            return
-        library = FxLibrary(spec)
-        if not library.check_capability():
-            return
-        player = FxPlayer(spec)
-        library.start_preload()
-        self._fx_pending = (wanted, player, library)
-
-    def _poll_fx_pack_switch(self) -> None:
-        if self._fx_pending is None:
-            return
-        wanted, player, library = self._fx_pending
-        # The pending library's own decode results only turn into resident
-        # textures (and ``preload_remaining`` drop) when something calls
-        # ITS ``pump()`` -- the active pack's ``pump()`` call in ``draw()``
-        # only ever drains ITSELF.
-        library.pump()
-        if library.preload_remaining > 0:
-            return
-        old_library = self._fx_library
-        self._fx_player, self._fx_library, self._fx_dir = player, library, wanted
-        self._fx_pending = None
-        if old_library is not None:
-            old_library.release()
-        logger.info("V3UI: doi sang goi fx %s (framebuffer rong hon %dpx)",
-                   wanted, FX_WIDE_THRESHOLD_PX)
 
     # ---- vẽ --------------------------------------------------------------
     def draw(self, framebuffer, scene_draw=None) -> None:
@@ -1030,8 +511,10 @@ class V3UI:
         if self.options.ui_shots:
             state = shot_state(self.manifest, name)
         else:
+            self._sync_shared_album_flags()
             state = v3_values.state_for(self.manifest, self.painter, self.state,
-                                        self.game, self.mouse, accounts=self._account_data)
+                                        None if self.game is None
+                                        else self.game.view(time.perf_counter()), self.mouse, accounts=self._accounts.accounts_view())
             state.hover = self.hover()
             state.pressed = self.mouse_down and state.hover is not None
             state.hover_fx = self._hover_fx
@@ -1132,59 +615,11 @@ class V3UI:
     def current_screen_ready(self) -> bool:
         return self.painter.screen_ready(self.state.screen, ())
 
-    # ---- Sakuga VFX (TASK_ui_sakuga_1117) ---------------------------------
-    def spawn_fx(self, name: str, x: float, y: float, **kwargs) -> bool:
-        """Spawn a named effect at design-space ``(x, y)``; no-op (returns
-        ``False``) if fx is off or its texture isn't resident yet."""
-        if not self._fx_enabled:
-            return False
-        return self._fx_library.try_spawn(self._fx_player, name, x, y, **kwargs)
-
-    def spawn_fx_word(self, word: str, style: str, x: float, y: float, **kwargs) -> bool:
-        """Spawn a bare word (no sprite) at design-space ``(x, y)``."""
-        if not self._fx_enabled:
-            return False
-        return self._fx_library.try_spawn_word(self._fx_player, word, style, x, y, **kwargs)
-
-    def clear_fx(self) -> None:
-        """Drop every live effect right now, regardless of screen scope.
-
-        TASK_game_feel_1118 P3: the sakuga screenshot stepper fires
-        ``hit_kill``/``hit_crit``/``hit_block`` back to back on the SAME
-        screen (``F.PLAY``) — ``_fx_library.enter_screen``'s scope-based
-        clearing only runs on a SCREEN CHANGE, so the previous shot's
-        effect (e.g. ``hit_crit``'s red DON) was still alive and visible
-        in the NEXT shot's screenshot (``fx_miss.png``)."""
-        if self._fx_enabled:
-            self._fx_player.clear(lambda _name: True)
 
     @property
     def fx_enabled(self) -> bool:
         return self._fx_enabled
 
-    def spawn_hit_fx(self, crit: bool) -> None:
-        """A LOCAL shot just killed a bug (``app.py``'s ``_album_shoot``,
-        only ever called for the player's own shots — never an
-        opponent's) — hit_kill/hit_crit at the crosshair, plus a wordless
-        star_pop over this screen's kill counter, if it has one."""
-        if not self._fx_enabled:
-            return
-        mx, my = self.mouse
-        self.spawn_fx("hit_crit" if crit else "hit_kill", mx, my)
-        key = _KILL_STAR_TEXT.get(self.state.screen)
-        if key is not None:
-            spec = self.manifest.text(self.state.screen, key)
-            if spec is not None:
-                rect = spec["rect"]
-                self.spawn_fx("star_pop", rect[0] + rect[2] * 0.5,
-                             rect[1] + rect[3] * 0.5, words=False)
-
-    def spawn_miss_fx(self) -> None:
-        """A local shot missed — hit_block at the crosshair."""
-        if not self._fx_enabled:
-            return
-        mx, my = self.mouse
-        self.spawn_fx("hit_block", mx, my)
 
     # ---- shooting feel (TASK_game_feel_1118 P4) ---------------------------
     def register_shot(self, hit: bool, crit: bool) -> None:
@@ -1237,131 +672,6 @@ class V3UI:
         ``is_scoped``, and for assigning the result to ``self.mouse``."""
         return self._scope.update_crosshair(self.mouse, raw_mouse)
 
-    # ---- per-tick/per-screen fx triggers (TASK_ui_sakuga_1117 Phase 6) ----
-    def _step_fx_triggers(self, state, now: float) -> None:
-        """Effects that fire on a STATE TRANSITION rather than a discrete
-        click/shot — loading bar, tilt checklist, a new toast, entering
-        WIN/PVP_RESULT. Reads ``state`` (this frame's already-computed
-        ``v3_values.state_for`` output) so it never re-derives business
-        logic (win rank, pipeline step, ...) that already lives there."""
-        if not self._fx_enabled:
-            return
-        dt = (0.0 if self._fx_trigger_last_t is None
-             else max(0.0, now - self._fx_trigger_last_t))
-        self._fx_trigger_last_t = now
-        screen = self.state.screen
-        if screen != self._fx_trigger_screen:
-            self._on_fx_trigger_screen_enter(screen, now)
-            self._fx_trigger_screen = screen
-        if screen in (F.LOADING, F.LOADING_READY):
-            self._step_loading_fx(state, dt)
-        elif screen == F.TILT:
-            self._step_tilt_fx()
-        elif screen == F.WIN:
-            self._step_win_fx(state, now)
-        elif screen == F.PVP_RESULT:
-            self._step_pvp_result_fx(state)
-        if screen not in (F.PLAY, F.PVP_HUNT, F.PVP_HIDE):
-            self._step_toast_fx(state, screen)
-
-    def _on_fx_trigger_screen_enter(self, screen: str, now: float) -> None:
-        if screen == F.LOADING:
-            self._fx_load_edge_elapsed = 0.0
-            self._fx_gogo_spawned = False
-            self._fx_load_done_spawned = False
-            self._fx_last_step_done = 0
-        if screen == F.TILT:
-            self._fx_last_tilt_checks = None
-        if screen == F.WIN:
-            self._fx_win_entered_t = now
-            self._fx_win_star_spawned = False
-            self._fx_rank_up_spawned = False
-        if screen == F.PVP_RESULT:
-            self._fx_pvp_result_spawned = False
-
-    def _step_loading_fx(self, state, dt: float) -> None:
-        # Mỗi "đã spawn" dưới đây chỉ CHỐT khi ``spawn_fx`` trả True — sheet
-        # chưa kịp decode (lần đầu vào màn, cache nguội) thì thử lại đúng
-        # khung sau, không bỏ cuộc sau một lần trượt (từng là lỗi thật: cờ
-        # "đã spawn" chốt trước khi biết kết quả, nên lần đầu lạnh cache là
-        # mất hẳn hiệu ứng đó, không bao giờ thử lại).
-        pct = max(0.0, min(1.0, float(state.bars.get("progress", 0.0))))
-        bar_x = _LOAD_BAR_X0 + _LOAD_BAR_W * pct
-        if self.state.screen == F.LOADING and 0.0 < pct < 1.0:
-            self._fx_load_edge_elapsed += dt
-            if self._fx_load_edge_elapsed >= _LOAD_EDGE_INTERVAL_S:
-                self._fx_load_edge_elapsed = 0.0
-                self.spawn_fx("load_edge", bar_x, _LOAD_BAR_Y)
-            if not self._fx_gogo_spawned and 0.30 < pct < 0.90:
-                word_x = max(_GOGO_X_RANGE[0], min(_GOGO_X_RANGE[1], bar_x))
-                if self.spawn_fx_word("gogo", "ink", word_x, _GOGO_Y, size=150.0,
-                                      rot=-0.08, life=2.9):
-                    self._fx_gogo_spawned = True
-        if not self._fx_load_done_spawned and pct >= 1.0:
-            if self.spawn_fx("load_done", *_LOAD_DONE_XY):
-                self._fx_load_done_spawned = True
-        step_dots = state.pips.get("step_dots")
-        if isinstance(step_dots, (list, tuple)):
-            done = sum(1 for flag in step_dots if flag)
-            index = self._fx_last_step_done
-            while index < min(done, len(_STEP_DOT_X)):
-                if not self.spawn_fx("star_pop", _STEP_DOT_X[index], _STEP_DOT_Y,
-                                     words=False):
-                    break               # chua decode xong: thu lai khung sau
-                index += 1
-            self._fx_last_step_done = index
-
-    def _step_tilt_fx(self) -> None:
-        checks = tuple(self.state.tilt_checks())
-        last = self._fx_last_tilt_checks
-        if last is None:
-            # Lần đầu sau khi vào TILT: chỉ lấy làm MỐC, không nổ sao cho
-            # dấu nào đã xong từ trước (quay lại màn này sau một lần mất
-            # mạng chẳng hạn) — đúng nghĩa "chỉ khi CHUYỂN sang xong".
-            self._fx_last_tilt_checks = checks
-            return
-        new_last = list(last)
-        for index, done in enumerate(checks):
-            if not done:
-                continue
-            if last[index] or self.spawn_fx(
-                    "star_pop", _TILT_STAR_X,
-                    _TILT_STAR_Y0 + _TILT_STAR_DY * index, words=False):
-                new_last[index] = True
-            # else: chua decode xong, giu False de thu lai khung sau.
-        self._fx_last_tilt_checks = tuple(new_last)
-
-    def _step_win_fx(self, state, now: float) -> None:
-        if not self._fx_win_star_spawned:
-            if self.spawn_fx("star_five", *_WIN_SCORE_XY):
-                self._fx_win_star_spawned = True
-        if (not self._fx_rank_up_spawned and "rank_up" in state.sprites
-                and now - self._fx_win_entered_t >= _RANK_UP_DELAY_S):
-            record = self.manifest.sprite(F.WIN, "rank_up")
-            if record is not None:
-                rect = record["rect"]
-                if self.spawn_fx("star_pop", rect[0] + rect[2] * 0.5,
-                                 rect[1] + rect[3] * 0.5, words=False):
-                    self._fx_rank_up_spawned = True
-
-    def _step_pvp_result_fx(self, state) -> None:
-        if self._fx_pvp_result_spawned:
-            return
-        if "crown" not in state.sprites:
-            # Thua/hoà: không có hiệu ứng, và KHÔNG có gì để spawn nên
-            # không cần thử lại — chốt luôn, khỏi gọi lại mỗi khung.
-            self._fx_pvp_result_spawned = True
-            return
-        if self.spawn_fx("star_five", *_PVP_CROWN_XY):
-            self._fx_pvp_result_spawned = True
-
-    def _step_toast_fx(self, state, screen: str) -> None:
-        until = self.state.message_until_s
-        if not state.message or until == self._fx_last_message_until:
-            return
-        self._fx_last_message_until = until
-        x, y = _TOAST_PHOTOS_XY if screen == F.PHOTOS else _TOAST_XY
-        self.spawn_fx("toast_in", x, y)
 
     def _scene(self, rect, scene_draw) -> None:
         """

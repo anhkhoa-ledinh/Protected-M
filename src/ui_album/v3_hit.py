@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import math
 from typing import TYPE_CHECKING
+from src.ui_album import ids as ID
 
 if TYPE_CHECKING:
     from src.ui_album.v3 import V3Manifest
@@ -66,14 +67,14 @@ def _rounded(radius: float) -> HotspotShape:
 #: Tên CHÍNH XÁC (không phải tiền tố) — mỗi tên chỉ có một hotspot, không có
 #: hậu tố thay đổi (khác ``btn_Sign in``/``btn_Create album``/...).
 _EXACT_SHAPES: dict[str, HotspotShape] = {
-    "continue": HotspotShape("none"),
-    "dropzone": _rounded(DROPZONE_CORNER_RADIUS_PX),
-    "recent_memory": _rounded(RECENT_MEMORY_CORNER_RADIUS_PX),
-    "sign_out": HotspotShape("underline"),
-    "leave": HotspotShape("underline"),
-    "slider": HotspotShape("thumb"),
-    "footer_link": HotspotShape("underline"),
-    "icon_show_password": HotspotShape("circle"),
+    ID.CONTINUE: HotspotShape("none"),
+    ID.DROPZONE: _rounded(DROPZONE_CORNER_RADIUS_PX),
+    ID.RECENT_MEMORY: _rounded(RECENT_MEMORY_CORNER_RADIUS_PX),
+    ID.SIGN_OUT: HotspotShape("underline"),
+    ID.LEAVE: HotspotShape("underline"),
+    ID.SLIDER: HotspotShape("thumb"),
+    ID.FOOTER_LINK: HotspotShape("underline"),
+    ID.ICON_SHOW_PASSWORD: HotspotShape("circle"),
 }
 
 #: Tiền tố — nhiều hotspot cùng kiểu, khác hậu tố (``btn_Sign in``,
@@ -256,12 +257,12 @@ def measure_ink_bounds(image, rect, image_scale: float, threshold: int = 150):
 #: chiều cao (``measure_ink_bounds`` cho số thật, xem báo cáo P2).
 #: Khoá ``(màn, tên)`` vì ``footer_link`` hiện chữ khác nhau tuỳ màn.
 LINK_HIT_RECTS: dict[tuple[str, str], tuple[float, float, float, float]] = {
-    ("v3_01a_sign_in", "link_forgot"): (692.0, 404.0, 134.0, 17.0),
-    ("v3_01c_sign_in_error", "link_forgot"): (692.0, 404.0, 134.0, 17.0),
-    ("v3_01a_sign_in", "link_guest"): (591.0, 626.0, 98.0, 16.0),
-    ("v3_01c_sign_in_error", "footer_link"): (593.0, 626.0, 96.0, 16.0),
-    ("v3_01b_sign_up", "footer_link"): (537.0, 578.0, 206.0, 16.0),
-    ("v3_02a_menu", "sign_out"): (1167.0, 49.0, 63.0, 15.0),
+    (ID.SIGN_IN, ID.LINK_FORGOT): (692.0, 404.0, 134.0, 17.0),
+    (ID.SIGN_IN_ERR, ID.LINK_FORGOT): (692.0, 404.0, 134.0, 17.0),
+    (ID.SIGN_IN, ID.LINK_GUEST): (591.0, 626.0, 98.0, 16.0),
+    (ID.SIGN_IN_ERR, ID.FOOTER_LINK): (593.0, 626.0, 96.0, 16.0),
+    (ID.SIGN_UP, ID.FOOTER_LINK): (537.0, 578.0, 206.0, 16.0),
+    (ID.MENU, ID.SIGN_OUT): (1167.0, 49.0, 63.0, 15.0),
 }
 
 

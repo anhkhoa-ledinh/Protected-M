@@ -101,7 +101,7 @@ def main(argv=None):
     rows = []
     for name in NAMES:
         path = folder / f"{name}.png"
-        rgb = ImageSource(path).tick(0.0)
+        rgb = ImageSource(import_photo(path)).tick(0.0)
         depth = estimator.estimate(rgb)          # MỘT lần, dùng cho cả 3 mức
         # K cũng chốt một lần: staging chỉ đổi MÀU, không đổi cách cắt cụm, nên
         # cả ba mức phải có cùng K mới so được với nhau.

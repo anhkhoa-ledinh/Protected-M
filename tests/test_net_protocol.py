@@ -109,3 +109,18 @@ def test_known_types_cover_every_task_message_name():
         "relocate", "tick", "end", "ping", "pong",
     }
     assert expected <= proto.KNOWN_TYPES
+
+
+def test_deeply_nested_json_is_a_protocol_error_not_a_crash():
+    from src.net import protocol
+    with pytest.raises(protocol.ProtocolError):
+        protocol.decode(b"[" * 100_000)
+
+
+def test_line_reader_cap_can_be_lowered_per_reader():
+    from src.net import protocol
+    reader = protocol.LineReader(max_bytes=100)
+    assert reader.feed(b'{"t":"a"}\n')[0]["t"] == "a"
+    with pytest.raises(protocol.ProtocolError):
+        reader.feed(b"x" * 200)
+    assert protocol.LineReader().max_bytes == protocol.MAX_MESSAGE_BYTES

@@ -20,23 +20,16 @@ import random
 import time
 from dataclasses import dataclass, field
 
-from src.game.pvp import ITEM_WEIGHT, LEVEL_TABLE, PVP_MODES
+from src.game.view import (ITEM_EFFECT_S, ITEM_WEIGHT, LEVEL_TABLE,  # noqa: F401
+                          PVP_MODES, PVP_UNLOCK_LEVELS, item_is_live, item_price)
+from src.ui_album.ids import (BOARD, LEVELS, LOADING, LOADING_READY, LOADOUT,  # noqa: F401
+                                LOSE, MENU, OFFLINE, PHOTOS, PLAY, PVP_FOUND,
+                                PVP_HIDE, PVP_HUNT, PVP_INVITE, PVP_MODE,
+                                PVP_RESULT, PVP_SEARCH, SETTINGS, SIGN_IN,
+                                SIGN_IN_ERR, SIGN_UP, TILT, WIN)
+from src.ui_album import ids as ID
 
 logger = logging.getLogger(__name__)
-
-SIGN_IN, SIGN_UP = "v3_01a_sign_in", "v3_01b_sign_up"
-SIGN_IN_ERR = "v3_01c_sign_in_error"
-MENU, SETTINGS = "v3_02a_menu", "v3_02b_settings"
-OFFLINE = "v3_02c_disconnected"
-LEVELS, PHOTOS = "v3_03_level_select", "v3_04_choose_photo"
-LOADING, LOADING_READY = "v3_07_loading", "v3_07_loading_ready"
-LOADOUT, TILT = "v3_05_loadout", "v3_06_head_tilt_check"
-PLAY = "v3_08_gameplay_hud"
-WIN, LOSE = "v3_09a_result_win", "v3_09b_result_lose"
-PVP_MODE, PVP_SEARCH = "v3_10_pvp_mode", "v3_11a_pvp_searching"
-PVP_INVITE, PVP_FOUND = "v3_11b_pvp_invite", "v3_11c_pvp_found"
-PVP_HUNT, PVP_HIDE = "v3_12a_pvp_hunter_hud", "v3_12b_pvp_bug_hud"
-PVP_RESULT, BOARD = "v3_13_pvp_result", "v3_14_leaderboard"
 
 #: Bí danh theo tên của ``flow.py``. ``app.py`` dùng CHUNG một bộ hàm cho cả
 #: hai giao diện (``self._album.flow.PIPE0``…); giữ đúng tên thuộc tính ở đây
@@ -51,8 +44,8 @@ PIPE100 = LOADING_READY
 BUG_THEME = "ngay"
 
 #: Tab trên cùng → màn. Chạy được ở **mọi** màn có bốn hotspot này.
-TABS = {"tab_Solo": LEVELS, "tab_PvP": PVP_MODE,
-        "tab_Leaderboard": BOARD, "tab_Settings": SETTINGS}
+TABS = {ID.TAB_SOLO: LEVELS, ID.TAB_PVP: PVP_MODE,
+        ID.TAB_LEADERBOARD: BOARD, ID.TAB_SETTINGS: SETTINGS}
 
 #: Màn không được rời bằng tab (chưa đăng nhập thì chưa có gì để xem).
 LOCKED = (SIGN_IN, SIGN_UP, SIGN_IN_ERR)
@@ -102,7 +95,7 @@ TILT_TIMEOUT_S = 15.0
 TILT_ANGLE_DEG = 8.0
 
 #: Bốn nút của màn chính, theo thứ tự ↑/↓ chạy qua.
-MENU_BUTTONS = ("btn_Solo", "btn_PvP", "btn_Leaderboard", "btn_Settings")
+MENU_BUTTONS = (ID.BTN_SOLO, ID.BTN_PVP, ID.BTN_LEADERBOARD, ID.BTN_SETTINGS)
 
 
 @dataclass
@@ -185,6 +178,11 @@ class V3Flow:
     #: TASK_shared_album_1111: đường dẫn ảnh đang chờ hộp xác nhận chia sẻ
     #: ("" = không hộp nào mở — chỉ việc này điều khiển ``_draw_confirm_dialog``).
     shared_album_pending: str = ""
+    #: Set by ``V3UI`` from its ``SharedAlbumService`` before it routes a click
+    #: or builds the values: the routes and values stay pure functions of state.
+    shared_can_upload: bool = False
+    shared_can_list: bool = False
+    shared_not_configured: str = ""
     #: Tập ảnh đã xác nhận ít nhất một lần (bấm "Share to album" lại với
     #: ảnh này thì khỏi hỏi lại — P2.3 "before the first upload of each photo").
     shared_album_confirmed: set = field(default_factory=set)
@@ -196,6 +194,12 @@ class V3Flow:
     #: chưa đăng nhập, ``"guest"`` = chơi khách. Khác ``player`` (tên hiển
     #: thị, cũng là nội dung ô "Username" trên màn đăng nhập/đăng ký).
     account_key: str = ""
+    #: Spendable points of the signed-in account; ``None`` for a guest or
+    #: nobody signed in (no wallet, items are free). Kept in step with the
+    #: account store by ``V3UI.sync_economy``.
+    wallet: int | None = None
+    earned_total: int = 0
+    levels_cleared: tuple = ()
     #: Ô nào trên màn đăng ký người dùng đã GÕ VÀO rồi — gợi ý lỗi chỉ hiện
     #: cho ô đã động tới (không doạ người mới vào màn với lỗi ngay lập tức).
     touched: set = field(default_factory=set)
@@ -248,6 +252,11 @@ class V3Flow:
     def weight_total(self) -> int:
         return sum(ITEM_WEIGHT.get(name, 0) for name in self.items)
 
+    def price_total(self, items=None) -> int:
+        """Points the equipped items (or ``items``) cost at match start."""
+        return sum(item_price(name)
+                   for name in (self.items if items is None else items))
+
     def go(self, screen: str) -> None:
         if screen != self.screen:
             logger.info("UI v3: %s -> %s", self.screen, screen)
@@ -283,31 +292,31 @@ class V3Flow:
 
 #: Ô nhập → tên thuộc tính giữ chuỗi của nó. Ba chuỗi RIÊNG: dùng chung một
 #: biến thì gõ ô này ô kia cũng đầy theo (lỗi người dùng gặp 06/11 23:01).
-FIELD_ATTR = {"field_user": "player", "field_pass": "password",
-              "field_pass2": "password2"}
+FIELD_ATTR = {ID.FIELD_USER: "player", ID.FIELD_PASS: "password",
+              ID.FIELD_PASS2: "password2"}
 
 #: TASK_accounts_1119: trần ký tự riêng từng ô — mật khẩu hợp lệ dài tới 64
 #: (``crypto.validate_password``), nên trần 24 cũ (dùng chung mọi ô) sẽ cắt
 #: mật khẩu dài mà người dùng không hề biết ("Raise the field cap so a
 #: password is never truncated silently").
-FIELD_MAXLEN = {"field_user": 32, "field_pass": 64, "field_pass2": 64}
+FIELD_MAXLEN = {ID.FIELD_USER: 32, ID.FIELD_PASS: 64, ID.FIELD_PASS2: 64}
 
 #: Thứ tự ô nhập khi bấm Tab.
-FIELD_ORDER = ("field_user", "field_pass", "field_pass2")
+FIELD_ORDER = (ID.FIELD_USER, ID.FIELD_PASS, ID.FIELD_PASS2)
 
 #: TASK_accounts_1119 Phase 6: the forgot-password dialog's own fields —
 #: declared here (next to ``FIELD_ATTR``) so ``field_value``/the caret
 #: helpers below can read both tables without a forward reference.
-FORGOT_FIELD_ATTR = {"field_forgot_user": "forgot_user",
-                     "field_forgot_code": "forgot_code",
-                     "field_forgot_pass": "forgot_new_pass",
-                     "field_forgot_pass2": "forgot_new_pass2"}
+FORGOT_FIELD_ATTR = {ID.FIELD_FORGOT_USER: "forgot_user",
+                     ID.FIELD_FORGOT_CODE: "forgot_code",
+                     ID.FIELD_FORGOT_PASS: "forgot_new_pass",
+                     ID.FIELD_FORGOT_PASS2: "forgot_new_pass2"}
 #: The code field gets slack for the dashes/spaces a user might type —
 #: normalised (stripped + upper-cased) only at submit time.
-FORGOT_FIELD_MAXLEN = {"field_forgot_user": 32, "field_forgot_code": 20,
-                       "field_forgot_pass": 64, "field_forgot_pass2": 64}
-FORGOT_FIELD_ORDER = ("field_forgot_user", "field_forgot_code",
-                      "field_forgot_pass", "field_forgot_pass2")
+FORGOT_FIELD_MAXLEN = {ID.FIELD_FORGOT_USER: 32, ID.FIELD_FORGOT_CODE: 20,
+                       ID.FIELD_FORGOT_PASS: 64, ID.FIELD_FORGOT_PASS2: 64}
+FORGOT_FIELD_ORDER = (ID.FIELD_FORGOT_USER, ID.FIELD_FORGOT_CODE,
+                      ID.FIELD_FORGOT_PASS, ID.FIELD_FORGOT_PASS2)
 
 
 def field_value(flow: V3Flow, name: str | None) -> str:
@@ -354,7 +363,7 @@ def _edit_delete(value: str, caret: int) -> tuple[str, int]:
 
 def type_char(flow: V3Flow, char: str) -> None:
     """Gõ một ký tự vào **đúng vị trí con trỏ** của ô đang chọn."""
-    if flow.focus == "field_join":
+    if flow.focus == ID.FIELD_JOIN:
         if char.isdigit() and len(flow.join_typed) < 4:
             flow.join_typed += char
         return
@@ -370,7 +379,7 @@ def type_char(flow: V3Flow, char: str) -> None:
 
 
 def backspace(flow: V3Flow) -> None:
-    if flow.focus == "field_join":
+    if flow.focus == ID.FIELD_JOIN:
         flow.join_typed = flow.join_typed[:-1]
         return
     attr = FIELD_ATTR.get(flow.focus or "")
@@ -526,14 +535,34 @@ def start_search(flow: V3Flow, now: float) -> None:
     flow.go(PVP_SEARCH)
 
 
+def pvp_lock_reason(flow: V3Flow) -> str | None:
+    """Why PvP is closed to this player, or ``None`` when it is open."""
+    if flow.wallet is None:                       # guest or nobody signed in
+        return "Sign in and win levels 1–5 to unlock PvP"
+    done = sum(1 for n in PVP_UNLOCK_LEVELS if n in flow.levels_cleared)
+    if done < len(PVP_UNLOCK_LEVELS):
+        return (f"Win levels 1–5 to unlock PvP — "
+                f"{done}/{len(PVP_UNLOCK_LEVELS)} done")
+    return None
+
+
 def toggle_item(flow: V3Flow, item: str) -> None:
-    """Gắn/bỏ một vật phẩm. Hết ô thì báo, không im lặng bỏ qua."""
+    """Gắn/bỏ một vật phẩm. Hết ô hoặc hết điểm thì báo, không im lặng bỏ qua."""
     if item in flow.items:
         flow.items.remove(item)
+        return
+    if not item_is_live(item):
+        say(flow, f"{item} is coming soon.")
         return
     if len(flow.items) >= flow.slots():
         say(flow, f"All {flow.slots()} item slots are full.")
         return
+    if flow.wallet is not None:
+        need = flow.price_total(flow.items + [item])
+        if need > flow.wallet:
+            say(flow, f"Not enough points: {item} costs {item_price(item)}, "
+                      f"you have {flow.wallet - flow.price_total()} left to spend.")
+            return
     flow.items.append(item)
 
 

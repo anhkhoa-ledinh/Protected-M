@@ -55,7 +55,7 @@ LAYER_METHODS = ("kmeans", "kmeans_vote")
 def prepare(path, estimator):
     """``(rgb, depth, img_ms, depth_ms)`` — phần KHÔNG phụ thuộc layer_method."""
     t0 = time.perf_counter()
-    rgb = ImageSource(path).tick(0.0)
+    rgb = ImageSource(import_photo(path)).tick(0.0)
     if rgb is None:
         raise ValueError("ImageSource tra ve None")
     img_ms = (time.perf_counter() - t0) * 1000.0

@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 
-from src.content.cv_io import imread_bgr
 import cv2
 import numpy as np
 import numpy.typing as npt
+
+from src.content import media_gate
+from src.content.media_gate import CleanPhoto
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +21,7 @@ logger = logging.getLogger(__name__)
 #: 180 MiB trong ``stage_layer_color``). Đổi lại, lớp xa mềm hơn với ảnh lớn hơn
 #: 2048: ảnh 5823×2700 ở D 450 còn 0,74 / 0,81 / 0,94 texel mỗi pixel màn ở
 #: L0 / L1 / L2 (trước khi chặn 2,1–2,7), vẫn hơn t22 (0,64 / 0,71).
-MAX_IMAGE_SIDE_PX = 2048
+MAX_IMAGE_SIDE_PX = media_gate.PIPELINE_MAX_SIDE_PX
 
 
 def _cap_size(image: npt.NDArray[np.uint8]) -> npt.NDArray[np.uint8]:
@@ -34,15 +35,21 @@ def _cap_size(image: npt.NDArray[np.uint8]) -> npt.NDArray[np.uint8]:
 
 
 class ImageSource:
-    """Load a single image and expose it as a static RGB frame stream."""
+    """Load a single image and expose it as a static RGB frame stream.
 
-    def __init__(self, path: Path) -> None:
+    Only a :class:`CleanPhoto` is accepted: the file already went through
+    ``media_gate.import_photo`` (checked, re-encoded, capped)."""
+
+    def __init__(self, photo: CleanPhoto) -> None:
+        if not isinstance(photo, CleanPhoto):
+            raise TypeError("ImageSource needs a CleanPhoto from media_gate.import_photo")
+        path = photo.path
         self._path = path
         self._rgb: npt.NDArray[np.uint8] | None = None
         self._width = 1
         self._height = 1
         self._aspect = 16.0 / 9.0
-        self._load(path)
+        self._load(photo)
 
     @property
     def aspect_ratio(self) -> float:
@@ -62,19 +69,14 @@ class ImageSource:
     def tick(self, _dt_s: float) -> npt.NDArray[np.uint8] | None:
         return self._rgb
 
-    def _load(self, path: Path) -> None:
+    def _load(self, photo: CleanPhoto) -> None:
+        path = photo.path
         if not path.exists():
             raise FileNotFoundError(f"Image not found: {path}")
-        bgr = imread_bgr(path)
-        if bgr is None:
-            raise ValueError(
-                f"Failed to decode image: {path.name} "
-                f"(file exists but OpenCV could not read it — "
-                f"try moving it to a simple ASCII path like D:\\Pictures\\photo.png)"
-            )
-        src_h, src_w = bgr.shape[:2]
-        # Chặn trên BGR, trước cvtColor: khỏi giữ thêm một bản RGB cỡ gốc.
-        self._rgb = cv2.cvtColor(_cap_size(bgr), cv2.COLOR_BGR2RGB)
+        rgb = media_gate.load_rgb(photo)
+        src_h, src_w = rgb.shape[:2]
+        # The gate already capped the long side; kept as a safety net.
+        self._rgb = _cap_size(rgb)
         self._height, self._width = self._rgb.shape[:2]
         if (src_w, src_h) != (self._width, self._height):
             logger.info(

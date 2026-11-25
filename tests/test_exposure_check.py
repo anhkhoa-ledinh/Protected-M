@@ -74,6 +74,10 @@ class _Manifest:
 
 class _UI:
     flow = F
+
+    @staticmethod
+    def charge_items(items):
+        return True
     manifest = _Manifest()
 
     def __init__(self) -> None:
@@ -91,6 +95,8 @@ class _Renderer:
 
     def layer_records(self):
         return []
+
+    current_clean_photo = None      # no photo on screen: camo is skipped
 
     def show_toast(self, text, is_error=False) -> None:
         self.toasts.append(text)

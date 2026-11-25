@@ -30,6 +30,7 @@ class _FakeAlbum:
         self.state = F.V3Flow()
         self.state.screen = screen
         self.hud_toggled = 0
+        self.game = None                 # the real V3UI always has one
 
     def toggle_hud_hidden(self) -> bool:
         self.hud_toggled += 1

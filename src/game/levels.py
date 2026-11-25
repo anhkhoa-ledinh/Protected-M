@@ -86,9 +86,9 @@ PVP_WEAPONS_SPEC = {**WEAPONS_SPEC, "Heavy-mag gun": WeaponSpec(50, 0.18, 2.5)}
 #: Base damage, headshot factor, armour pierce (1.00 / 0.85 / 0.70, in the
 #: order the loadout screen lists the guns: Sniper, Shotgun, Heavy-mag).
 WEAPON_DAMAGE = {
-    "Precision gun": DamageSpec(100.0, 2.0, 1.00),
-    "Spread gun": DamageSpec(25.0, 1.0, 0.85),
-    "Heavy-mag gun": DamageSpec(34.0, 1.5, 0.70),
+    "Precision gun": DamageSpec(150.0, 2.0, 1.00),
+    "Spread gun": DamageSpec(37.5, 1.0, 0.85),
+    "Heavy-mag gun": DamageSpec(51.0, 1.5, 0.70),
 }
 
 

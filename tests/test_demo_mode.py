@@ -95,7 +95,7 @@ class DemoConfigTest(unittest.TestCase):
         app._album_options = AlbumOptions(enabled=album_enabled)
         app._content = app._load_content(root)
         app._renderer = SimpleNamespace(
-            load_content_file=lambda p: (True, f"Loaded: {p.name}"),
+            load_content_file=lambda p, label=None: (True, f"Loaded: {label}"),
             show_toast=lambda *a, **k: None, set_props=lambda items: None,
             # FR-DEPTH-03: _try_load_media hỏi thông báo chờ sau mỗi lần nạp.
             take_content_notice=lambda: None)

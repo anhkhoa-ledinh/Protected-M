@@ -10,6 +10,7 @@ import cv2
 import numpy as np
 
 from src.content.image_source import ImageSource
+from src.content.media_gate import import_photo
 
 
 class ImageSizeCapTest(unittest.TestCase):
@@ -24,7 +25,9 @@ class ImageSizeCapTest(unittest.TestCase):
             big, small = Path(tmp) / "big.png", Path(tmp) / "small.png"
             cv2.imwrite(str(big), np.zeros((2700, 5823, 3), np.uint8))
             cv2.imwrite(str(small), np.zeros((900, 1200, 3), np.uint8))
-            capped, demo = ImageSource(big), ImageSource(small)
+            cache = Path(tmp) / "clean"
+            capped = ImageSource(import_photo(big, cache))
+            demo = ImageSource(import_photo(small, cache))
         self.assertEqual((capped.width, capped.height), (2048, 950))
         self.assertEqual(capped.tick(0.0).shape, (950, 2048, 3))
         self.assertAlmostEqual(capped.aspect_ratio, 5823 / 2700, delta=0.01)

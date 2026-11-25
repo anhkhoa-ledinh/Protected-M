@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from src.account import crypto as account_crypto
+from src.shared import account_rules
 from src.account import store as account_store
 from src.ui_album import v3_flow as F
 from src.ui_album import v3_routes
@@ -237,6 +237,9 @@ def ui(gl_context, monkeypatch, tmp_path):
     ``tests/test_account_session.py``'s ``isolated_accounts`` fixture."""
     monkeypatch.setenv("HCPD_NO_FX", "1")
     from src.ui_album.options import AlbumOptions
+    from src.account.service import LocalAccountService
+    from src.services.prefs_service import LocalPrefsService
+    from src.services.shared_album_service import LocalSharedAlbumService
     from src.ui_album.v3_ui import V3UI
 
     monkeypatch.setattr(account_store, "accounts_path",
@@ -244,7 +247,10 @@ def ui(gl_context, monkeypatch, tmp_path):
     monkeypatch.setattr(account_store, "session_path",
                         lambda root: tmp_path / "assets" / "config" / "session.json")
     options = AlbumOptions(enabled=True, ui="v3")
-    instance = V3UI(ROOT, ROOT / "assets" / "shaders", options)
+    instance = V3UI(ROOT, ROOT / "assets" / "shaders", options,
+                    accounts=LocalAccountService(__import__("tempfile").mkdtemp(prefix="hcpd_acc_")),
+                    shared_album=LocalSharedAlbumService(),
+                    prefs=LocalPrefsService(ROOT))
     yield instance
     instance.release()
 
@@ -439,8 +445,8 @@ def test_five_wrong_codes_trigger_the_cooldown(ui):
         _wait_until_not_busy(ui)
     assert "Too many tries" in ui.state.forgot_error
 
-    key = account_crypto.username_key("CooldownUser1")
-    assert ui._account_throttle.cooldown_remaining(key, time.perf_counter()) > 0.0
+    key = account_rules.username_key("CooldownUser1")
+    assert ui._accounts._throttle.cooldown_remaining(key, time.perf_counter()) > 0.0
 
 
 def test_cooldown_is_shared_between_sign_in_and_forgot_attempts(ui):
@@ -463,8 +469,8 @@ def test_cooldown_is_shared_between_sign_in_and_forgot_attempts(ui):
     _wait_until_not_busy(ui)
     assert "Too many tries" in ui.state.forgot_error
 
-    key = account_crypto.username_key("SharedThrotUser1")
-    assert ui._account_throttle.cooldown_remaining(key, time.perf_counter()) > 0.0
+    key = account_rules.username_key("SharedThrotUser1")
+    assert ui._accounts._throttle.cooldown_remaining(key, time.perf_counter()) > 0.0
 
 
 def test_a_successful_reset_resets_the_shared_throttle(ui):
@@ -484,8 +490,8 @@ def test_a_successful_reset_resets_the_shared_throttle(ui):
     _wait_until_not_busy(ui)
     assert ui.state.forgot_open is False   # the correct code still worked
 
-    key = account_crypto.username_key("ThrotResetUser1")
-    assert ui._account_throttle.cooldown_remaining(key, time.perf_counter()) == 0.0
+    key = account_rules.username_key("ThrotResetUser1")
+    assert ui._accounts._throttle.cooldown_remaining(key, time.perf_counter()) == 0.0
 
 
 def test_cooldown_check_happens_before_any_hashing_no_thread_started(ui, monkeypatch):
@@ -494,7 +500,7 @@ def test_cooldown_check_happens_before_any_hashing_no_thread_started(ui, monkeyp
     synchronous check in memory, same as ``sign_in_submit``."""
     import threading
 
-    import src.ui_album.v3_ui as v3_ui_module
+    import src.ui_album.v3_account as v3_ui_module  # the account jobs live here now
 
     code = _sign_up(ui, "NoThreadUser1")
     wrong_code = "Z" * 12 if code.replace("-", "") != "Z" * 12 else "Y" * 12

@@ -93,6 +93,8 @@ class SceneRenderer:
         #: album), gọi sau pass cảnh và TRƯỚC các lớp — đúng chỗ của quả cầu
         #: cũ, nên cơ chế lớp-che-bọ không đổi.
         self.extra_scene_draw = None
+        #: drawn after the photo layers, depth test off (the thermal marks)
+        self.post_layer_draw = None
         # Chẩn đoán C2, tắt mặc định: HCPD_PROP_PROBE=1 in state depth thật.
         self._probe = os.environ.get("HCPD_PROP_PROBE") == "1"
         self._probe_logged = 0
@@ -301,13 +303,20 @@ class SceneRenderer:
 
         return ContentPlaneRenderer.DEPTH_STEP_M
 
-    def load_content_file(self, path: Path) -> tuple[bool, str]:
-        """Hot-swap the content plane media without restarting."""
+    def load_content_file(self, path, *, label: str | None = None) -> tuple[bool, str]:
+        """Hot-swap the content plane media without restarting. ``path`` is a
+        ``Path`` or an already checked ``media_gate.CleanPhoto``."""
         if self._project_root is None or self._content is None:
             return False, "Content system not initialized"
         self._ensure_content_plane()
         assert self._video_plane is not None
-        return self._video_plane.load_file(path)
+        return self._video_plane.load_file(path, label=label)
+
+    @property
+    def current_clean_photo(self):
+        """``media_gate.CleanPhoto`` on screen now (``None``: a video or none)."""
+        plane = self._video_plane
+        return None if plane is None else plane.clean_photo
 
     def _ensure_content_plane(self) -> None:
         if self._video_plane is not None:
@@ -409,6 +418,10 @@ class SceneRenderer:
                 self._video_plane.draw(view_flat, proj_flat)
         if probe:
             self._log_depth_state("sau layer")
+        if self.post_layer_draw is not None:
+            with stage("bugs_heat"):
+                self.post_layer_draw(view_flat, proj_flat)
+            self._shader.use()
 
         self._debug.begin_frame()
         if self._debug.visible:

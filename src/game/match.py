@@ -14,6 +14,8 @@ import random
 import time
 from dataclasses import dataclass, field
 
+from src.game.pvp import ITEM_EFFECT_S
+from src.game.scoring import OVERTIME_MAX_S, OVERTIME_PENALTY, match_score  # noqa: F401
 from src.game.levels import (LEVELS, WEAPON_DAMAGE, WEAPONS_SPEC, DamageSpec,
                              WeaponSpec, hit_damage)
 
@@ -27,9 +29,9 @@ ITEM_WEIGHT = {"Pháo sáng": 3, "Thuốc giải": 5, "Khiên axit": 4,
               "Kính lọc": 4, "La bàn": 2, "Máy quét nhiệt": 8,
               "Nước tăng lực": 3, "Bom khói": 6}
 
-#: Quá giờ ở cấp Châu Á: −5 điểm mỗi giây, thua sau ngần này giây.
-OVERTIME_MAX_S = 30.0
-OVERTIME_PENALTY = 5.0
+# Quá giờ ở cấp Châu Á: −5 điểm mỗi giây, thua sau ngần này giây —
+# ``OVERTIME_MAX_S`` / ``OVERTIME_PENALTY`` come from ``scoring`` (the server
+# uses the same numbers).
 
 
 #: Ba khẩu khác nhau ở cả ba con số, đúng lời mô tả in trên màn trang bị:
@@ -144,6 +146,8 @@ class AlbumMatch:
     mag_size: int = 10
     rounds_left: int = -1
     reload_until_s: float = 0.0
+    #: item name -> time its effect ends (see ``use_item``)
+    item_until_s: dict = field(default_factory=dict)
     #: Nhịp bắn: giây tối thiểu giữa hai phát. 0 = bắn nhanh tuỳ tay.
     fire_interval_s: float = 0.0
     reload_s: float = RELOAD_S
@@ -279,10 +283,45 @@ class AlbumMatch:
             self.reload_until_s = now + self.reload_s
         return True
 
+    def view(self, now: float):
+        """The frozen snapshot the UI reads (``src.game.view.MatchView``)."""
+        from src.game.view import build_match_view
+
+        return build_match_view(self, now)
+
     def tick_reload(self, now: float) -> None:
         if self.reload_until_s and now >= self.reload_until_s:
             self.reload_until_s = 0.0
             self.rounds_left = int(self.mag_size)
+            logger.info("Reload end: %d/%d", self.rounds_left, self.mag_size)
+
+    def use_item(self, item: str, now: float) -> bool:
+        """Use an equipped item once: its effect runs for ``ITEM_EFFECT_S[item]``
+        seconds and ``used`` counts it (the score formula and the server read
+        ``used``). ``False`` = not equipped, not a working item, or spent."""
+        seconds = ITEM_EFFECT_S.get(item)
+        if seconds is None or item not in self.items or self.used.get(item, 0) >= 1 \
+                or self.ended:
+            return False
+        self.used[item] = self.used.get(item, 0) + 1
+        self.item_until_s[item] = now + seconds
+        logger.info("Item used: %s for %.1f s (used=%s)", item, seconds, self.used)
+        return True
+
+    def item_active(self, item: str, now: float) -> bool:
+        return now < self.item_until_s.get(item, 0.0)
+
+    def start_reload(self, now: float) -> bool:
+        """Reload on request (the R key): only when the magazine is not full
+        and no reload is running. Takes the gun's normal ``reload_s`` and
+        fills the magazine, same as the automatic reload on an empty one."""
+        self.tick_reload(now)
+        if self.reloading(now) or self.rounds_left >= self.mag_size:
+            return False
+        self.reload_until_s = now + self.reload_s
+        logger.info("Reload start: %d/%d, %.1f s", max(0, self.rounds_left),
+                    self.mag_size, self.reload_s)
+        return True
 
     @property
     def seconds(self) -> float:
@@ -317,14 +356,13 @@ class AlbumMatch:
         return 100.0 * left * min(1.0, self.elapsed_s / max(1.0, self.seconds))
 
     def score(self) -> int:
-        """Điểm = giây còn lại − Σ(trọng số vật phẩm × số lần dùng)."""
-        table = self.weights or ITEM_WEIGHT
-        spent = sum(table.get(name, 0) * count
-                    for name, count in self.used.items())
-        base = max(0.0, self.time_left_s) - spent
-        if self.level == 5:
-            base -= OVERTIME_PENALTY * self.overtime_s
-        return int(round(base))
+        """Match score: ``max(0, seconds left x level - sum(weight x uses))``.
+
+        A lost match scores 0. Level 5 keeps its overtime penalty inside the
+        same ``max(0, ...)``.
+        """
+        return match_score(self.level, self.ended == "lose", self.time_left_s,
+                           self.used, self.weights or ITEM_WEIGHT)
 
     def tick(self, head_ok: bool, layer_label: str = "") -> str:
         """Nhịp mỗi khung; trả ``""``/``"win"``/``"lose"``."""

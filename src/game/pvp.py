@@ -25,4 +25,25 @@ ITEM_WEIGHT = {"Flare": 3, "Antidote": 5, "Acid shield": 4, "Filter lens": 4,
               "Compass": 2, "Thermal scan": 8, "Energy drink": 3,
               "Smoke bomb": 6}
 
+#: An item costs ``weight x ITEM_PRICE_PER_WEIGHT`` points, paid from the
+#: account wallet when a match starts with it equipped.
+ITEM_PRICE_PER_WEIGHT = 10
+
+
+def item_price(item: str) -> int:
+    return ITEM_WEIGHT.get(item, 0) * ITEM_PRICE_PER_WEIGHT
+
+
+#: The items that really work, and for how many seconds one use lasts: the one
+#: table. Every other item in ``ITEM_WEIGHT`` is "Coming soon": shown on the
+#: loadout, never equippable, never charged.
+ITEM_EFFECT_S = {"Flare": 8.0, "Thermal scan": 6.0}
+
+
+def item_is_live(item: str) -> bool:
+    return item in ITEM_EFFECT_S
+
 PVP_MODES = ("Competitive", "Hunt & Hide")
+
+#: PvP opens once every solo level has been won at least once.
+PVP_UNLOCK_LEVELS = (1, 2, 3, 4, 5)

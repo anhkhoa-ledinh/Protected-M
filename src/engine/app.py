@@ -35,7 +35,7 @@ from src.content.prop_game import (
 )
 from src.content.prop_probe import probe_at, probe_props
 from src.content.prop_rest_eye import REST_MEASURE_S, rest_eye, spread_mm, z_rest_mm
-from src.content import shared_album
+from src.content import media_gate, shared_album
 from src.content.shared_album_worker import SharedAlbumWorker, PENDING as SHARE_PENDING
 from src.config.schema import AppConfig, ContentSettings, UiSettings, _merge_dataclass
 from src.gui.file_dialog import pick_media_file
@@ -51,6 +51,7 @@ from src.renderer.webcam_preview import WebcamPreviewSettings
 from src.scene import build_room_scene
 from src.scene.window_box import build_scene_for
 from src.ui_album.options import AlbumOptions
+from src.ui_album import ids as ID
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +74,8 @@ HOOK_ENV_VARS = (
     "HCPD_UI_SHOTS_1117", "HCPD_AA_BASELINE_1118", "HCPD_V3_LIVE",
     "HCPD_PERF_PROFILE", "HCPD_PVP_AUTO", "HCPD_PVP_SHOTS",
     "HCPD_PROP_PROBE", "HCPD_VIDEO_STATS", "HCPD_HUD_FIX_1119_SHOTS",
-    "HCPD_ALBUM_AUTOWIN", "HCPD_BUG_SEED",
+    "HCPD_ALBUM_AUTOWIN", "HCPD_BUG_SEED", "HCPD_ECONOMY_1124",
+    "HCPD_HARDENING_1124_SHOTS", "HCPD_BAD_PHOTO_1124", "HCPD_CENTRAL_CONFIG", "HCPD_DISPLAY_MODE", "HCPD_RELOAD_1124",
 )
 
 #: Bug-placement seed an automatch run uses unless ``HCPD_BUG_SEED`` says
@@ -240,6 +242,10 @@ class HcpdApplication:
         from src.config import prefs as _prefs
 
         self._prefs = _prefs.load(project_root)
+        # Dev hook: a scripted run may force the windowed mode (the pin tool
+        # then sets the geometry), whatever the user's own prefs say.
+        if os.environ.get("HCPD_DISPLAY_MODE") == "window":
+            self._prefs = {**self._prefs, "display": "window"}
         self._window = GlfwWindow(config.renderer, demo=self._demo,
                                   album=self._album_options.enabled,
                                   ui_v3=self._album_options.is_v3,
@@ -437,7 +443,15 @@ class HcpdApplication:
                 self._screen_cal["screen_height"])
         return build_room_scene()
 
-    def _try_load_media(self, path: Path, now: float) -> None:
+    def _load_error(self, text: str) -> None:
+        """A photo that could not be opened: the toast of the 3D pass, plus the
+        album's own message line (the toast alone is not visible in v3)."""
+        self._renderer.show_toast(text, is_error=True)
+        album = self._album
+        if album is not None and self._album_options.is_v3:
+            album.flow.say(album.state, text, 5.0)
+
+    def _try_load_media(self, path: Path, now: float, *, clean=None) -> None:
         """
         Load image/video via picker or drag-drop; persist on success.
 
@@ -445,15 +459,18 @@ class HcpdApplication:
         vòng lặp — để số giây của ván bị bỏ dở không gồm thời gian chọn file.
         """
         if not path.exists():
-            self._renderer.show_toast(f"File not found: {path.name}", is_error=True)
+            self._load_error(f"File not found: {path.name}")
             return
         if not is_supported_media(path):
-            self._renderer.show_toast("Unsupported file type", is_error=True)
+            self._load_error("Unsupported file type")
             return
 
-        ok, msg = self._renderer.load_content_file(path)
+        # An image goes through ``media_gate`` inside ``load_content_file``
+        # (``clean``: the caller already did it, e.g. for a PvP photo).
+        ok, msg = self._renderer.load_content_file(
+            clean if clean is not None else path, label=path.name)
         if not ok:
-            self._renderer.show_toast(msg, is_error=True)
+            self._load_error(msg)
             return
 
         kind = detect_content_type(path) or "video"
@@ -474,15 +491,40 @@ class HcpdApplication:
         notice = self._renderer.take_content_notice()
         self._renderer.show_toast(msg if notice is None else f"{msg} — {notice}")
 
+    def _use_item_slot(self, number: int, now: float) -> None:
+        """Number key N in a match = use the item in slot N (once per match)."""
+        match = self._album.game
+        index = number - 1
+        if match is None or not 0 <= index < len(match.items):
+            return
+        item = match.items[index]
+        if match.use_item(item, now):
+            self._album.flow.say(self._album.state, f"{item} on")
+        else:
+            logger.info("Item %s not used (spent, not working, or match over)", item)
+
     def _draw_album_bugs(self, view_flat, proj_flat) -> None:
         """Vẽ bọ của ván đang chơi (F3). Không có ván thì không vẽ gì."""
         if self._game is None or not self._game.props:
             return
         if self._bugs is None:
             return
+        match = self._album.game
+        now = time.perf_counter()
         self._bugs.draw(view_flat, proj_flat, self._game.props,
                         self._game.found, self._album.state.level,
-                        self._album.bug_theme)
+                        self._album.bug_theme,
+                        flare=match is not None and match.item_active("Flare", now))
+
+    def _draw_album_heat(self, view_flat, proj_flat) -> None:
+        """Thermal scan marks, after the photo layers (see ``BugPainter.draw_heat``)."""
+        match = self._album.game
+        if (self._game is None or not self._game.props or self._bugs is None
+                or match is None
+                or not match.item_active("Thermal scan", time.perf_counter())):
+            return
+        self._bugs.draw_heat(view_flat, proj_flat, self._game.props,
+                             self._album.state.level)
 
     def _tick_album(self, input_state, now: float) -> None:
         """
@@ -499,7 +541,9 @@ class HcpdApplication:
         # ``evidence_1118`` right below — ``_build_hud_fix_1119_steps``
         # also drives its own fixed ``album.mouse`` per step.
         hud_fix_1119_shots = self._devtools.env("HCPD_HUD_FIX_1119_SHOTS") == "1"
-        if not sakuga_shots and not scope_bench and not evidence_1118 and not hud_fix_1119_shots:
+        hardening_1124_shots = self._devtools.env("HCPD_HARDENING_1124_SHOTS") == "1"
+        if (not sakuga_shots and not scope_bench and not evidence_1118
+                and not hud_fix_1119_shots and not hardening_1124_shots):
             # TASK_ui_sakuga_1117: lượt chụp 20 ảnh tự đặt ``album.mouse``
             # cho từng bước (hover_*/press_*) — con trỏ OS thật ghi đè lên
             # đúng mỗi khung thì KHÔNG BAO GIỜ thấy hover, bất kể bước nào
@@ -723,16 +767,30 @@ class HcpdApplication:
         if input_state.focus_down:
             album.move_focus(1)
         if input_state.replay:
+            logger.info("Key R: screen=%s match=%s", state.screen,
+                        album.game is not None)
             if state.screen in (album.flow.WIN, album.flow.LOSE):
                 state.go(album.flow.TILT)
+            elif (state.screen in (album.flow.PLAY, album.flow.PVP_HUNT)
+                  and album.game is not None):
+                # Reload to a full magazine at any time (solo and PvP hunter).
+                # No text field exists on these screens, so a stale menu focus
+                # must not swallow the key.
+                if not album.game.start_reload(now):
+                    logger.info("R ignored: %d/%d rounds, reloading=%s",
+                                album.game.rounds_left, album.game.mag_size,
+                                album.game.reloading(now))
             elif state.screen == album.flow.PHOTOS:
                 # TASK_shared_album_1111 P3: cung phim R, nghia khac theo man —
                 # y het Enter (album.submit()) da doi nghia theo man tu truoc.
-                self._album_action(album.activate("btn_Random from album"), now)
+                self._album_action(album.activate(ID.BTN_RANDOM_FROM_ALBUM), now)
         if input_state.item_slot and not self._v3_field_focused():
             state.slot_selected = int(input_state.item_slot)
+            if (state.screen in (album.flow.PLAY, album.flow.PVP_HUNT)
+                    and album.game is not None):
+                self._use_item_slot(int(input_state.item_slot), now)
         if input_state.share_to_album and state.screen == album.flow.PHOTOS:
-            self._album_action(album.activate("btn_Share to album"), now)
+            self._album_action(album.activate(ID.BTN_SHARE_TO_ALBUM), now)
         if (input_state.hud_hide_toggle and not self._v3_field_focused()
                 and state.screen in (album.flow.PLAY, album.flow.PVP_HUNT,
                                      album.flow.PVP_HIDE)):
@@ -765,7 +823,7 @@ class HcpdApplication:
         # không đọc được qua danh sách cú bấm.
         if (state.screen == album.flow.SETTINGS
                 and self._window.is_mouse_down()
-                and album.hover() == "slider"):
+                and album.hover() == ID.SLIDER):
             self._album_action(album.click(), now)
         # Màn thử nghiêng cần góc đầu thật để chấm hai dấu trái/phải.
         if state.screen == album.flow.TILT and not self._v3_live:
@@ -964,15 +1022,15 @@ class HcpdApplication:
         lạ) trả ``None`` và ``assign_bug_camo`` bị bỏ qua — con bọ khi đó vẽ
         không nguỵ trang, không phải lỗi chết ván.
         """
-        from src.content.cv_io import imread_bgr
+        from src.content import media_gate
 
+        photo = self._renderer.current_clean_photo
+        if photo is None:
+            return None
         try:
-            bgr = imread_bgr(Path(self._content.content_path))
+            return media_gate.load_rgb(photo)
         except (OSError, ValueError):
             return None
-        if bgr is None:
-            return None
-        return bgr[..., ::-1]
 
     def _aim_context(self):
         """
@@ -1197,70 +1255,83 @@ class HcpdApplication:
             camera.scope_active = False
 
     def _album_action(self, action: str, now: float) -> None:
-        """Thực hiện một hành động mà giao diện album yêu cầu."""
-        F = self._album.flow
+        """Run an action the album UI asks for: the UI's own ``dispatch``
+        forwards it to the handler registered below (or to its account
+        controller)."""
+        self._album.dispatch(action, now)
 
+    def _register_album_actions(self) -> None:
+        """B5: the callbacks ``V3UI.dispatch`` forwards to. Each one is the
+        body of one branch of the old ``_album_action`` if-chain, unchanged."""
+        album = self._album
+        album.register_handler("pick_file", self._act_pick_file)
+        album.register_handler("start_pipeline", self._act_start_pipeline)
+        album.register_handler("rest_eye", lambda action, now: self._begin_rest_measure(now))
+        album.register_handler("start_game", lambda action, now: self._start_album_match(now))
+        album.register_handler("next_level", self._act_next_level)
+        album.register_handler("logout", self._act_logout)
+        album.register_handler("copy_code", self._act_copy_code)
+        album.register_handler("share_confirmed", self._act_share_confirmed)
+        album.register_handler("random_from_album", lambda action, now: self._start_random_photo())
+        for mode_action in (ID.DISPLAY_FULL, ID.DISPLAY_WINDOW):
+            album.register_handler(mode_action, self._act_display_mode)
+        album.register_prefix_handler("pvp_", self._pvp_action)
+
+    def _act_pick_file(self, action: str, now: float) -> None:
         state = self._album.state
-        if action == "pick_file":
-            picked = pick_media_file()
-            # Hộp thoại vừa đóng: cửa sổ game đang bị thu nhỏ, kéo nó về NGAY
-            # (kể cả khi người dùng bấm Huỷ) rồi mới làm gì tiếp.
-            self._window.restore_and_focus()
-            if picked is not None:
-                state.photo = picked
-                if picked not in state.recent:
-                    state.recent.insert(0, picked)
-                    del state.recent[4:]
-                # Chọn xong là chạy luôn bước tách lớp: trước đây app đứng
-                # yên ở màn chọn ảnh, người dùng tưởng nó không nhận ảnh.
-                self._album_action("start_pipeline", now)
-        elif action == "start_pipeline":
-            if state.photo is None:
-                state.photo = self._content.resolved_media_path(self._root)
-            self._try_load_media(Path(state.photo), now)
-            state.pipeline_pct = 0.0
-            self._album_pipeline_started_s = now
-            state.go(F.PIPE0)
-        elif action == "rest_eye":
-            self._begin_rest_measure(now)
-        elif action == "start_game":
-            self._start_album_match(now)
-        elif action == "next_level":
-            state.level = min(5, state.level + 1)
-            state.go(F.LOADOUT)
-        elif action == "logout":
-            # TASK_accounts_1119 Phase 4: a "remember me" session (if any)
-            # must not outlive a deliberate sign-out.
-            if self._album_options.is_v3:
-                self._album.sign_out()
-            state.player = state.password = state.password2 = ""
-            state.account_key = ""
-            state.focus = None
-            state.go(F.SIGN_IN if hasattr(F, "SIGN_IN") else F.LOGIN)
-        elif action == "copy_code":
-            self._window.set_clipboard(f"PM-{state.room_code[:4] or '0000'}")
-            F.say(state, "Code copied")
-        elif action == "share_confirmed":
-            path = state.shared_album_upload_path
-            state.shared_album_upload_path = ""
-            self._start_share_upload(path)
-        elif action == "random_from_album":
-            self._start_random_photo()
-        elif action in ("display_full", "display_window"):
-            mode = "fullscreen" if action == "display_full" else "window"
-            if self._window.set_display_mode(mode):
-                self._apply_display_mode(mode)
-        elif action.startswith("pvp_"):
-            self._pvp_action(action, now)
-        elif action == "account_sign_in":
-            self._album.sign_in_submit()
-        elif action == "account_sign_up":
-            self._album.sign_up_submit()
-        elif action == "account_forgot_submit":
-            self._album.forgot_submit()
-        elif action == "account_copy_recovery_code":
-            self._album.copy_recovery_code()
-            F.say(state, "Code copied")
+        picked = pick_media_file()
+        # Hộp thoại vừa đóng: cửa sổ game đang bị thu nhỏ, kéo nó về NGAY
+        # (kể cả khi người dùng bấm Huỷ) rồi mới làm gì tiếp.
+        self._window.restore_and_focus()
+        if picked is not None:
+            state.photo = picked
+            if picked not in state.recent:
+                state.recent.insert(0, picked)
+                del state.recent[4:]
+            # Chọn xong là chạy luôn bước tách lớp: trước đây app đứng
+            # yên ở màn chọn ảnh, người dùng tưởng nó không nhận ảnh.
+            self._album_action("start_pipeline", now)
+
+    def _act_start_pipeline(self, action: str, now: float) -> None:
+        state = self._album.state
+        if state.photo is None:
+            state.photo = self._content.resolved_media_path(self._root)
+        self._try_load_media(Path(state.photo), now)
+        state.pipeline_pct = 0.0
+        self._album_pipeline_started_s = now
+        state.go(self._album.flow.PIPE0)
+
+    def _act_next_level(self, action: str, now: float) -> None:
+        state = self._album.state
+        state.level = min(5, state.level + 1)
+        state.go(self._album.flow.LOADOUT)
+
+    def _act_logout(self, action: str, now: float) -> None:
+        # TASK_accounts_1119 Phase 4: a "remember me" session (if any)
+        # must not outlive a deliberate sign-out.
+        F, state = self._album.flow, self._album.state
+        self._album.sign_out()
+        state.player = state.password = state.password2 = ""
+        state.account_key = ""
+        self._album.sync_economy()
+        state.focus = None
+        state.go(F.SIGN_IN)
+
+    def _act_copy_code(self, action: str, now: float) -> None:
+        state = self._album.state
+        self._window.set_clipboard(f"PM-{state.room_code[:4] or '0000'}")
+        self._album.flow.say(state, "Code copied")
+
+    def _act_share_confirmed(self, action: str, now: float) -> None:
+        state = self._album.state
+        path = state.shared_album_upload_path
+        state.shared_album_upload_path = ""
+        self._start_share_upload(path)
+
+    def _act_display_mode(self, action: str, now: float) -> None:
+        mode = "fullscreen" if action == ID.DISPLAY_FULL else "window"
+        if self._window.set_display_mode(mode):
+            self._apply_display_mode(mode)
 
     def _tick_album_match(self, now: float) -> None:
         """Nhịp của màn tách lớp và của ván đang chơi."""
@@ -1321,9 +1392,24 @@ class HcpdApplication:
                 # TASK_accounts_1119 Phase 5: save right after a match
                 # result (a signed-in account) or the one-time guest
                 # toast (never saved) — see V3UI.note_match_finished.
-                self._album.note_match_finished()
+                final = self._album.note_match_finished(
+                    won=(ended == "win"), level=match.level,
+                    score=match.score(), used=dict(match.used))
+                if self._album.match_verdict:
+                    state.last_result["rejected"] = self._album.match_verdict
+                if final != state.last_result["score"]:
+                    # The central server scores with its own clock.
+                    state.last_result["score"] = final
+                    if state.photo is not None:
+                        state.history[str(state.photo)]["score"] = final
             state.go(F.WIN if ended == "win" else F.LOSE)
             self._album.game = None
+
+    def _central_config_path(self) -> Path:
+        """``assets/config/central.json`` (absent = play locally);
+        ``HCPD_CENTRAL_CONFIG`` points a scripted run at another file."""
+        override = self._devtools.env("HCPD_CENTRAL_CONFIG").strip()
+        return Path(override) if override else self._root / "assets" / "config" / "central.json"
 
     # ---- TASK_pvp_lan_1116: PvP over LAN --------------------------------
     # Network I/O itself never runs here — ``PvpClient`` owns a background
@@ -1579,8 +1665,15 @@ class HcpdApplication:
         cache_dir.mkdir(parents=True, exist_ok=True)
         path = cache_dir / f"{local_sha1}.jpg"
         path.write_bytes(data)
+        # The other player's file is only ever loaded as a clean copy.
+        try:
+            clean = media_gate.import_photo(path, allowed_root=cache_dir)
+        except media_gate.PhotoRejected as exc:
+            path.unlink(missing_ok=True)
+            self._album.flow.say(state, str(exc))
+            return
         state.photo = path
-        self._try_load_media(path, now)
+        self._try_load_media(path, now, clean=clean)
         self._pvp_photo_ready = True
 
     def _pvp_lobby_message(self) -> str:
@@ -1739,7 +1832,11 @@ class HcpdApplication:
         if self._bugs is not None:
             self._bugs.reset()
         weapon = state.weapon_name() or F.WEAPONS[0]
-        match = start_match(state.level, self._game, weapon, list(state.items),
+        items = list(state.items)
+        if not self._album.charge_items(items, state.mode):
+            F.say(state, "Not enough points for these items — going in without.")
+            items = []
+        match = start_match(state.level, self._game, weapon, items,
                             F.ITEM_WEIGHT)
         match.layer_total = len(self._renderer.layer_records())
         spec = WEAPONS_SPEC.get(weapon, DEFAULT_SPEC)
@@ -1940,6 +2037,11 @@ class HcpdApplication:
             # nếu không ``score()`` tra bảng tiếng Việt và ra 0 cho mọi món.
             weapon = state.weapon_name() or F.WEAPONS[0]
             items = list(state.items)
+            # Items are paid for when the match starts (points economy).
+            if not self._album.charge_items(items):
+                F.say(state, "Not enough points for these items.")
+                state.go(F.LOADOUT)
+                return
         else:
             weapon = (f"Sung {state.weapon}" if state.weapon is not None
                       else "Sung")
@@ -2421,19 +2523,47 @@ class HcpdApplication:
                     # this machine's account/session state happens to be.
                     import tempfile
 
-                    from src.account import store as account_store
+                    # TASK_economy_1124: a run may reuse ONE temp dir (restart
+                    # test) and start from a copy of a fixture accounts file.
+                    # Never a dir under the repo's own assets/config.
+                    keep = self._devtools.env("HCPD_ECONOMY_DIR").strip()
+                    if keep and (Path(keep).resolve() / "x").is_relative_to(
+                            (self._root / "assets" / "config").resolve()):
+                        raise SystemExit("HCPD_ECONOMY_DIR must not be assets/config")
+                    if keep:
+                        tmp_dir = Path(keep)
+                        tmp_dir.mkdir(parents=True, exist_ok=True)
+                    else:
+                        tmp_dir = Path(tempfile.mkdtemp(prefix="hcpd_scripted_run_"))
+                    seed = self._devtools.env("HCPD_ECONOMY_SEED").strip()
+                    target = tmp_dir / "assets" / "config" / "accounts.json"
+                    if seed and not target.exists():
+                        import shutil
 
-                    tmp_dir = Path(tempfile.mkdtemp(prefix="hcpd_scripted_run_"))
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copyfile(seed, target)       # a COPY; the source is only read
                     self._scripted_run_tmp_dir = tmp_dir
-                    account_store.accounts_path = (
-                        lambda root: tmp_dir / "assets" / "config" / "accounts.json")
-                    account_store.session_path = (
-                        lambda root: tmp_dir / "assets" / "config" / "session.json")
+                    account_root = tmp_dir
+                else:
+                    account_root = self._root
+                from src.account.remote import build_account_service
+                from src.services.prefs_service import LocalPrefsService
+                from src.services.shared_album_service import LocalSharedAlbumService
+
                 self._album = V3UI(self._root, self._shader_dir,
-                                   self._album_options, window=self._window)
+                                   self._album_options, window=self._window,
+                                   accounts=build_account_service(
+                                       account_root, self._central_config_path()),
+                                   shared_album=LocalSharedAlbumService(),
+                                   prefs=LocalPrefsService(self._root))
+                self._register_album_actions()
+                signin = self._devtools.env("HCPD_ECONOMY_SIGNIN").strip()
+                if signin and self._is_scripted_run():
+                    self._album.dev_sign_in(signin)
             self._album.initialize()
             self._bugs = self._build_bug_painter()
             self._renderer.extra_scene_draw = self._draw_album_bugs
+            self._renderer.post_layer_draw = self._draw_album_heat
             if self._album_options.is_v3:
                 # D2: từ đây, dời hoặc đổi cỡ cửa sổ là dời tấm kính thật.
                 self._window.set_geometry_listener(self._refresh_window_plane)
@@ -2777,7 +2907,8 @@ class HcpdApplication:
             self._renderer.release()
         self._window.destroy()
         tmp_dir = getattr(self, "_scripted_run_tmp_dir", None)
-        if tmp_dir is not None:
+        if tmp_dir is not None and not self._devtools.env("HCPD_ECONOMY_DIR").strip():
+            # a dir the run was GIVEN (restart test) is the caller's to remove
             import shutil
 
             shutil.rmtree(tmp_dir, ignore_errors=True)

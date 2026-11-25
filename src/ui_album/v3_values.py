@@ -17,17 +17,11 @@ from __future__ import annotations
 
 import time
 
-from src.account import crypto as account_crypto
-from src.content import shared_album
+from src.shared import account_rules
 from src.ui_album import v3_flow as F
-from src.game.match import WEAPON_LABEL
+from src.game.view import WEAPON_LABEL
 from src.ui_album.v3 import V3State
-
-#: Bảng xếp hạng mẫu (U2: "The data stays the sample").
-SAMPLE_BOARD = (
-    ("Mai", 980), ("Huy", 910), ("Lan", 845), ("Quang", 780), ("Bao", 720),
-    ("Trang", 690), ("Nam", 655), ("Linh", 610), ("Son", 575), ("Khanh", 540),
-)
+from src.ui_album import ids as ID
 
 #: Màu lấy từ bảng ``colors`` của manifest, gọi tên cho dễ đọc.
 INK, SAFE, DANGER = "#24415F", "#3AA17A", "#E8676B"
@@ -221,18 +215,18 @@ def _signup_problem(flow, accounts: dict | None) -> str | None:
     (để kiểm tên đã bị lấy chưa); ``None`` bỏ qua việc kiểm đó (vd. khi
     gọi mà chưa có kho — không nên xảy ra ở đường chạy thật, nhưng tránh
     văng thay vì giả định)."""
-    if "field_user" in flow.touched:
-        display, reason = account_crypto.validate_username(flow.player)
+    if ID.FIELD_USER in flow.touched:
+        display, reason = account_rules.validate_username(flow.player)
         if display is None:
             return reason
-        if accounts is not None and account_crypto.username_key(display) in accounts.get(
+        if accounts is not None and account_rules.username_key(display) in accounts.get(
                 "accounts", {}):
             return "Username already taken"
-    if "field_pass" in flow.touched:
-        ok, reason = account_crypto.validate_password(flow.password)
+    if ID.FIELD_PASS in flow.touched:
+        ok, reason = account_rules.validate_password(flow.password)
         if not ok:
             return reason
-    if "field_pass2" in flow.touched and flow.password2 != flow.password:
+    if ID.FIELD_PASS2 in flow.touched and flow.password2 != flow.password:
         return "Passwords don't match"
     return None
 
@@ -244,8 +238,8 @@ def _sign_in(state, flow, accounts: dict | None = None) -> None:
     state.texts["pass"] = dots
     state.texts["pass2"] = dots2
     state.remember = flow.remember
-    state.caret = {"field_user": "user", "field_pass": "pass",
-                   "field_pass2": "pass2"}.get(flow.focus or "")
+    state.caret = {ID.FIELD_USER: "user", ID.FIELD_PASS: "pass",
+                   ID.FIELD_PASS2: "pass2"}.get(flow.focus or "")
     state.caret_index = flow.caret_index
     state.focus = flow.focus
     if flow.screen == F.SIGN_IN_ERR:
@@ -253,12 +247,12 @@ def _sign_in(state, flow, accounts: dict | None = None) -> None:
     if flow.screen == F.SIGN_UP:
         # TASK_accounts_1119: "valid_user" chỉ bật khi tên VỪA hợp lệ VỪA
         # còn trống — không còn là "có gõ gì đó" như bản mô phỏng cũ.
-        display, _reason = account_crypto.validate_username(flow.player)
+        display, _reason = account_rules.validate_username(flow.player)
         taken = (display is not None and accounts is not None
-                and account_crypto.username_key(display) in accounts.get("accounts", {}))
+                and account_rules.username_key(display) in accounts.get("accounts", {}))
         if display is not None and not taken:
             state.sprites["valid_user"] = True
-        pass_ok, _reason2 = account_crypto.validate_password(flow.password)
+        pass_ok, _reason2 = account_rules.validate_password(flow.password)
         if pass_ok and flow.password == flow.password2:
             state.sprites["valid_pass2"] = True
         problem = _signup_problem(flow, accounts)
@@ -277,6 +271,16 @@ def _sign_in(state, flow, accounts: dict | None = None) -> None:
 
 
 # ---- màn chính ---------------------------------------------------------
+def _wallet_line(state, manifest, screen, rect, template_key, text) -> None:
+    """A text the art has no slot for (wallet, price): draw it with the
+    style of an existing text ``template_key`` of the same screen."""
+    template = _spec(manifest, screen, template_key) if manifest else None
+    if template is None:
+        return
+    state.extra.append((list(rect), template["runs"], [text],
+                        template.get("al", "left")))
+
+
 def _menu(state, flow, manifest=None, painter=None) -> None:
     name = flow.player or "guest"
     state.texts["player_name"] = _fit_name(manifest, painter, F.MENU, "player_name", name)
@@ -292,6 +296,13 @@ def _menu(state, flow, manifest=None, painter=None) -> None:
     else:
         state.texts["photo_damage"] = "not played yet"
     state.focus = flow.focus if flow.focus in F.MENU_BUTTONS else None
+    if flow.wallet is not None:
+        _wallet_line(state, manifest, F.MENU, (144, 596, 360, 22),
+                     "photo_caption", f"Points  {flow.wallet}")
+    reason = F.pvp_lock_reason(flow)
+    if reason is not None:
+        _wallet_line(state, manifest, F.MENU, (144, 622, 600, 22),
+                     "photo_caption", reason)
 
 
 # ---- màn cài đặt -------------------------------------------------------
@@ -377,14 +388,14 @@ def _photos(state, flow) -> None:
         state.texts["damage_text"] = f"{record['eaten']:.0f}% eaten"
     else:
         state.hidden |= {"damage_badge", "damage_text"}
-    can_upload = shared_album.can_upload()
+    can_upload = flow.shared_can_upload
     state.texts["share_to_album_label"] = ("Share to album" if can_upload
-                                           else shared_album.NOT_CONFIGURED)
+                                           else flow.shared_not_configured)
     state.alpha["share_to_album_btn"] = 1.0 if can_upload else 0.55
     # P3: list/random chi can cloud_name+tag, khong can upload_preset.
-    can_list = shared_album.load_config() is not None
+    can_list = flow.shared_can_list
     state.texts["random_from_album_label"] = ("Random from album" if can_list
-                                               else shared_album.NOT_CONFIGURED)
+                                               else flow.shared_not_configured)
     state.alpha["random_from_album_btn"] = 1.0 if can_list else 0.55
 
 
@@ -424,6 +435,11 @@ def _loadout(state, flow, manifest, painter) -> None:
     level, items = flow.level, flow.items
     state.texts["note"] = F.LEVEL_NOTE[level]
     state.texts["weight_total"] = str(flow.weight_total())
+    if flow.wallet is not None:
+        left = flow.wallet - flow.price_total()
+        _wallet_line(state, manifest, screen, (912, 540, 304, 24), "weight_total",
+                     f"Points {flow.wallet} · items {flow.price_total()}"
+                     f" · left {left}")
     used, total = len(items), flow.slots()
     state.texts["slots_label"] = f"ITEM SLOTS · {used} / {total}"
     state.colours["slots_label"] = MUTED if used == 0 else SLOT_WARM
@@ -452,7 +468,20 @@ def _loadout_stickers(state, flow, manifest) -> None:
     placed = manifest.sprite(screen, "sticker_placed")
     label = _spec(manifest, screen, "sticker_placed_label")
     rects = manifest.screens[screen].get("sticker_rects", {})
+    soon_label = _spec(manifest, screen, "sticker_placed_label")
     for item in F.ITEM_WEIGHT:
+        if not F.item_is_live(item):
+            # shown, not sold: dimmed, with a label in the middle of the card
+            state.sprites[f"sticker:{item}"] = True
+            state.alpha[f"sticker:{item}"] = 0.3
+            anchor = rects.get(item)
+            if soon_label is not None and anchor is not None:
+                rect = list(soon_label["rect"])
+                rect[0], rect[1] = float(anchor[0]), float(anchor[1]) + 56.0
+                rect[2] = float(anchor[2])
+                state.extra.append((rect, soon_label["runs"], ["Coming soon"],
+                                    "center"))
+            continue
         if item not in flow.items:
             state.sprites[f"sticker:{item}"] = True
             continue
@@ -517,7 +546,9 @@ def _loadout_slots(state, flow, manifest, painter) -> None:
         _slot_line(state, manifest, screen, "slot_name", slot_rect,
                    layout.get("name"), item)
         _slot_line(state, manifest, screen, "slot_sub", slot_rect,
-                   layout.get("sub"), f"key {number} · weight {weight}")
+                   layout.get("sub"),
+                   f"key {number} · {F.item_price(item)} pts"
+                   f" · {F.ITEM_EFFECT_S.get(item, 0):g} s")
     _ = painter
 
 
@@ -663,8 +694,8 @@ def _hud(state, flow, game, manifest, now) -> None:
     if game is not None:
         state.shots = [(x, y, now - fired, hit)
                        for x, y, fired, hit in getattr(game, "shots", ())]
-        state.hp_bars = game.hp_bars(now)
-        if game.reloading(now):
+        state.hp_bars = list(game.hp_bars)
+        if game.reloading:
             # Không có ô nào trên bản vẽ dành cho việc nạp đạn, nên nói bằng
             # dòng báo — nếu không, bấm chuột mà súng im là khó hiểu.
             state.message = "Reloading…"
@@ -689,7 +720,7 @@ def _aim_ready(game, now: float) -> float:
     """
     if game is None:
         return 1.0
-    if game.reloading(now):
+    if game.reloading:
         return 0.0
     gap = float(getattr(game, "fire_interval_s", 0.0) or 0.0)
     if gap <= 0.0:
@@ -804,6 +835,8 @@ def _hud_items(state, flow, game, manifest, screen) -> None:
         item = flow.items[index]
         left = max(0, 1 - int(used.get(item, 0)))
         mark = "selected" if number == selected else "normal"
+        state.slot_labels |= {f"islot#{index}", f"ikey#{index}",
+                              f"islot_icon#{index}", f"iused#{index}"}
         _place(state, manifest, screen, f"islot:{mark}", slot, (0.0, 0.0),
                f"islot#{index}")
         key_off = layout.get("key") or (0, 0, 20, 20)
@@ -855,8 +888,8 @@ def _slot_text(state, manifest, screen, key, slot, offset, text,
         rect = [slot[0] + offset[0], slot[1] + offset[1], offset[2], offset[3]]
     else:
         rect = [slot[0] + offset[0], slot[1] + offset[1], base[2], base[3]]
-    state.extra.append((rect, template["runs"], [str(text)],
-                        align or template.get("al", "left")))
+    state.slot_extra.append((rect, template["runs"], [str(text)],
+                             align or template.get("al", "left")))
 
 
 #: Hiệu ứng xếp từ x = 52, cách nhau 8 px thiết kế (README mục Key rules).
@@ -891,7 +924,7 @@ def _hud_effects(state, flow, game, manifest, screen) -> None:
 
 
 # ---- kết quả đơn -------------------------------------------------------
-def _result(state, flow, manifest, win: bool) -> None:
+def _result(state, flow, manifest, win: bool, accounts=None) -> None:
     screen = F.WIN if win else F.LOSE
     level = flow.level
     result = flow.last_result or {}
@@ -904,18 +937,24 @@ def _result(state, flow, manifest, win: bool) -> None:
         state.texts["stamp_line"] = (f"LEVEL {level} · {flow.level_name().upper()}"
                                      f" · {time.strftime('%d.%m.%Y')}")
         state.texts["caption"] = f"{found}/{total} bugs turned to dust"
+    rejected = result.get("rejected") if win else None
     rows = []
     if not win:
         rows.append(("Bugs left", f"{total - found} / {total}", False))
     # Số 0 không mang dấu: "+0" đọc như một khoản cộng, mà hết giờ thì không
     # cộng được gì cả.
     left = int(result.get("time_left", 0))
-    rows.append(("Time left", f"+{left}" if left > 0 else str(left), False))
-    for item, count in (result.get("used") or {}).items():
+    points = left * level
+    if rejected:
+        _rejected_title(state, rejected)
+    else:
+        rows.append((f"Time left {left} s × level {level}",
+                     f"+{points}" if points > 0 else str(points), False))
+    for item, count in ({} if rejected else (result.get("used") or {})).items():
         weight = F.ITEM_WEIGHT.get(item, 0) * int(count)
         rows.append((f"{item} ×{count} · weight {F.ITEM_WEIGHT.get(item, 0)}",
                      f"-{weight}", True))
-    if level == 5 and result.get("overtime_s"):
+    if level == 5 and result.get("overtime_s") and not rejected:
         penalty = int(round(result["overtime_s"] * 5))
         rows.append((f"Overtime {mmss(result['overtime_s'])} · penalty",
                      f"-{penalty}", True))
@@ -926,16 +965,39 @@ def _result(state, flow, manifest, win: bool) -> None:
     _hide_spare_rows(state, manifest, screen, ("row_label", "row_value"),
                      len(rows))
     state.texts["score"] = str(score)
-    if win:
+    if win and not rejected:
         state.colours["score"] = SAFE
+    elif rejected:
+        state.colours["score"] = DANGER
     else:
         state.colours["score"] = DANGER if score < 0 else INK
-    rank = _board_rank(score)
-    if win and rank is not None:
+    from src.ui_album import board
+
+    rank = board.rank_of(accounts, flow.account_key)
+    if win and not rejected and rank is not None and rank <= 10:
         state.sprites["rank_up"] = True
         state.texts["rank_up_text"] = f"You're now #{rank} on the Solo board"
     else:
         state.hidden |= {"rank_up", "rank_up_text"}
+
+
+#: What the result screen says when the central server did not count a win.
+_REFUSED = {"too_fast": "The server refused it: too fast to be a real match.",
+            "time": "The server refused it: it came after the time limit.",
+            "offline": "Can't reach the server: this win was not recorded."}
+
+
+def _rejected_title(state, reason: str) -> None:
+    """The baked title says "Memory saved"; when the server did not count the
+    win, cover it (flat card colour, art px) and say so in one line."""
+    from src.ui_album import board
+
+    state.covers.append(("rect", board._d(1120, 170, 1640, 250), board.WHITE))
+    title = board._run("Not saved", "Baloo 2", 800, 40.0, DANGER)
+    state.extra.append(([752.0, 118.0, 480.0, 50.0], [title], ["Not saved"], "left"))
+    line = _REFUSED.get(reason, "The server did not accept this result.")
+    note = board._run(line, "Nunito", 700, 14.0, DANGER)
+    state.extra.append(([752.0, 232.0, 432.0, 20.0], [note], [line], "left"))
 
 
 def _hide_spare_rows(state, manifest, screen, prefixes, count) -> None:
@@ -947,14 +1009,9 @@ def _hide_spare_rows(state, manifest, screen, prefixes, count) -> None:
                 state.hidden.add(key)
 
 
-def _board_rank(score: int) -> int | None:
-    """Thứ hạng nếu điểm chen được vào bảng mẫu; ``None`` nếu không."""
-    better = sum(1 for _name, value in SAMPLE_BOARD if value > score)
-    return better + 1 if better < len(SAMPLE_BOARD) else None
-
-
 # ---- PvP ---------------------------------------------------------------
-def _pvp_lobby(state, flow, now, manifest=None, painter=None) -> None:
+def _pvp_lobby(state, flow, now, manifest=None, painter=None,
+               accounts=None) -> None:
     screen = flow.screen
     state.texts["eyebrow"] = (f"PVP · {flow.mode.upper()}"
                               if screen == F.PVP_INVITE else
@@ -967,12 +1024,15 @@ def _pvp_lobby(state, flow, now, manifest=None, painter=None) -> None:
     if screen == F.PVP_SEARCH:
         state.texts["search_time"] = mmss(now - flow.search_started_s)
         items = ", ".join(flow.items) or "no items"
-        rank = _board_rank(int((flow.last_result or {}).get("score", 0))) or 99
-        state.texts["you_sub"] = f"Solo rank #{rank} · {items}"
+        from src.ui_album import board
+
+        rank = board.rank_of(accounts, flow.account_key)
+        state.texts["you_sub"] = (f"Solo rank #{rank} · {items}" if rank
+                                  else f"Solo unranked · {items}")
     elif screen == F.PVP_INVITE:
         state.texts["room_code"] = f"PM-{(flow.room_code or '0000')[:4]}"
         state.texts["join_typed"] = flow.join_typed.ljust(4, "_")
-        state.focus = "field_join" if flow.focus == "field_join" else None
+        state.focus = ID.FIELD_JOIN if flow.focus == ID.FIELD_JOIN else None
     elif screen == F.PVP_FOUND:
         state.texts["countdown"] = str(max(1, 3 - int(now - flow.found_at_s)))
         # TASK_accounts_1119: NETWORK-SUPPLIED — the opponent's own typed
@@ -1052,19 +1112,15 @@ def _pvp_rows(rows) -> list:
 
 
 # ---- bảng xếp hạng -----------------------------------------------------
-def _board(state, flow, manifest=None, painter=None) -> None:
-    """TASK_accounts_1119 Phase 5: ``flow.history`` is whatever the
-    SIGNED-IN account loaded at sign-in (``V3UI._load_progress``) and
-    updated after each match since — this just reads it; nothing here
-    needs to know an account was ever involved."""
-    best = max([int((flow.last_result or {}).get("score", 0))]
-               + [int(r.get("score", 0)) for r in flow.history.values()])
-    rank = _board_rank(best)
-    state.texts["you_rank"] = str(rank if rank is not None else
-                                  len(SAMPLE_BOARD) + 1)
-    you_name = f"You · {flow.player or 'guest'}"
-    state.texts["you_name"] = _fit_name(manifest, painter, F.BOARD, "you_name", you_name)
-    state.texts["you_score"] = str(best)
+def _board(state, flow, manifest=None, painter=None, accounts=None) -> None:
+    """Real leaderboard: every account on this computer, ranked by lifetime
+    points (``board.py``). Without a manifest (static shots) it keeps the
+    baked sample art."""
+    if manifest is None:
+        return
+    from src.ui_album import board
+
+    board.fill_state(state, flow, manifest, painter, accounts)
 
 
 #: TASK_ui_sakuga_1117 Phase 5: ``tab_Solo`` targets ``F.LEVELS``
@@ -1081,7 +1137,7 @@ def _selected_hotspots(screen: str, flow) -> set:
     (Phase 5's halved hover-ring alpha on an already-selected row)."""
     selected: set = set()
     for name in F.TABS:
-        in_section = (screen in _SOLO_TAB_SCREENS if name == "tab_Solo"
+        in_section = (screen in _SOLO_TAB_SCREENS if name == ID.TAB_SOLO
                      else screen == F.TABS[name])
         if in_section:
             selected.add(name)
@@ -1090,8 +1146,8 @@ def _selected_hotspots(screen: str, flow) -> set:
     if screen == F.LOADOUT:
         selected.add(f"weapon_{flow.weapon_name()}")
     if screen == F.SETTINGS:
-        selected.add("display_window" if flow.display == "window" else "display_full")
-        selected.add("theme_night" if flow.theme == "night" else "theme_day")
+        selected.add(ID.DISPLAY_WINDOW if flow.display == "window" else ID.DISPLAY_FULL)
+        selected.add(ID.THEME_NIGHT if flow.theme == "night" else ID.THEME_DAY)
     return selected
 
 
@@ -1136,15 +1192,15 @@ def state_for(manifest, painter, flow, game=None, aim=None, accounts=None) -> V3
             state.aim = aim
             state.aim_ready = _aim_ready(game, now)
     elif screen == F.WIN:
-        _result(state, flow, manifest, win=True)
+        _result(state, flow, manifest, win=True, accounts=accounts)
         state.photo = flow.photo
     elif screen == F.LOSE:
-        _result(state, flow, manifest, win=False)
+        _result(state, flow, manifest, win=False, accounts=accounts)
         state.photo = flow.photo
     elif screen in (F.PVP_SEARCH, F.PVP_INVITE, F.PVP_FOUND):
-        _pvp_lobby(state, flow, now, manifest, painter)
+        _pvp_lobby(state, flow, now, manifest, painter, accounts)
     elif screen == F.PVP_RESULT:
         _pvp_result(state, flow, manifest, painter)
     elif screen == F.BOARD:
-        _board(state, flow, manifest, painter)
+        _board(state, flow, manifest, painter, accounts)
     return state

@@ -19,13 +19,19 @@ import numpy as np
 from OpenGL import GL
 
 from src.renderer.shader import ShaderProgram
-from src.game.levels import LEGACY_CAMO
+from src.game.view import LEGACY_CAMO
 from src.ui_album.textures import load_rgba, upload_rgba
 
 logger = logging.getLogger(__name__)
 
 FADE_S = 0.4
 DUST_S = 2.0
+#: Item looks: (scale, alpha) rings from the widest, and the flat colour (the
+#: sprite shader multiplies it by ~0.6 on a dark sprite, so it is set above 1).
+FLARE_RGB = (1.5, 1.15, 0.35)
+FLARE_RINGS = ((1.7, 0.2), (1.35, 0.45))
+HEAT_RGB = (1.6, 0.45, 0.15)
+HEAT_RINGS = ((2.6, 0.2), (1.9, 0.3), (1.3, 0.5))
 #: Sprite to gấp ngần này lần bán kính quả cầu đánh dấu cũ.
 #:
 #: Lúc chưa sửa lỗi nạp ma trận, sprite KHÔNG hề hiện; tôi tưởng nó quá nhỏ
@@ -90,7 +96,7 @@ def assign_bug_camo(props, rgb_image, rest_eye_mm, screen_mm=(344.0, 194.0),
     ``BUG_CAMO_STRENGTH`` > 0, nhưng ``draw()`` chỉ dùng giá trị này nếu nó
     tồn tại trên prop.
     """
-    from src.game.viewport_filter import DESIGN_SIZE, project_to_design
+    from src.game.view import DESIGN_SIZE, project_to_design
 
     height, width = rgb_image.shape[:2]
     half = max(1, int(patch_px) // 2)
@@ -162,7 +168,7 @@ class BugPainter:
         và thứ phép bắn ĐO không bao giờ là hai hình khác nhau. ``None`` khi
         thiếu bộ asset: lúc đó không có bọ để vẽ, cũng không có gì để bắn.
         """
-        from src.game.hit import SpriteMask
+        from src.game.view import SpriteMask
 
         relative = sprite_for(self.manifest, level)
         if not relative:
@@ -209,8 +215,44 @@ class BugPainter:
         GL.glDrawArrays(GL.GL_TRIANGLES, 0, 6)
         GL.glBindVertexArray(0)
 
-    def draw(self, view, projection, props, found, level, theme) -> None:
-        """Vẽ mọi con bọ của ván; ``props`` là danh sách của ``prop_game``."""
+    def _draw_glow(self, view, projection, centre, size, texture, rgb, rings) -> None:
+        """Soft flat-colour silhouette(s) of the sprite, bigger than it:
+        ``rings`` = ``(scale, alpha)`` from the widest. The bug is drawn at the
+        same depth right after, so the caller sets ``GL_LEQUAL``."""
+        for scale, alpha in rings:
+            self._draw_quad(view, projection, centre, size * scale,
+                            (1.0, 1.0, 1.0, alpha), texture, (*rgb, 1.0))
+
+    def draw_heat(self, view, projection, props, level) -> None:
+        """Thermal scan: a heat mark on every live bug, drawn AFTER the photo
+        layers with the depth test off, so it shows through them."""
+        relative = sprite_for(self.manifest, level)
+        texture = self.texture(relative) if relative else None
+        if texture is None:
+            return
+        self._shader.use()
+        GL.glEnable(GL.GL_BLEND)
+        GL.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA)
+        culling = GL.glIsEnabled(GL.GL_CULL_FACE)
+        GL.glDisable(GL.GL_CULL_FACE)
+        GL.glDisable(GL.GL_DEPTH_TEST)
+        for index, prop in enumerate(props):
+            if index in self.found_at:
+                continue
+            centre = [v / 1000.0 for v in prop["pos_mm"]]
+            size = float(prop["radius_mm"]) / 1000.0 * float(prop.get("size_k", SIZE_FACTOR))
+            self._draw_glow(view, projection, centre, size, texture, HEAT_RGB, HEAT_RINGS)
+        GL.glEnable(GL.GL_DEPTH_TEST)
+        GL.glDisable(GL.GL_BLEND)
+        if culling:
+            GL.glEnable(GL.GL_CULL_FACE)
+
+    def draw(self, view, projection, props, found, level, theme,
+             flare: bool = False) -> None:
+        """Vẽ mọi con bọ của ván; ``props`` là danh sách của ``prop_game``.
+
+        ``flare``: camouflage 0 and a soft amber outline on every live bug.
+        """
         relative = sprite_for(self.manifest, level)
         texture = self.texture(relative) if relative else None
         if texture is None:
@@ -225,6 +267,7 @@ class BugPainter:
                         if props else 0.0)
         now = time.perf_counter()
         self._shader.use()
+        GL.glDepthFunc(GL.GL_LEQUAL)      # a glow and its bug share one depth
         GL.glEnable(GL.GL_BLEND)
         GL.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA)
         # Pass cảnh bật GL_CULL_FACE. Quad quay mặt về camera dựng trong không
@@ -244,6 +287,10 @@ class BugPainter:
             strength = float(prop.get("camo_strength", BUG_CAMO_STRENGTH))
             camo = (*camo_rgb, strength) if camo_rgb else (0.0, 0.0, 0.0, 0.0)
             if index not in self.found_at:
+                if flare:
+                    camo = (0.0, 0.0, 0.0, 0.0)
+                    self._draw_glow(view, projection, centre, size, texture,
+                                    FLARE_RGB, FLARE_RINGS)
                 self._draw_quad(view, projection, centre, size,
                                 (1.0, 1.0, 1.0, 1.0), texture, camo)
                 continue
@@ -261,6 +308,7 @@ class BugPainter:
                                     (white[0], white[1], white[2], 0.9),
                                     texture)
         _ = found
+        GL.glDepthFunc(GL.GL_LESS)
         GL.glDisable(GL.GL_BLEND)
         if culling:
             GL.glEnable(GL.GL_CULL_FACE)

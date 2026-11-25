@@ -82,7 +82,8 @@ def _app(**extra) -> HcpdApplication:
     app._bugs = _BugsPainter()
     app._content = SimpleNamespace(game_prop_radius_mm=6.0,
                                    overscan_design_eye_mm=(0.0, 85.0))
-    app._album = SimpleNamespace(game=None, flow=F, state=F.V3Flow())
+    app._album = SimpleNamespace(game=None, flow=F, state=F.V3Flow(),
+                                charge_items=lambda items, mode="solo": True)
     app._game = None
     app._game_planes = ()
     app._game_layers_revision = 0
@@ -122,11 +123,17 @@ class PvpHandlePhotoTest(unittest.TestCase):
         import hashlib
         import tempfile
 
-        data = b"\xff\xd8\xff fake jpeg bytes"
+        import io
+
+        from PIL import Image
+
+        buffer = io.BytesIO()
+        Image.new("RGB", (32, 24), (90, 80, 70)).save(buffer, "JPEG")
+        data = buffer.getvalue()
         sha1 = hashlib.sha1(data).hexdigest()
         with tempfile.TemporaryDirectory() as tmp:
             app = _app(_root=Path(tmp))
-            app._try_load_media = lambda path, now: None
+            app._try_load_media = lambda path, now, clean=None: None
             app._pvp_handle_photo(
                 {"jpeg_b64": base64.b64encode(data).decode("ascii"), "sha1": sha1},
                 time.perf_counter())
@@ -134,6 +141,24 @@ class PvpHandlePhotoTest(unittest.TestCase):
             self.assertTrue(expected.exists())
             self.assertEqual(expected.read_bytes(), data)
             self.assertEqual(str(app._album.state.photo), str(expected))
+
+    def test_a_sha1_matching_non_photo_is_refused_and_deleted(self) -> None:
+        import base64
+        import hashlib
+        import tempfile
+
+        data = b"PK\x03\x04 this is a zip, not a photo"
+        sha1 = hashlib.sha1(data).hexdigest()
+        with tempfile.TemporaryDirectory() as tmp:
+            app = _app(_root=Path(tmp))
+            app._try_load_media = lambda path, now, clean=None: (_ for _ in ()).throw(
+                AssertionError("must not load a rejected photo"))
+            app._pvp_handle_photo(
+                {"jpeg_b64": base64.b64encode(data).decode("ascii"), "sha1": sha1},
+                time.perf_counter())
+            cache_dir = Path(tmp) / "assets" / "cache" / "pvp"
+            self.assertFalse(list(cache_dir.iterdir()))
+            self.assertFalse(app._pvp_photo_ready)
 
     def test_rejects_a_mismatched_sha1_and_writes_nothing(self) -> None:
         import base64

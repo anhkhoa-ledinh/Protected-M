@@ -1,0 +1,50 @@
+# Central server (one container; it backs itself up). Normally driven by
+#   bash deploy/server.sh <command>
+name: hcpd
+
+x-hardened: &hardened
+  image: hcpd-server
+  build:
+    context: ..
+    dockerfile: deploy/Dockerfile
+  read_only: true
+  tmpfs:
+    - /tmp:size=16m,mode=1777
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  server:
+    <<: *hardened
+    container_name: ${HCPD_CONTAINER:-hcpd-server}
+    mem_limit: ${HCPD_MEM_LIMIT:-256m}
+    pids_limit: 128
+    environment:
+      HCPD_PORT: "47830"
+      HCPD_MAX_CONNS: ${HCPD_MAX_CONNS:-200}
+      HCPD_MAX_CONNS_PER_IP: ${HCPD_MAX_CONNS_PER_IP:-10}
+      HCPD_RATE_PER_S: ${HCPD_RATE_PER_S:-20}
+      HCPD_RATE_BURST: ${HCPD_RATE_BURST:-40}
+      HCPD_CONNECTS_PER_MIN: ${HCPD_CONNECTS_PER_MIN:-60}
+      HCPD_BACKUP_EVERY_S: ${HCPD_BACKUP_EVERY_S:-86400}
+      HCPD_BACKUP_KEEP: ${HCPD_BACKUP_KEEP:-7}
+    ports:
+      - "${HCPD_BIND:-127.0.0.1}:${HCPD_PORT:-47830}:47830"
+    volumes:
+      - data:/data
+      - certs:/certs:ro
+      - backups:/backups
+
+volumes:
+  data:
+    name: ${HCPD_DATA_VOLUME:-hcpd-data}
+  certs:
+    name: ${HCPD_CERTS_VOLUME:-hcpd-certs}
+  backups:
+    name: ${HCPD_BACKUPS_VOLUME:-hcpd-backups}

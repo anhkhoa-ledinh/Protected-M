@@ -46,7 +46,7 @@ class HealthAndDamage(unittest.TestCase):
         self.assertEqual([L.WEAPON_DAMAGE[w].pierce for w in WEAPONS],
                          [1.00, 0.85, 0.70])
         self.assertEqual([L.WEAPON_DAMAGE[w].damage for w in WEAPONS],
-                         [100.0, 25.0, 34.0])
+                         [150.0, 37.5, 51.0])
         self.assertEqual([L.WEAPON_DAMAGE[w].headshot_mult for w in WEAPONS],
                          [2.0, 1.0, 1.5])
 
@@ -55,12 +55,12 @@ class HealthAndDamage(unittest.TestCase):
         self.assertEqual(L.PVP_WEAPONS_SPEC["Heavy-mag gun"], (50, 0.18, 2.5))
 
     def test_shots_to_kill_three_cells_by_hand(self):
-        # Sniper, body, level 5: 100 * 1.00 / 5 = 20 a hit; 500 / 20 = 25.
-        self.assertEqual(L.hits_to_kill("Precision gun", False, 5), 25)
-        # Heavy-mag, head, level 4: 34 * 1.5 * 0.70 / 4 = 8.925; 400 / 8.925 = 44.8 -> 45.
-        self.assertEqual(L.hits_to_kill("Heavy-mag gun", True, 4), 45)
-        # Shotgun pellet, level 2: 25 * 0.85 / 2 = 10.625; 200 / 10.625 = 18.8 -> 19.
-        self.assertEqual(L.hits_to_kill("Spread gun", False, 2), 19)
+        # Sniper, body, level 5: 150 * 1.00 / 5 = 30 a hit; 500 / 30 = 16.7 -> 17.
+        self.assertEqual(L.hits_to_kill("Precision gun", False, 5), 17)
+        # Heavy-mag, head, level 4: 51 * 1.5 * 0.70 / 4 = 13.3875; 400 / 13.3875 = 29.9 -> 30.
+        self.assertEqual(L.hits_to_kill("Heavy-mag gun", True, 4), 30)
+        # Shotgun pellet, level 2: 37.5 * 0.85 / 2 = 15.9375; 200 / 15.9375 = 12.5 -> 13.
+        self.assertEqual(L.hits_to_kill("Spread gun", False, 2), 13)
 
 
 class ReadersFollowTheTable(unittest.TestCase):

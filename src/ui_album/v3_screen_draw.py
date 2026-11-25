@@ -16,7 +16,8 @@ from typing import TYPE_CHECKING
 from OpenGL import GL
 import numpy as np
 
-from src.ui_album.hud_cards import element_card_map, cards_for_screen
+from src.ui_album.hud_cards import (cards_for_screen, element_card_map,
+                                    item_slot_card_index)
 from src.ui_album.scope import (RETICLE_ARM_PX, RETICLE_COL, RETICLE_GAP_PX,
                                 RETICLE_THICK_PX, VIGNETTE_ALPHA,
                                 VIGNETTE_COL, VIGNETTE_RADIUS_PX,
@@ -33,6 +34,7 @@ from src.ui_album.v3_painter import rgba
 from src.ui_album.v3_text_field import (CARET_COL, _draw_field_text,
                                         _field_box_rect, _forgot_field_value,
                                         forgot_field_value_rect)
+from src.ui_album import ids as ID
 
 if TYPE_CHECKING:
     from src.ui_album.v3 import V3Manifest, V3Painter, V3State
@@ -106,12 +108,12 @@ TOAST_FONT = {"ff": "Nunito", "fw": 800, "fs": 15.0, "col": TOAST_FG}
 #: TASK_game_feel_fix_1118 Fix 10: screens with a gameplay HUD — the
 #: per-card fade machinery (proximity, scope, H-hide) only applies
 #: here (menus/results draw their ``top.png`` the old, single-quad way).
-HUD_CARD_SCREENS = frozenset({"v3_08_gameplay_hud", "v3_12a_pvp_hunter_hud",
-                              "v3_12b_pvp_bug_hud"})
+HUD_CARD_SCREENS = frozenset({ID.PLAY, ID.PVP_HUNT,
+                              ID.PVP_HIDE})
 
 #: Code-drawn album buttons, with fixed rectangles matching the manifest
 #: hotspots. Share sits on the memory caption row; Random in the drop card.
-CHOOSE_PHOTO_SCREEN = "v3_04_choose_photo"
+CHOOSE_PHOTO_SCREEN = ID.PHOTOS
 SHARE_BTN_RECT = (944.0, 384.0, 228.0, 30.0)
 RANDOM_BTN_RECT = (264.0, 478.0, 240.0, 52.0)
 SHARE_BTN_FONT = {"ff": "Nunito", "fw": 800, "fs": 14.0, "ls": 0.0,
@@ -191,10 +193,10 @@ FORGOT_FIELD_X = 378.0
 FORGOT_FIELD_W = 524.0
 #: ``(hotspot name, label, y, is_password)``, top to bottom.
 FORGOT_FIELDS = (
-    ("field_forgot_user", "Username", 198.0, False),
-    ("field_forgot_code", "Recovery code", 262.0, False),
-    ("field_forgot_pass", "New password", 326.0, True),
-    ("field_forgot_pass2", "Confirm new password", 390.0, True),
+    (ID.FIELD_FORGOT_USER, "Username", 198.0, False),
+    (ID.FIELD_FORGOT_CODE, "Recovery code", 262.0, False),
+    (ID.FIELD_FORGOT_PASS, "New password", 326.0, True),
+    (ID.FIELD_FORGOT_PASS2, "Confirm new password", 390.0, True),
 )
 FORGOT_ERROR_RECT = (378.0, 458.0, 524.0, 20.0)
 _forgot_error_bottom = FORGOT_ERROR_RECT[1] + FORGOT_ERROR_RECT[3]
@@ -329,6 +331,12 @@ def _card_fade(card_map: dict, state: V3State, key: str) -> tuple[int | None, fl
     return index, base * float(state.hud_hidden_alpha)
 
 
+def _slot_card_alpha(manifest, screen: str, state: V3State) -> float:
+    """Current alpha of the item-slot card (1.0 on a screen without one)."""
+    index = item_slot_card_index(cards_for_screen(manifest, screen))
+    return 1.0 if index is None else float(state.card_alpha.get(index, 1.0))
+
+
 def _draw_hud_top_cards(painter, manifest, screen, record, state) -> None:
     """TASK_game_feel_fix_1118 Fix 10.1: draw ``top.png`` per CARD, each
     at its own current alpha, instead of one single full-canvas quad —
@@ -347,6 +355,8 @@ def _draw_hud_top_cards(painter, manifest, screen, record, state) -> None:
     """
     top = record.get("top")
     for index, card in enumerate(cards_for_screen(manifest, screen)):
+        if not card.art:
+            continue
         base = float(state.card_alpha.get(index, 1.0)) if card.fades else 1.0
         alpha = base * float(state.hud_hidden_alpha)
         painter.layer_region(card.rect, top, alpha)
@@ -356,6 +366,21 @@ def _joined_text(value) -> str:
     if isinstance(value, (list, tuple)):
         return "".join(str(v) for v in value)
     return "" if value is None else str(value)
+
+
+def _draw_covers(painter, state) -> None:
+    """Flat shapes that hide sample text baked into the art."""
+    for cover in state.covers:
+        kind, rect = cover[0], cover[1]
+        if kind == "rect":
+            painter.fill(rect, rgba(cover[2]))
+        elif kind == "rounded":
+            painter.rounded(rect, cover[2], rgba(cover[3]))
+        elif kind == "patch":
+            image = cover[3]
+            entry = painter.pil.get(cover[2], lambda: (image, None))
+            if entry is not None:
+                painter.quad(rect, entry[0])
 
 
 def _draw_bars(painter, record, state, card_map) -> None:
@@ -438,12 +463,14 @@ def _draw_sprites(painter, manifest, screen, record, state, card_map) -> None:
     # directly instead of through ``_card_fade`` — none of them are in
     # the always-visible whitelist (that's only crosshair/bite, neither
     # ever borrowed).
+    slot_fade = _slot_card_alpha(manifest, screen, state)
     for label, (other, key, rect) in state.borrowed.items():
         borrowed = manifest.sprite(other, key)
         if borrowed is not None:
             painter.sprite(rect, borrowed.get("file"),
                            float(state.alpha.get(label, 1.0))
-                           * float(state.hud_hidden_alpha),
+                           * float(state.hud_hidden_alpha)
+                           * (slot_fade if label in state.slot_labels else 1.0),
                            label in state.mirror)
     _ = screen
 
@@ -463,7 +490,7 @@ def _draw_remember_switch(painter, screen, record, state) -> None:
     if state.remember:
         return
     hotspot = next((h for h in record.get("hotspots", ())
-                    if h["n"] == "switch_remember"), None)
+                    if h["n"] == ID.SWITCH_REMEMBER), None)
     if hotspot is None:
         return
     x, y, w, h = (float(v) for v in hotspot_rect(screen, hotspot))
@@ -501,6 +528,10 @@ def _draw_texts(painter, manifest, screen, record, state, card_map) -> None:
     # its own, same reasoning as the borrowed-sprite loop above).
     for rect, runs, texts, align in state.extra:
         painter.line(rect, runs, texts, align, float(state.hud_hidden_alpha))
+    slot_alpha = (float(state.hud_hidden_alpha)
+                  * _slot_card_alpha(manifest, screen, state))
+    for rect, runs, texts, align in state.slot_extra:
+        painter.line(rect, runs, texts, align, slot_alpha)
 
 
 def _hole(painter, x: float, y: float, size: float, colour) -> None:
@@ -645,8 +676,8 @@ def _draw_confirm_dialog(painter, state) -> None:
         painter.line((x + pad, y + pad + index * line_h, w - 2 * pad, line_h),
                      [CONFIRM_TEXT_FONT], parts, "left")
     for name, rect, label, bg in (
-            ("btn_confirm_no", CONFIRM_NO_RECT, "No", "#DCE9F7"),
-            ("btn_confirm_yes", CONFIRM_YES_RECT, "Yes", BUTTON_PRIMARY_COL)):
+            (ID.BTN_CONFIRM_NO, CONFIRM_NO_RECT, "No", "#DCE9F7"),
+            (ID.BTN_CONFIRM_YES, CONFIRM_YES_RECT, "Yes", BUTTON_PRIMARY_COL)):
         fg = INK if bg != BUTTON_PRIMARY_COL else "#FFFFFF"
         painter.rounded(rect, 10.0, rgba(bg))
         painter.line(rect, [{**CONFIRM_BTN_FONT, "col": fg}], [label], "center")
@@ -696,9 +727,9 @@ def _draw_recovery_dialog(painter, state) -> None:
     painter.rounded((x + pad, code_y, w - 2 * pad, 56.0), 10.0, rgba(_FIELD_BG_COL))
     painter.line((x + pad, code_y, w - 2 * pad, 56.0),
                  [RECOVERY_CODE_FONT], [state.recovery_code], "center")
-    _draw_dialog_button(painter, state, "btn_recovery_copy", RECOVERY_COPY_RECT,
+    _draw_dialog_button(painter, state, ID.BTN_RECOVERY_COPY, RECOVERY_COPY_RECT,
                         "Copy", False)
-    _draw_dialog_button(painter, state, "btn_recovery_saved", RECOVERY_SAVED_RECT,
+    _draw_dialog_button(painter, state, ID.BTN_RECOVERY_SAVED, RECOVERY_SAVED_RECT,
                         "I saved it", True)
 
 
@@ -734,10 +765,10 @@ def _draw_forgot_dialog(painter, state) -> None:
     error = str(state.texts.get("forgot_error") or "")
     if error:
         painter.line(FORGOT_ERROR_RECT, [FORGOT_ERROR_FONT], [error], "left")
-    _draw_dialog_button(painter, state, "btn_forgot_submit", FORGOT_SUBMIT_RECT,
+    _draw_dialog_button(painter, state, ID.BTN_FORGOT_SUBMIT, FORGOT_SUBMIT_RECT,
                         "Reset password", True)
     painter.line(FORGOT_CANCEL_RECT, [FORGOT_CANCEL_FONT], ["Cancel"], "center")
-    if state.hover == "btn_forgot_cancel":
+    if state.hover == ID.BTN_FORGOT_CANCEL:
         painter.rounded_frame(FORGOT_CANCEL_RECT, rgba(CARET_COL), HOVER_PX, 6.0)
 
 

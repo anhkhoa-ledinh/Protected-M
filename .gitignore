@@ -117,3 +117,10 @@ results/
 # giao diện v3 vẫn dùng để vẽ bọ. Thiếu nó thì vào trận không có con bọ nào,
 # nên commit kèm repo giống ui_v3 — mở ngoại lệ cho luật `*.png` ở trên.
 !assets/ui_album/**/*.png
+assets/config/central.json
+assets/config/remote_session.json
+assets/config/remote_progress.json
+
+# Server deployment: real settings and certs never go in git
+deploy/.env
+deploy/certs/

@@ -125,3 +125,400 @@ def test_net_package_does_not_depend_on_ui_or_engine():
             if any(imp == p or imp.startswith(p + ".") for p in _NET_FORBIDDEN_PREFIXES):
                 offenders.append((str(path.relative_to(ROOT)), imp))
     assert offenders == [], f"src/net imports ui_album/engine/renderer: {offenders}"
+
+
+# ---- TASK_hardening_1124: one door for user photos ---------------------------
+
+#: Modules that open an image file but never a user's photo: shipped art
+#: (UI atlas, fx packs) or files this app wrote itself (bake and fill caches).
+#: Anything else must get its pixels from ``media_gate``.
+_OWN_FILE_IMAGE_READERS = {
+    "src/ui_album/hud_cards.py", "src/ui_album/textures.py",
+    "src/ui_album/board.py", "src/ui_album/v3_hover.py",
+    "src/fx/spec.py", "src/fx/library.py", "src/fx/player.py",
+    "src/content/bake.py", "src/content/lama_fill.py",
+}
+_GATE = "src/content/media_gate.py"
+_IMAGE_DECODERS = {"cv2.imread", "cv2.imdecode", "PIL.Image.open",
+                   "PIL.Image.frombytes", "PIL.Image.frombuffer"}
+
+
+def _dotted(node) -> str:
+    import ast as _ast
+
+    parts = []
+    while isinstance(node, _ast.Attribute):
+        parts.append(node.attr)
+        node = node.value
+    if isinstance(node, _ast.Name):
+        parts.append(node.id)
+    return ".".join(reversed(parts))
+
+
+def _aliases(tree) -> dict[str, str]:
+    """``import numpy as np`` -> {"np": "numpy"}; ``from cv2 import imwrite
+    as w`` -> {"w": "cv2.imwrite"}. A call is judged by what it really is,
+    not by the local name."""
+    import ast as _ast
+
+    out: dict[str, str] = {}
+    for node in _ast.walk(tree):
+        if isinstance(node, _ast.Import):
+            for alias in node.names:
+                out[(alias.asname or alias.name).split(".")[0]] = (
+                    alias.name if alias.asname else alias.name.split(".")[0])
+        elif isinstance(node, _ast.ImportFrom) and node.module and not node.level:
+            for alias in node.names:
+                out[alias.asname or alias.name] = f"{node.module}.{alias.name}"
+    return out
+
+
+def _canonical(node, aliases: dict[str, str]) -> str:
+    name = _dotted(node)
+    head, _, rest = name.partition(".")
+    full = aliases.get(head, head)
+    return f"{full}.{rest}" if rest else full
+
+
+def _decoder_calls() -> dict[str, set[str]]:
+    import ast as _ast
+
+    found: dict[str, set[str]] = {}
+    for path in _production_py_files():
+        tree = _ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        aliases = _aliases(tree)
+        for node in _ast.walk(tree):
+            if (isinstance(node, _ast.Call)
+                    and _canonical(node.func, aliases) in _IMAGE_DECODERS):
+                found.setdefault(str(path.relative_to(ROOT)).replace("\\", "/"),
+                                 set()).add(_canonical(node.func, aliases))
+    return found
+
+
+def test_only_the_media_gate_decodes_user_photos():
+    offenders = {mod: calls for mod, calls in _decoder_calls().items()
+                 if mod != _GATE and mod not in _OWN_FILE_IMAGE_READERS}
+    assert offenders == {}, (
+        f"decode a user photo through src.content.media_gate, not directly: {offenders}")
+
+
+def test_cv2_imdecode_exists_only_in_the_media_gate():
+    uses = {mod for mod, calls in _decoder_calls().items() if "cv2.imdecode" in calls}
+    assert uses <= {_GATE}, f"cv2.imdecode used outside the gate: {uses}"
+
+
+def test_the_own_file_reader_list_has_no_stale_entries():
+    calls = _decoder_calls()
+    stale = sorted(m for m in _OWN_FILE_IMAGE_READERS if m not in calls)
+    assert stale == [], f"remove from _OWN_FILE_IMAGE_READERS (no decoder call): {stale}"
+
+
+# ---- TASK_hardening_1124: camera data stays local -----------------------------
+
+#: What may hold camera frames or landmarks. ``src.renderer.webcam_preview``
+#: only shows the frame on screen (GL texture).
+_CAMERA_PREFIXES = ("src.camera", "src.tracking", "src.pose",
+                    "src.renderer.webcam_preview")
+#: Code that talks to the network, stores accounts or shows the album UI must
+#: never see a camera frame, directly or through anything it imports.
+_CAMERA_FREE = ("src/net", "src/account", "src/content/shared_album.py",
+                "src/content/shared_album_worker.py", "src/ui_album")
+
+
+def _rel(path: Path) -> str:
+    return str(path.relative_to(ROOT)).replace("\\", "/")
+
+
+def _module_files() -> dict[str, Path]:
+    return {import_graph.module_name(p): p for p in _production_py_files()
+            if p.name != "main.py"}
+
+
+def _is_camera(module: str) -> bool:
+    return any(module == p or module.startswith(p + ".") for p in _CAMERA_PREFIXES)
+
+
+def _resolve(name: str, modules: dict[str, Path]) -> str | None:
+    """``src.a.b.c`` -> the longest prefix that is a real module/package."""
+    parts = name.split(".")
+    while parts:
+        candidate = ".".join(parts)
+        if candidate in modules:
+            return candidate
+        parts.pop()
+    return None
+
+
+def _camera_paths(start: Path, modules: dict[str, Path]) -> list[str]:
+    """The import chain from ``start`` to a camera module, or ``[]``."""
+    first = import_graph.module_name(start)
+    queue, seen = [(first, [first])], {first}
+    while queue:
+        current, chain = queue.pop(0)
+        path = modules.get(current)
+        if path is None:
+            continue
+        for imp in import_graph.extract_imports(path):
+            if _is_camera(imp):
+                return chain + [imp]
+            target = _resolve(imp, modules)
+            if target and target not in seen:
+                seen.add(target)
+                queue.append((target, chain + [target]))
+    return []
+
+
+def test_net_account_shared_album_and_album_ui_never_reach_camera_code():
+    modules = _module_files()
+    offenders = {}
+    for path in _production_py_files():
+        rel = _rel(path)
+        if any(rel == p or rel.startswith(p + "/") for p in _CAMERA_FREE):
+            chain = _camera_paths(path, modules)
+            if chain:
+                offenders[rel] = " -> ".join(chain)
+    assert offenders == {}, f"camera/tracking/pose reachable from: {offenders}"
+
+
+#: Calls that write an image or an array to disk.
+_FRAME_WRITERS = {"cv2.imwrite", "cv2.VideoWriter", "numpy.save", "numpy.savez",
+                  "numpy.savez_compressed", "imageio.imwrite", "imageio.v3.imwrite"}
+#: The only modules that write one, and what they write: baked layers of a
+#: photo (bake, lama_fill), the photo gate's clean copy, F12 screenshots of the
+#: GL framebuffer. ``src/devtools`` is exempt (evidence tooling).
+_FRAME_WRITER_MODULES = {"src/content/bake.py", "src/content/lama_fill.py",
+                         "src/content/media_gate.py", "src/ui_album/shots.py"}
+
+
+def _writer_calls() -> dict[str, set[str]]:
+    import ast as _ast
+
+    found: dict[str, set[str]] = {}
+    for path in _production_py_files():
+        tree = _ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        aliases = _aliases(tree)
+        for node in _ast.walk(tree):
+            if not isinstance(node, _ast.Call):
+                continue
+            name = _canonical(node.func, aliases)
+            on_array_image = (isinstance(node.func, _ast.Attribute)
+                              and node.func.attr == "save"
+                              and isinstance(node.func.value, _ast.Call)
+                              and _canonical(node.func.value.func, aliases)
+                              .endswith("fromarray"))
+            if name in _FRAME_WRITERS or on_array_image:
+                found.setdefault(_rel(path), set()).add(name or "Image.fromarray().save")
+    return found
+
+
+def test_only_known_modules_write_images_and_none_outside_devtools_sees_a_camera():
+    outside = {m: c for m, c in _writer_calls().items()
+               if not m.startswith("src/devtools/")}
+    unknown = {m: c for m, c in outside.items() if m not in _FRAME_WRITER_MODULES}
+    assert unknown == {}, f"new image/array writer outside devtools: {unknown}"
+
+    modules = _module_files()
+    touching = {}
+    for module in outside:
+        chain = _camera_paths(ROOT / module, modules)
+        if chain:
+            touching[module] = " -> ".join(chain)
+    assert touching == {}, f"a module that writes images can reach the camera: {touching}"
+
+
+#: B1. ``src.fx`` may not import ``ui_album`` (see ``_FIXED_PAIRS``), so its
+#: screen table keeps copies; ``tests/test_ui_ids.py`` checks they match.
+_ID_LITERAL_EXEMPT = {"src/fx/screens.py", "src/ui_album/ids.py"}
+
+
+def test_no_ui_id_literal_outside_ids_py():
+    import ast
+    import importlib
+
+    ids = importlib.import_module("src.ui_album.ids")
+    wanted = {v for k, v in vars(ids).items() if k.isupper() and isinstance(v, str)}
+    wanted |= set(ids.NOT_USED_IN_CODE)
+    offenders = []
+    for path in _production_py_files():
+        rel = path.relative_to(ROOT).as_posix()
+        if rel in _ID_LITERAL_EXEMPT:
+            continue
+        tree = ast.parse(path.read_text("utf-8"))
+        docstrings = {id(n.body[0].value) for n in ast.walk(tree)
+                      if isinstance(n, (ast.Module, ast.ClassDef, ast.FunctionDef,
+                                        ast.AsyncFunctionDef))
+                      and n.body and isinstance(n.body[0], ast.Expr)}
+        for node in ast.walk(tree):
+            if (isinstance(node, ast.Constant) and isinstance(node.value, str)
+                    and node.value in wanted and id(node) not in docstrings):
+                offenders.append(f"{rel}:{node.lineno} {node.value!r}")
+    assert offenders == [], "use src.ui_album.ids instead of the literal:\n" + "\n".join(offenders)
+
+
+def test_ui_album_never_imports_the_account_package():
+    """B2: the UI gets an ``AccountService`` injected; it must not import
+    ``src.account`` (the rules it needs live in ``src.shared.account_rules``)."""
+    offenders = []
+    for path in _production_py_files():
+        if "src/ui_album/" not in path.as_posix():
+            continue
+        for imp in import_graph.extract_imports(path):
+            if imp == "src.account" or imp.startswith("src.account."):
+                offenders.append(f"{path.relative_to(ROOT)}: {imp}")
+    assert offenders == [], offenders
+
+
+def test_ui_album_imports_neither_the_shared_album_nor_prefs_modules():
+    """B3: the UI asks injected services (``src.services``); it never imports
+    ``src.content.shared_album`` or ``src.config.prefs`` itself."""
+    banned = {"src.content.shared_album", "src.config.prefs"}
+    offenders = []
+    for path in _production_py_files():
+        if "src/ui_album/" not in path.as_posix():
+            continue
+        for imp in import_graph.extract_imports(path):
+            if imp in banned or any(imp.startswith(b + ".") for b in banned):
+                offenders.append(f"{path.relative_to(ROOT)}: {imp}")
+    assert offenders == [], offenders
+
+
+def test_ui_album_imports_only_game_view_from_src_game():
+    """B4: the UI reads a ``MatchView`` snapshot; the one ``src.game`` module
+    it may import is ``src.game.view``."""
+    offenders = []
+    for path in _production_py_files():
+        if "src/ui_album/" not in path.as_posix():
+            continue
+        for imp in import_graph.extract_imports(path):
+            if (imp == "src.game" or imp.startswith("src.game.")) and imp != "src.game.view":
+                offenders.append(f"{path.relative_to(ROOT)}: {imp}")
+    assert offenders == [], offenders
+
+
+_WRITE_CALLS = {"write_text", "write_bytes", "dump", "replace"}
+
+
+def test_ui_album_writes_no_files():
+    """B5: the UI persists nothing itself (accounts, prefs and photos are written
+    by services and ``app``). Flags ``open(..., "w"/"a"/"x")``, ``write_text``,
+    ``write_bytes``, ``json.dump`` and ``os.replace``."""
+    import ast
+
+    offenders = []
+    for path in _production_py_files():
+        if "src/ui_album/" not in path.as_posix():
+            continue
+        for node in ast.walk(ast.parse(path.read_text("utf-8"))):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", "")
+            if name in _WRITE_CALLS and not (name == "replace" and not (
+                    isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name)
+                    and func.value.id == "os")):
+                offenders.append(f"{path.relative_to(ROOT)}:{node.lineno} {name}")
+            if name == "open":
+                mode = ""
+                if len(node.args) > 1 and isinstance(node.args[1], ast.Constant):
+                    mode = str(node.args[1].value)
+                for kw in node.keywords:
+                    if kw.arg == "mode" and isinstance(kw.value, ast.Constant):
+                        mode = str(kw.value.value)
+                if any(c in mode for c in "wax+"):
+                    offenders.append(f"{path.relative_to(ROOT)}:{node.lineno} open({mode!r})")
+    assert offenders == [], offenders
+
+
+def test_v3_ui_stays_small():
+    lines = (ROOT / "src/ui_album/v3_ui.py").read_text("utf-8").count("\n")
+    assert lines <= 760, f"v3_ui.py is {lines} lines; move work out of V3UI"
+
+
+def test_devtools_touch_the_app_only_through_dev_hooks():
+    """B6: no ``app._x`` / ``self._app._x`` access (and no getattr with a
+    private name) under ``src/devtools``."""
+    import ast
+
+    offenders = []
+    for path in _production_py_files():
+        if "src/devtools/" not in path.as_posix():
+            continue
+        for node in ast.walk(ast.parse(path.read_text("utf-8"))):
+            if isinstance(node, ast.Attribute) and node.attr.startswith("_") \
+                    and not node.attr.startswith("__"):
+                base = node.value
+                if (isinstance(base, ast.Name) and base.id == "app") or (
+                        isinstance(base, ast.Attribute) and base.attr == "_app"):
+                    offenders.append(f"{path.relative_to(ROOT)}:{node.lineno} .{node.attr}")
+            if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                    and node.func.id in {"getattr", "hasattr", "setattr"}
+                    and len(node.args) > 1 and isinstance(node.args[0], ast.Name)
+                    and node.args[0].id == "app" and isinstance(node.args[1], ast.Constant)
+                    and str(node.args[1].value).startswith("_")):
+                offenders.append(f"{path.relative_to(ROOT)}:{node.lineno} {node.func.id}(app, ...)")
+    assert offenders == [], offenders
+
+
+# ---- TASK_platform_1124 C1: the central server stays small and separate -----
+
+_SERVER_ALLOWED_SRC = ("src.server", "src.game", "src.account.crypto",
+                       "src.shared", "src.net.protocol", "src")
+
+
+def test_server_imports_only_its_allowed_layers_and_the_standard_library():
+    offenders = []
+    for path in import_graph.iter_py_files(ROOT / "src" / "server"):
+        rel = str(path.relative_to(ROOT))
+        for imp in _all_top_level_imports(path):
+            root = imp.split(".")[0]
+            if root == "src":
+                ok = any(imp == p or imp.startswith(p + ".")
+                         for p in _SERVER_ALLOWED_SRC)
+                if not ok:
+                    offenders.append((rel, imp))
+            elif root not in sys.stdlib_module_names and root != "__future__":
+                offenders.append((rel, imp))          # a third-party package
+    assert offenders == [], f"src/server reaches outside its layer: {offenders}"
+
+
+def test_net_and_server_share_only_the_protocol_module():
+    offenders = []
+    for path in import_graph.iter_py_files(ROOT / "src" / "net"):
+        for imp in import_graph.extract_imports(path):
+            if imp == "src.server" or imp.startswith("src.server."):
+                offenders.append((str(path.relative_to(ROOT)), imp))
+    for path in import_graph.iter_py_files(ROOT / "src" / "server"):
+        for imp in import_graph.extract_imports(path):
+            if (imp == "src.net" or imp.startswith("src.net.")) \
+                    and imp != "src.net.protocol":
+                offenders.append((str(path.relative_to(ROOT)), imp))
+    assert offenders == [], offenders
+
+
+def test_nothing_else_imports_the_server_package():
+    offenders = []
+    for path in _production_py_files():
+        if "src/server/" in path.as_posix():
+            continue
+        for imp in import_graph.extract_imports(path):
+            if imp == "src.server" or imp.startswith("src.server."):
+                offenders.append(f"{path.relative_to(ROOT)}: {imp}")
+    assert offenders == [], offenders
+
+
+def test_importing_the_server_pulls_in_no_heavy_or_ui_modules():
+    """The server runs on a bare VM: no OpenCV, NumPy, Pillow, GL, no UI,
+    camera or content code may come in, even through ``src.game``."""
+    import subprocess
+
+    code = (
+        "import sys, src.server.app, src.server.admin, src.server.__main__\n"
+        "bad = [m for m in sys.modules if m.split('.')[0] in "
+        "('cv2','numpy','PIL','OpenGL','glfw','torch','onnxruntime') or "
+        "m.startswith(('src.ui_album','src.engine','src.renderer','src.camera',"
+        "'src.tracking','src.pose','src.content','src.fx','src.scene'))]\n"
+        "print(sorted(bad))\n")
+    done = subprocess.run([sys.executable, "-c", code], cwd=ROOT,
+                          capture_output=True, text=True)
+    assert done.returncode == 0, done.stderr
+    assert done.stdout.strip() == "[]", done.stdout
