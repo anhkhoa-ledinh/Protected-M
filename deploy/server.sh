@@ -274,6 +274,8 @@ cmd_import() {
     say "loading the image ..."
     docker load -i "$dir/image.tar" >/dev/null
     make_volumes
+    mkdir -p "$CERT_DIR"
+    [ -f "$CERT_DIR/cert.pem" ] || cp "$dir/cert.pem" "$CERT_DIR/cert.pem"
     HCPD_IMAGE="$IMAGE" bash "$DEPLOY/import_certs.sh" "$dir" "$V_CERTS" >/dev/null
     oneoff -i --user 10001 -v "$V_BACKUPS:/backups" -- sh -c "cat > /backups/$backup_file" < "$dir/$backup_file"
     if oneoff -v "$V_DATA:/data:ro" -- test -f /data/server.db; then
