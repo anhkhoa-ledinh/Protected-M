@@ -119,6 +119,7 @@ class _Conn:
         self._send_lock = threading.Lock()
         self.last_seen = time.monotonic()
         self.alive = True
+        self.disconnected_at: "float | None" = None
         self.token = secrets.token_hex(8)
         self.match: "_Match | None" = None
         self.last_match: "_Match | None" = None
@@ -356,6 +357,9 @@ class Server:
 
     def _on_disconnect(self, conn: _Conn) -> None:
         conn.alive = False
+        conn.disconnected_at = time.monotonic()
+        logger.info("pvp server: %s disconnected (last_seen %.2fs ago)",
+                    conn.name, time.monotonic() - conn.last_seen)
         with self._lock:
             self._conns.discard(conn)
             for key, waiting in list(self._queue.items()):
@@ -400,6 +404,10 @@ class Server:
             # or Hunt & Hide setup too).
             for conn in match.players():
                 if not conn.alive and now - conn.last_seen > self._reconnect_s:
+                    logger.info("pvp server: forfeit %s in match %s: now-last_seen=%.2fs, "
+                                "since disconnect=%.2fs",
+                                conn.name, match.id, now - conn.last_seen,
+                                now - (conn.disconnected_at or now))
                     self._end_match(match, reason="opponent_disconnected",
                                      winner=match.other(conn))
                     return
@@ -550,6 +558,8 @@ class Server:
                     if seat in match.ready:
                         match.ready.discard(seat)
                         match.ready.add(conn)
+                logger.info("pvp server: rejoin accepted: %s took the %s seat in match %s",
+                            conn.name, seat_attr, match.id)
                 match.other(conn).send({"t": proto.ERROR, "code": "opponent_reconnected",
                                         "message": "Opponent reconnected."})
                 conn.send({"t": proto.MATCHED, "role": match.role_of(conn),
@@ -558,6 +568,8 @@ class Server:
                            "mode": match.mode, "level": match.level,
                            "room": match.id, "token": conn.token, "resumed": True})
                 return
+        logger.info("pvp server: rejoin refused: no seat for token (%d matches, %d ended)",
+                    len(matches), sum(1 for m in matches if m.ended))
         conn.send({"t": proto.ERROR, "code": "rejoin_failed",
                    "message": "No match to rejoin."})
 

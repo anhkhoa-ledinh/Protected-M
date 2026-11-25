@@ -89,13 +89,20 @@ class FakeClient:
 
     def recv_type(self, t: str, timeout: float = 5.0) -> dict:
         deadline = time.monotonic() + timeout
+        skipped: list[str] = []
         while True:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                raise TimeoutError(f"no {t!r} message received in time")
-            msg = self.recv(remaining)
+                raise TimeoutError(f"no {t!r} message received in time; "
+                                   f"skipped: {skipped or 'none'}")
+            try:
+                msg = self.recv(remaining)
+            except TimeoutError:
+                raise TimeoutError(f"no {t!r} message received in time; "
+                                   f"skipped: {skipped or 'none'}") from None
             if msg.get("t") == t:
                 return msg
+            skipped.append(f"{msg.get('t')}/{msg.get('code')}")
 
     def close(self) -> None:
         self._stop.set()
