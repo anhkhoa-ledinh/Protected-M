@@ -119,6 +119,13 @@ class _NullDevTools:
         pass
 
 
+_V3_TEXT_FIELDS = frozenset({
+    ID.FIELD_USER, ID.FIELD_PASS, ID.FIELD_PASS2, ID.FIELD_JOIN,
+    ID.FIELD_FORGOT_USER, ID.FIELD_FORGOT_CODE, ID.FIELD_FORGOT_PASS,
+    ID.FIELD_FORGOT_PASS2,
+})
+
+
 class HcpdApplication:
     """
     Head-coupled perspective display application.
@@ -743,7 +750,9 @@ class HcpdApplication:
         if not self._album_options.is_v3:
             return False
         state = self._album.state
-        return state.focus is not None or state.forgot_open
+        # ``state.focus`` also holds a main-menu button (click / Up-Down),
+        # which is not a text field and must not swallow match keys.
+        return state.focus in _V3_TEXT_FIELDS or state.forgot_open
 
     def _tick_v3_input(self, input_state, now: float) -> None:
         """
