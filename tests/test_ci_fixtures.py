@@ -32,6 +32,20 @@ def test_gl_context_is_skipped_when_forced(monkeypatch, request):
         request.getfixturevalue("gl_context")
 
 
+def _fake_glfw(monkeypatch):
+    """A glfw that gets as far as a window, so the fixture's own decision on
+    ``glGetString`` is what these tests exercise (a headless runner would stop
+    at ``glfw.init()`` first)."""
+    import glfw
+
+    monkeypatch.setattr(glfw, "init", lambda: True)
+    monkeypatch.setattr(glfw, "window_hint", lambda *a: None)
+    monkeypatch.setattr(glfw, "create_window", lambda *a: object())
+    monkeypatch.setattr(glfw, "make_context_current", lambda w: None)
+    monkeypatch.setattr(glfw, "destroy_window", lambda w: None)
+    monkeypatch.setattr(glfw, "terminate", lambda: None)
+
+
 def test_gl_context_skips_when_glgetstring_raises(monkeypatch, request):
     """TASK_ci_1116 P3 round 1 CI failure: the runner creates a non-None
     window (GLFW only warns, it doesn't fail the call) over a context that
@@ -45,6 +59,8 @@ def test_gl_context_skips_when_glgetstring_raises(monkeypatch, request):
     monkeypatch.delenv("PM_FORCE_NO_GL", raising=False)
     import OpenGL.GL as GL
 
+    _fake_glfw(monkeypatch)
+
     def boom(name):
         raise RuntimeError("simulated: GLError 1282 (invalid operation)")
 
@@ -57,6 +73,7 @@ def test_gl_context_skips_when_version_is_below_3_3(monkeypatch, request):
     monkeypatch.delenv("PM_FORCE_NO_GL", raising=False)
     import OpenGL.GL as GL
 
+    _fake_glfw(monkeypatch)
     monkeypatch.setattr(GL, "glGetString", lambda name: b"3.1.0 Mesa 20.0")
     with pytest.raises(pytest.skip.Exception, match=r"3\.1\.0 Mesa 20\.0"):
         request.getfixturevalue("gl_context")
