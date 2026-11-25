@@ -5,7 +5,8 @@
 
 ``run`` copies ``server.db`` with the SQLite online backup API (safe while the
 server writes), checks the copy, keeps the newest ``--keep`` files and logs one
-line per run. With ``--every`` it repeats forever (the compose backup service);
+line per run. With ``--every`` it repeats forever; the server runs the same code in a
+background thread (``--backup-dir``);
 without it, it runs once. ``restore`` puts a backup into a data dir that has no
 database yet; it never overwrites one."""
 
@@ -90,6 +91,25 @@ def restore(backup_file: Path, data_dir: Path) -> Path:
         src.close()
     log.info("restored %s into %s (%d accounts)", backup_file.name, target, accounts)
     return target
+
+
+def start_background(data_dir: Path, backup_dir: Path, keep: int, every: float,
+                     stop: threading.Event) -> threading.Thread:
+    """Back up once now, then every ``every`` seconds, until ``stop`` is set.
+
+    Runs in a daemon thread inside the server process. A failed run is logged
+    and never stops the server or the loop."""
+    def loop() -> None:
+        while True:
+            try:
+                backup_once(data_dir, backup_dir, keep)
+            except Exception as exc:
+                log.error("backup FAILED: %s: %s", type(exc).__name__, exc)
+            if stop.wait(every):
+                return
+    thread = threading.Thread(target=loop, name="hcpd-backup", daemon=True)
+    thread.start()
+    return thread
 
 
 def _run(args) -> int:

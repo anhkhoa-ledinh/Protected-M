@@ -53,3 +53,19 @@ def test_restore_refuses_a_corrupt_file(tmp_path):
 def test_backup_without_database_fails(tmp_path):
     with pytest.raises(FileNotFoundError):
         backup.backup_once(tmp_path / "empty", tmp_path / "b")
+
+
+def test_background_thread_backs_up_and_survives_failure(tmp_path):
+    import threading
+    import time
+    store = _db(tmp_path)
+    stop = threading.Event()
+    th = backup.start_background(store.data_dir, tmp_path / "b", 3, 0.2, stop)
+    time.sleep(1.5)
+    (store.data_dir / DB_NAME).rename(store.data_dir / "moved")   # next runs fail
+    time.sleep(0.6)
+    assert th.is_alive()                                           # failure did not kill it
+    stop.set()
+    th.join(2)
+    assert not th.is_alive()
+    assert 1 <= len(list((tmp_path / "b").glob("server-*.db"))) <= 3

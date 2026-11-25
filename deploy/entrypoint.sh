@@ -10,4 +10,7 @@ exec python -m src.server \
     --max-conns-per-ip "${HCPD_MAX_CONNS_PER_IP:-10}" \
     --rate-per-s "${HCPD_RATE_PER_S:-20}" \
     --rate-burst "${HCPD_RATE_BURST:-40}" \
-    --connects-per-min "${HCPD_CONNECTS_PER_MIN:-60}"
+    --connects-per-min "${HCPD_CONNECTS_PER_MIN:-60}" \
+    --backup-dir /backups \
+    --backup-every "${HCPD_BACKUP_EVERY_S:-86400}" \
+    --backup-keep "${HCPD_BACKUP_KEEP:-7}"

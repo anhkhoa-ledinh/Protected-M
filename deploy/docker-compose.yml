@@ -1,5 +1,5 @@
-# Central server + daily backup. Run from the repo root:
-#   docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d --build
+# Central server (one container; it backs itself up). Normally driven by
+#   bash deploy/server.sh <command>
 name: hcpd
 
 x-hardened: &hardened
@@ -32,27 +32,13 @@ services:
       HCPD_RATE_PER_S: ${HCPD_RATE_PER_S:-20}
       HCPD_RATE_BURST: ${HCPD_RATE_BURST:-40}
       HCPD_CONNECTS_PER_MIN: ${HCPD_CONNECTS_PER_MIN:-60}
+      HCPD_BACKUP_EVERY_S: ${HCPD_BACKUP_EVERY_S:-86400}
+      HCPD_BACKUP_KEEP: ${HCPD_BACKUP_KEEP:-7}
     ports:
       - "${HCPD_BIND:-127.0.0.1}:${HCPD_PORT:-47830}:47830"
     volumes:
       - data:/data
       - certs:/certs:ro
-
-  backup:
-    <<: *hardened
-    container_name: ${HCPD_BACKUP_CONTAINER:-hcpd-backup}
-    mem_limit: 128m
-    pids_limit: 32
-    entrypoint: ["python", "-m", "src.server.backup"]
-    command: ["run", "--data-dir", "/data", "--backup-dir", "/backups",
-              "--keep", "${HCPD_BACKUP_KEEP:-7}", "--every", "${HCPD_BACKUP_EVERY_S:-86400}"]
-    healthcheck:
-      disable: true
-    depends_on:
-      server:
-        condition: service_healthy   # the database exists once the server is up
-    volumes:
-      - data:/data
       - backups:/backups
 
 volumes:

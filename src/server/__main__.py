@@ -7,9 +7,11 @@ import asyncio
 import logging
 import signal
 import sys
+import threading
 from pathlib import Path
 
 from src.server.app import CentralServer
+from src.server.backup import start_background
 from src.server.config import DEFAULT_PORT, LOOPBACK, ConfigError, ServerConfig
 
 
@@ -30,17 +32,27 @@ def parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--rate-burst", type=int, default=ServerConfig.rate_burst)
     p.add_argument("--connects-per-min", type=int,
                    default=ServerConfig.connects_per_min_per_ip)
+    p.add_argument("--backup-dir", type=Path,
+                   help="enable the built-in backup thread, writing here")
+    p.add_argument("--backup-every", type=float, default=86400,
+                   help="seconds between backups (the first runs at start)")
+    p.add_argument("--backup-keep", type=int, default=7)
     return p.parse_args(argv)
 
 
-async def _run(cfg: ServerConfig) -> None:
+async def _run(cfg: ServerConfig, args=None) -> None:
     server = CentralServer(cfg)
     await server.start()
+    halt = threading.Event()
+    if args is not None and args.backup_dir and args.backup_every > 0:
+        start_background(cfg.data_dir, args.backup_dir, args.backup_keep,
+                         args.backup_every, halt)
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, stop.set)
     await stop.wait()
+    halt.set()
     await server.stop()
 
 
@@ -60,7 +72,7 @@ def main(argv=None) -> int:
     except ConfigError as exc:
         print(f"refused: {exc}", file=sys.stderr)
         return 2
-    asyncio.run(_run(cfg))
+    asyncio.run(_run(cfg, args))
     return 0
 
 
