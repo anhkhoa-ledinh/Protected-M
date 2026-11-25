@@ -132,7 +132,7 @@ def test_the_board_comes_from_the_server(srv, tmp_path):
 # ---- trust and failure ---------------------------------------------------------------
 
 def test_a_server_with_another_certificate_is_refused(srv, tmp_path):
-    _, _ = make_cert(tmp_path / "other")
+    _, _ = make_cert(tmp_path / "other", "b")
     client = CentralClient("127.0.0.1", srv.port, tmp_path / "other" / "cert.pem", timeout=5)
     with pytest.raises(CentralIdentityError):
         client.request({"t": "ping"})

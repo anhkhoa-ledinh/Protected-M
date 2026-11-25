@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
+import shutil
 import socket
 import ssl
 import subprocess
@@ -29,10 +31,25 @@ CERT_TOOL = ROOT / "tools" / "make_dev_cert.sh"
 
 # ---- helpers ---------------------------------------------------------------
 
-def make_cert(out: Path, *extra: str) -> tuple[Path, Path]:
-    subprocess.run(["bash", str(CERT_TOOL), str(out), *extra], check=True,
-                   capture_output=True)
+PKI = ROOT / "tests" / "data" / "pki"
+
+
+def make_cert(out: Path, which: str = "a") -> tuple[Path, Path]:
+    """Copy a fixed public test pair (a or b) into ``out``; no bash needed."""
+    out.mkdir(parents=True, exist_ok=True)
+    for kind in ("cert", "key"):
+        shutil.copyfile(PKI / f"{which}_{kind}.pem", out / f"{kind}.pem")
     return out / "cert.pem", out / "key.pem"
+
+
+def real_bash_and_openssl() -> bool:
+    """False on the Windows WSL stub, which is a `bash` that cannot run anything."""
+    try:
+        done = subprocess.run(["bash", "-c", "openssl version"],
+                              capture_output=True, text=True, timeout=20)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return done.returncode == 0 and "openssl" in done.stdout.lower()
 
 
 class Running:
@@ -138,6 +155,8 @@ def test_data_dir_inside_the_repo_is_refused():
 
 
 def test_cert_tool_refuses_to_write_inside_the_repo():
+    if not real_bash_and_openssl():
+        pytest.skip("needs a working bash and openssl (not the Windows WSL stub)")
     done = subprocess.run(["bash", str(CERT_TOOL), str(ROOT / "tmp_pki")],
                           capture_output=True, text=True)
     assert done.returncode != 0 and "inside the repo" in done.stderr
@@ -149,7 +168,8 @@ def test_cert_tool_refuses_to_write_inside_the_repo():
 def test_store_creates_a_private_dir_and_migrates_once(tmp_path):
     store = Store(tmp_path / "d")
     assert store.schema_version() == len(MIGRATIONS)
-    assert (tmp_path / "d").stat().st_mode & 0o077 == 0
+    if os.name == "posix":                         # Windows has no mode bits
+        assert (tmp_path / "d").stat().st_mode & 0o077 == 0
     store.close()
     again = Store(tmp_path / "d")                 # second open: no re-migration
     rows = again.connect().execute("SELECT COUNT(*) FROM meta").fetchone()[0]
@@ -279,7 +299,7 @@ def test_plain_tcp_to_a_tls_server_gets_nothing_and_is_closed(tmp_path):
 
 def test_client_refuses_a_server_with_another_certificate(tmp_path):
     cfg, _ = tls_cfg(tmp_path)
-    _, _ = make_cert(tmp_path / "other")
+    _, _ = make_cert(tmp_path / "other", "b")
     with Running(cfg) as srv:
         with pytest.raises(ssl.SSLCertVerificationError):
             connect(srv.port, tmp_path / "other" / "cert.pem")
@@ -385,3 +405,26 @@ def test_the_server_survives_a_garbage_burst(tmp_path):
         s = connect(srv.port)
         send(s, HELLO)
         assert recv_line(s)["t"] == "ok"
+
+
+# ---- test-cert guard and signals ---------------------------------------------
+
+def test_the_server_refuses_a_public_test_certificate(tmp_path, capsys):
+    from src.server.__main__ import main
+    base = ["--data-dir", str(tmp_path / "d"), "--cert", str(PKI / "a_cert.pem"),
+            "--key", str(PKI / "a_key.pem")]
+    assert main(base) == 2
+    assert "public test certificate" in capsys.readouterr().err
+
+
+def test_the_test_certificate_is_accepted_with_the_insecure_flag(tmp_path, monkeypatch):
+    from src.server import __main__ as m
+    ran = []
+
+    async def fake_run(cfg, args=None):
+        ran.append(cfg)
+    monkeypatch.setattr(m, "_run", fake_run)
+    assert m.main(["--data-dir", str(tmp_path / "d"), "--insecure-localhost",
+                   "--cert", str(PKI / "a_cert.pem"),
+                   "--key", str(PKI / "a_key.pem")]) == 0
+    assert ran

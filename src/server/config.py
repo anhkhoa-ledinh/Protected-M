@@ -13,6 +13,24 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 
 LOOPBACK = "127.0.0.1"
 
+#: SHA-256 of the public test certificates in tests/data/pki (their keys are
+#: published in the repo, so a real server must never use them).
+TEST_CERT_SHA256 = frozenset({
+    "dee22e5cc4039301679af22fb625c2f8355c8d53be0b39efaa2da65afc0763a0",
+    "1618b3ac91d2637a7a8c1e56530a6cfc5f9a96f4c252fd8d5c1ea5900033d2ea",
+})
+
+
+def is_test_cert(path: Path) -> bool:
+    """True when the PEM file holds one of the public test certificates."""
+    import hashlib
+    import ssl
+    try:
+        der = ssl.PEM_cert_to_DER_cert(Path(path).read_text(encoding="ascii"))
+    except (OSError, ValueError):
+        return False
+    return hashlib.sha256(der).hexdigest() in TEST_CERT_SHA256
+
 
 class ConfigError(ValueError):
     """The settings are unsafe or inconsistent; the server does not start."""

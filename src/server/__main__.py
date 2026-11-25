@@ -12,7 +12,8 @@ from pathlib import Path
 
 from src.server.app import CentralServer
 from src.server.backup import start_background
-from src.server.config import DEFAULT_PORT, LOOPBACK, ConfigError, ServerConfig
+from src.server.config import (DEFAULT_PORT, LOOPBACK, ConfigError, ServerConfig,
+                               is_test_cert)
 
 
 def parse_args(argv=None) -> argparse.Namespace:
@@ -71,6 +72,10 @@ def main(argv=None) -> int:
         cfg.validate()
     except ConfigError as exc:
         print(f"refused: {exc}", file=sys.stderr)
+        return 2
+    if not cfg.insecure_localhost and cfg.cert and is_test_cert(cfg.cert):
+        print("refused: this is a public test certificate (tests/data/pki); "
+              "make your own with tools/make_dev_cert.sh", file=sys.stderr)
         return 2
     asyncio.run(_run(cfg, args))
     return 0
