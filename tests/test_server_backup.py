@@ -69,3 +69,18 @@ def test_background_thread_backs_up_and_survives_failure(tmp_path):
     th.join(2)
     assert not th.is_alive()
     assert 1 <= len(list((tmp_path / "b").glob("server-*.db"))) <= 3
+
+
+def test_failed_check_leaves_no_file_and_keeps_old_backups(tmp_path):
+    store = _db(tmp_path)
+    good = backup.backup_once(store.data_dir, tmp_path / "b", now=1_000_000)
+    db = store.data_dir / DB_NAME
+    store.close() if hasattr(store, "close") else None
+    data = bytearray(db.read_bytes())
+    data[:] = b"\x00" * len(data)
+    db.write_bytes(bytes(data))
+    for suffix in ("-wal", "-shm"):
+        (store.data_dir / (DB_NAME + suffix)).unlink(missing_ok=True)
+    with pytest.raises(Exception):
+        backup.backup_once(store.data_dir, tmp_path / "b", now=1_000_100)
+    assert sorted(p.name for p in (tmp_path / "b").iterdir()) == [good.name]
