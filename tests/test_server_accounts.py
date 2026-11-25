@@ -243,7 +243,18 @@ def test_no_network_message_reaches_an_admin_action():
 
 # ---- passwords and tokens never reach the log -------------------------------------------------
 
-def test_a_real_run_never_logs_passwords_tokens_or_recovery_codes(tmp_path):
+# The second run imitates Windows, whose event loop has no add_signal_handler.
+_NO_SIGNAL_LOOP = (
+    "import asyncio, sys\n"
+    "def _no(self, *a, **k): raise NotImplementedError\n"
+    "for c in (asyncio.SelectorEventLoop,):\n"
+    "    c.add_signal_handler = _no\n"
+    "from src.server.__main__ import main\n"
+    "raise SystemExit(main(sys.argv[1:]))\n")
+
+
+@pytest.mark.parametrize("windows_like", [False, True], ids=["native", "no-signal-handlers"])
+def test_a_real_run_never_logs_passwords_tokens_or_recovery_codes(tmp_path, windows_like):
     secret_pw = "S3cretPassw0rd!xyz"
     logfile = tmp_path / "server.log"
     with socket.socket() as s:
@@ -251,7 +262,9 @@ def test_a_real_run_never_logs_passwords_tokens_or_recovery_codes(tmp_path):
         port = s.getsockname()[1]
     with open(logfile, "wb") as out:
         proc = subprocess.Popen(
-            [sys.executable, "-m", "src.server", "--data-dir", str(tmp_path / "d"),
+            ([sys.executable, "-c", _NO_SIGNAL_LOOP] if windows_like
+             else [sys.executable, "-m", "src.server"])
+            + ["--data-dir", str(tmp_path / "d"),
              "--insecure-localhost", "--port", str(port), "--rate-per-s", "1000",
              "--rate-burst", "1000"], cwd=ROOT, stdout=out, stderr=out)
         try:
@@ -261,6 +274,10 @@ def test_a_real_run_never_logs_passwords_tokens_or_recovery_codes(tmp_path):
                     break
                 except OSError:
                     time.sleep(0.1)
+            else:
+                out.flush()
+                tail = logfile.read_text(errors="replace")[-3000:]
+                pytest.fail(f"the server never listened; log tail:\n{tail}")
             sock = socket.create_connection(("127.0.0.1", port), 5)
             f = sock.makefile("rwb")
 

@@ -428,3 +428,33 @@ def test_the_test_certificate_is_accepted_with_the_insecure_flag(tmp_path, monke
                    "--cert", str(PKI / "a_cert.pem"),
                    "--key", str(PKI / "a_key.pem")]) == 0
     assert ran
+
+
+def test_the_server_starts_and_stops_when_the_loop_has_no_signal_handlers(
+        tmp_path, monkeypatch):
+    """Windows event loops raise NotImplementedError from add_signal_handler."""
+    import signal
+    from src.server import __main__ as m
+
+    def no_support(self, *a, **k):
+        raise NotImplementedError
+    monkeypatch.setattr(asyncio.SelectorEventLoop, "add_signal_handler", no_support,
+                        raising=False)
+    installed = {}
+    monkeypatch.setattr(signal, "signal", lambda sig, h: installed.setdefault(sig, h))
+
+    async def go():
+        task = asyncio.create_task(m._run(plain_cfg(tmp_path)))
+        for _ in range(100):
+            if signal.SIGINT in installed:
+                break
+            await asyncio.sleep(0.05)
+        assert signal.SIGINT in installed        # the fallback was used
+        installed[signal.SIGINT](signal.SIGINT, None)
+        await asyncio.wait_for(task, 10)         # and it stops the server
+
+    loop = asyncio.new_event_loop()    # not asyncio.run: it installs its own SIGINT hook
+    try:
+        loop.run_until_complete(go())
+    finally:
+        loop.close()
