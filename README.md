@@ -51,11 +51,14 @@ Everything runs on the CPU. A dedicated GPU is not required.
 
 ## Requirements
 
-- Windows 10 or 11. The launch scripts are `.bat` files. Tested with Python
-  3.13.
+- Windows 10/11 or Linux (developed on CachyOS + Hyprland). Launch scripts:
+  `run_game.bat` / `run_server.bat` on Windows, `bash run_game.sh` /
+  `bash run_server.sh` on Linux. Tested with Python 3.13.
 - A webcam, with your face lit from the front.
 - A few GB of free disk space for PyTorch and the models downloaded on first
   run.
+- Optional: Docker, only on the machine that hosts the
+  [central server](#central-server-optional).
 
 ---
 
@@ -156,17 +159,18 @@ never committed.
 run_game.bat
 ```
 
-This runs `python main.py --album` with the `.venv` in this folder and
-writes a log to `logs\game_<date>_<time>.log`. If `.venv` does not exist yet,
-the script tells you how to create it.
+On Linux: `bash run_game.sh`. Both run `python main.py --album` and write a
+log to `logs/game_<date>_<time>.log`. If the Python environment does not
+exist yet, the script tells you how to create it.
 
 A round goes like this:
 
-1. **Sign in.** Accounts are real and local — stored only on this computer
-   (`assets/config/accounts.json`), with a scrypt-hashed password, **Remember
-   me** (keeps you signed in next launch) and a recovery code if you forget
-   your password. Playing as guest skips sign-in but does not save your
-   progress.
+1. **Sign in.** Accounts are stored on this computer
+   (`assets/config/accounts.json`) by default, or on a
+   [central server](#central-server-optional) if one is configured. Passwords
+   are scrypt-hashed; **Remember me** keeps you signed in next launch, and a
+   recovery code gets you back in if you forget your password. Playing as
+   guest skips sign-in but saves nothing.
 2. **Choose a level.**
 3. **Choose a photo.** You can:
    - pick one from your computer;
@@ -174,7 +178,8 @@ A round goes like this:
    - press `U` to share yours to the shared album.
 
    Then click **Split layers & continue** and wait for the layers to bake.
-4. **Loadout.** Pick one of three guns and put items in your slots.
+4. **Loadout.** Pick one of three guns and put items in your slots. Items
+   cost points (see [Points](#points)).
 5. **Head-tilt check.** Tilt your head left and right. **Enter match** unlocks
    anyway after 15 s, so a weak webcam cannot block you.
 6. **Hunt.** Move your head to look behind the layers, aim with the mouse and
@@ -182,24 +187,65 @@ A round goes like this:
 
 ### Levels
 
-| Level | Bugs | Time | Item slots | Bugs fight back | Bug HP |
-|---|---|---|---|---|---|
-| 1 · Easy | 6 | 180 s | 2 | no | 100 |
-| 2 · Normal | 8 | 150 s | 3 | no | 100 |
-| 3 · Hard | 10 | 150 s | 3 | yes | 150 |
-| 4 · Infestation | 12 | 120 s | 4 | yes | 200 |
-| 5 · Asian Mode | 12 | 120 s | 4 | yes; stamina and overtime count | 200 |
+Higher levels are harder in ways the photo cannot cap: bugs hide where you
+must lean further, blend in more, are smaller, take more hits, and on levels
+4–5 move to a new hiding spot once you have seen them for a while.
+
+| Level | Bugs asked | Time | Item slots | Lean to reveal | Camouflage | Bug size | Moves after being seen | Bug HP |
+|---|---|---|---|---|---|---|---|---|
+| 1 · Easy | 6 | 180 s | 2 | 40–70 mm | 0.40 | ×1.0 | — | 100 |
+| 2 · Normal | 8 | 150 s | 3 | 50–85 mm | 0.55 | ×1.0 | — | 200 |
+| 3 · Hard | 10 | 150 s | 3 | 60–100 mm | 0.70 | ×1.0 | — | 300 |
+| 4 · Infestation | 12 | 120 s | 4 | 75–110 mm | 0.85 | ×0.875 | 4 s | 400 |
+| 5 · Asian Mode | 12 | 120 s | 4 | 90–120 mm | 1.00 | ×0.75 | 2.5 s | 500 |
+
+A photo can only hide as many bugs as it has hiding spots. When it holds
+fewer than the level asks for, the loading screen and the HUD say so (e.g.
+"photo holds 4 of 12"). Bug positions are random each match; the game tries
+eight layouts and keeps the fullest. Every number here lives in one table,
+`src/game/levels.py`.
 
 ### Guns
 
-| Gun | Magazine | Time between shots | Reload | Damage |
-|---|---|---|---|---|
-| Sniper rifle | 12 | 0.50 s | 1.1 s | 100 per hit (×2 on a headshot) |
-| Shotgun | 8 | 0.38 s | 0.9 s | 5 pellets × 25 per shot (no headshot bonus) |
-| Heavy-mag gun | 50 | 0.18 s | 2.5 s | 34 per hit (×1.5 on a headshot) |
+| Gun | Magazine | Time between shots | Reload | Damage per hit | Armour pierce |
+|---|---|---|---|---|---|
+| Sniper rifle | 12 | 0.50 s | 1.1 s | 150 (×2 on a headshot) | 1.00 |
+| Shotgun | 8 | 0.38 s | 0.9 s | 5 pellets × 37.5 (no headshot bonus) | 0.85 |
+| Heavy-mag gun | 100 | 0.18 s | 5.0 s | 51 (×1.5 on a headshot) | 0.70 |
 
-Hold right mouse to scope in with the Sniper rifle. Hold left click with the
-Heavy-mag gun for full-auto; the other two guns fire once per click.
+Damage to a bug = base damage × armour pierce × headshot bonus ÷ level.
+Press `R` to reload to a full magazine at any time. Hold right mouse to scope
+in with the Sniper rifle. Hold left click with the Heavy-mag gun for
+full-auto; the other two guns fire once per click.
+
+In PvP every hit still kills in one shot, and the Heavy-mag gun keeps its PvP
+magazine (50 rounds, 2.5 s reload).
+
+### Items
+
+| Item | Effect | Weight | Price |
+|---|---|---|---|
+| Flare | 8 s: every bug loses its camouflage and gets an outline | 3 | 30 |
+| Thermal scan | 6 s: bugs show as heat marks, even behind the photo layers | 8 | 80 |
+| Antidote, Acid shield, Filter lens, Compass, Energy drink, Smoke bomb | Coming soon (shown, not sold) | | |
+
+Press `1`, `2` or `3` in a match to use the item in that slot, once per match.
+Levels 4 and 5 have a fourth slot, but it has no key yet.
+
+### Points
+
+Points are both your score and your currency.
+
+- **Match score** = seconds left × level − Σ(uses × item weight). A lost
+  match scores 0. On level 5 the clock does not stop at zero: you get 30 more
+  seconds at −5 points per second, then the match is lost.
+- **Wallet:** a new account starts with 100 points. A win adds its score to
+  your wallet and to your **lifetime total**, which ranks the leaderboard;
+  spending never lowers your rank.
+- **Items cost points:** price = item weight × 10, paid when the match starts.
+- **PvP unlocks** once you have won every level 1–5 at least once.
+- **Leaderboard:** real players, ranked by lifetime total — the accounts on
+  this computer, or everyone on the central server.
 
 ### Controls
 
@@ -208,10 +254,10 @@ Heavy-mag gun for full-auto; the other two guns fire once per click.
 | Mouse | Aim, and click buttons |
 | Left click | Shoot (during a match); hold for full-auto with the Heavy-mag gun |
 | Right mouse (hold) | Scope in with the Sniper rifle |
-| `1` `2` `3` | Select an item slot |
+| `1` `2` `3` | Use the item in that slot (in a match) · select a slot (loadout) |
 | `H` | Hide/show the HUD (in a match only) |
 | `C` | Recentre to where you are sitting now |
-| `R` | Play again (result screen) · random photo from the shared album (photo screen) |
+| `R` | Reload to a full magazine (in a match) · play again (result screen) · random photo from the shared album (photo screen) |
 | `U` | Share the chosen photo to the shared album (photo screen) |
 | `Enter` | Main button of the current screen |
 | `↑` / `↓` | Move focus on the main menu |
@@ -253,11 +299,16 @@ report *"Shared album not configured"* and the rest of the game works
 normally.
 
 Anyone who has your unsigned preset can upload to your account. The app
-therefore treats everything it downloads as untrusted:
+therefore treats everything it downloads as untrusted. Every photo — shared,
+picked from your computer, or received in PvP — goes through one import gate
+(`src/content/media_gate.py`) before anything decodes it:
 
-- it checks that the file decodes as an image;
-- it rejects anything over 4096 px on the long side;
-- it never builds a file path from a remote name.
+- the file type is decided by its content, not its name (PNG, JPEG, WebP);
+- size and pixel limits are checked before decoding (no decompression bombs);
+- multi-frame files are refused; extra bytes after the image are dropped;
+- the photo is decoded once and re-encoded to a clean PNG with no metadata,
+  and only that copy goes further;
+- no file path is ever built from a remote name.
 
 ---
 
@@ -274,7 +325,7 @@ automatically.
    run_server.bat
    ```
 
-   Leave that window open for the whole session (`Ctrl+C` to stop it).
+   (On Linux: `bash run_server.sh`.) Leave that window open for the whole session (`Ctrl+C` to stop it).
 
 2. **Allow Python through Windows Firewall.** The first time you run
    `run_server.bat` (or `run_game.bat`), Windows will ask to allow Python
@@ -323,26 +374,66 @@ automatically.
 
 ---
 
+## Central server (optional)
+
+By default accounts, wallets and the leaderboard live on each computer. A
+**central server** keeps them in one place, so players on different machines
+share one leaderboard. The server is ours (`src/server/`, Python standard
+library only) and is the referee: it holds the wallets, charges items, and
+computes each score from **its own clock** with one-time match tickets, so a
+modified game cannot simply report a bigger score.
+
+It runs as **one Docker container**, driven by one script. On the machine
+that hosts it:
+
+```bash
+bash deploy/server.sh setup      # first time: settings, certificate, image
+bash deploy/server.sh start      # start and wait until healthy
+bash deploy/server.sh status     # running? last backup? how many accounts?
+bash deploy/server.sh help       # every command
+```
+
+- TLS only; the game pins the server's certificate (`cert.pem`). Give players
+  `cert.pem`, never `key.pem`.
+- Not exposed by default: it listens on `127.0.0.1` until you set `HCPD_BIND`
+  in `deploy/.env` (for example a [Tailscale](https://tailscale.com/)
+  `100.x` address, so friends can join without opening your router).
+- Backs itself up at start and every 24 h, keeping the last 7
+  (`backup`, `backups`, `restore`). `export` / `import` move it to another
+  machine; `update` rebuilds it after a code change, keeping the data.
+
+On each player's machine, point the game at the server with
+`assets/config/central.json` (the cert path is relative to that file):
+
+```json
+{"mode": "remote", "host": "100.x.y.z", "port": 47830, "cert": "server_cert.pem", "name": "Home server"}
+```
+
+Delete the file to go back to local accounts. Full guide (Vietnamese):
+[docs/deploy.md](docs/deploy.md). Design, roles and known limits:
+[docs/server.md](docs/server.md); threat review:
+[docs/security.md](docs/security.md).
+
+---
+
 ## Known issues
 
 This is a demo build. Known problems so far:
 
 - **The player health bar never changes.** There is no way to damage the
-  player yet, in solo play or PvP — a level is lost only by running out of
-  time, never by taking a hit.
-- **Loadout items have no effect yet.** Picking one into a slot and using it
-  (PvP only — solo play has no way to use an item at all) only costs points
-  via its weight and shows up in the match result; none of the 8 items
-  (Flare, Antidote, Acid shield, Filter lens, Compass, Thermal scan, Energy
-  drink, Smoke bomb) heals, reveals or helps in any other way.
-- **The leaderboard still shows sample entries.** Accounts and match history
-  are real and local now (see [Play](#play) above); only the leaderboard
-  itself is not wired to real player data yet — your own row is computed
-  from your real history, the rest are fixed sample rows.
-- **Hunt & Hide bug placement is automatic, not click-to-place.** The
-  hider's bugs are placed by the same algorithm solo matches use (hidden
-  from the design rest eye), not by clicking the photo. Relocating one bug
-  during the hunt isn't implemented either.
+  player yet — a level is lost only by running out of time.
+- **The fourth item slot (levels 4–5) has no key.** Only `1`–`3` are bound.
+- **Only two items work.** Flare and Thermal scan have real effects; the other
+  six are shown as "Coming soon" and cannot be bought.
+- **In-match PvP still runs on the LAN server.** The central server handles
+  sign-in, rooms and photo checks for PvP, but the match itself (hits,
+  timers, results) still goes through `run_server` on the local network, and
+  PvP results are not on the leaderboard yet.
+- **A win the server refuses** shows "Not saved" and a score of 0, but the win
+  art (the "PROTECTED" stamp and the "Next level" button) is still drawn.
+- **Saving a result to the central server blocks the screen** for up to 8 s on
+  a slow network.
+- **Hunt & Hide bug placement is automatic, not click-to-place.**
 - **The first load of a new photo is slow.** Depth estimation, layer splitting
   and LaMa all run on the CPU. On a 2-core laptop this can take a minute or
   more. The same photo loads instantly the second time, from
@@ -350,20 +441,22 @@ This is a demo build. Known problems so far:
 - **Head tracking needs light from the front.** Sit 40–50 cm from the screen.
   Close other apps that hold the webcam (Zalo, Meet, Teams, browser tabs)
   before starting.
+- **On Hyprland, a tiled window changes the game** (fewer hiding spots fit).
+  Float it — see [Linux](#linux).
 - **`cv2` may fail to import.** `requirements.txt` lists both
   `opencv-python` and `opencv-contrib-python`. If `import cv2` fails, uninstall
   both and reinstall only `opencv-contrib-python`.
 
-If the game misbehaves, the log is in `logs\`. Please attach it when you
+If the game misbehaves, the log is in `logs/`. Please attach it when you
 report a bug.
 
 ---
 
 ## Roadmap
 
-- Click-to-place bug hiding for Hunt & Hide's hider, and bug relocation
-  during the hunt.
-- A real leaderboard instead of sample data.
+- In-match PvP on the central server, with PvP results on the leaderboard.
+- Bugs that fight back, player health and the six remaining items.
+- Click-to-place bug hiding for Hunt & Hide's hider.
 - Sound.
 
 ---
@@ -406,9 +499,12 @@ HUD instead.
 .venv\Scripts\python.exe -m pytest -q
 ```
 
+On Linux: `~/.venvs/protected-m/bin/python -m pytest -q`.
+
 Tests that need a real OpenGL context skip automatically, with a clear
 reason, on a machine without a real OpenGL 3.3 driver — this is what
-happens on CI's runners.
+happens on CI's runners. The suite fails if any test changes the real files
+in `assets/config/`.
 
 ---
 
@@ -425,29 +521,40 @@ happens on CI's runners.
 | `assets/config/user_prefs.json` | Display mode and window position | no |
 | `assets/config/shared_album.json` | Cloudinary settings | no |
 | `assets/config/pvp.json` | PvP server `IP:port` override (skips discovery) | no |
-| `assets/config/accounts.json` | Local accounts: display name, scrypt-hashed password, recovery-code hash, play history and best score | no |
+| `assets/config/accounts.json` | Local accounts: display name, scrypt-hashed password, recovery-code hash, play history, wallet, lifetime points, levels cleared | no |
 | `assets/config/accounts.json.bak` | Previous good copy of `accounts.json`, used to recover from an interrupted write | no |
 | `assets/config/session.json` | "Remember me" session token, for auto sign-in on the next launch | no |
+| `assets/config/central.json` | Use a central server: `mode`, `host`, `port`, pinned `cert`, display `name` | no |
+| `deploy/.env` | Central server settings (bind address, port, limits, backups); copy of `deploy/.env.example` | no |
 
 ---
 
 ## Architecture
 
-Dependencies only point down:
+Dependencies only point down, and data flows one way:
 
 ```
+input → routes (action name) → V3UI.dispatch → services / game → MatchView → painter
+
 app (thin shell: window, loop, wiring)
-  -> ui, game, net        ui and net read game; game imports none of them
+  -> ui, game, net, services   ui never imports account, game internals, camera or tracking
   -> renderer, tracking, content
+server (separate process / container) -> game rules, shared account rules, account crypto
 ```
 
-`game/` is plain Python — match rules, weapons, firing, hit resolution,
-scoring — with no import of `src.engine`, `src.renderer`, `src.ui_album`,
-`src.fx`, `src.net`, OpenGL, glfw or PIL. `net/` depends on `game` for match
-constants, not on the UI. `devtools/` (bench/evidence/automatch test hooks)
-plugs into `app` through one entry point and is only imported when an
-`HCPD_*` flag is set. `tests/test_architecture.py` parses every import with
-`ast` and fails if any of this is broken.
+- `game/` is plain Python — match rules, weapons, firing, hit resolution,
+  scoring — with no import of the engine, renderer, UI, fx, net, OpenGL, glfw
+  or PIL.
+- The UI talks to accounts only through the `AccountService` interface (a
+  local and a remote implementation), reads the match only through a frozen
+  `MatchView`, and writes no files.
+- `server/` imports no UI, camera, tracking or content code; camera frames
+  never reach the network.
+- `devtools/` (bench/evidence/automatch hooks) uses only the public
+  `DevHooks` facade and is imported only when an `HCPD_*` flag is set.
+
+`tests/test_architecture.py` parses every import with `ast` and fails if any
+of this is broken.
 
 ---
 
@@ -455,8 +562,10 @@ plugs into `app` through one entry point and is only imported when an
 
 ```
 main.py                 Entry point (--album = game, --demo = research demo)
-run_game.bat            Launch the game
-run_server.bat          Launch the PvP LAN server
+run_game.bat / .sh      Launch the game (Windows / Linux)
+run_server.bat / .sh    Launch the PvP LAN server
+deploy/                 Central server: Dockerfile, docker-compose.yml,
+                        server.sh (the one script to run it), .env.example
 tools/launch/           Research launchers: run.bat/run.ps1 (sandbox),
                         run_demo.bat (presentation mode)
 src/
@@ -475,8 +584,13 @@ src/
   filters/              One Euro, Kalman, EMA, motion prediction
   math/                 Projection, matrices, quaternions
   camera/ scene/ gui/   Webcam capture, scene graph (meshes), calibration wizard
-  net/                  PvP wire protocol, LAN server, UDP discovery, client
-                        (depends on game, not on ui_album)
+  net/                  PvP wire protocol, LAN server, UDP discovery, client,
+                        central-server client (depends on game, not on ui_album)
+  server/               Central server: TLS, roles, accounts, wallet, scores,
+                        rooms, backups (standard library only)
+  shared/               Rules shared by the game and the server
+                        (usernames/passwords)
+  account/              AccountService (local and remote), store, crypto
 assets/
   ui_v3/                Game UI pack exported from Penpot (in git)
   ui_album/             Bug sprites (sprites/) + manifest.json (sprite
@@ -486,7 +600,10 @@ assets/
 scripts/                Measurement and report tools used for the thesis
                         (pvp_bot.py — headless PvP test client)
 tests/                  pytest suite
-docs/                   Technical documentation (docs/KY_THUAT_HE_THONG.md is in Vietnamese)
+tools/                  pin_window.py (fixed window for measurements),
+                        make_dev_cert.sh, research launchers
+docs/                   Technical documentation: security.md, server.md,
+                        deploy.md (Vietnamese), KY_THUAT_HE_THONG.md (Vietnamese)
 ```
 
 ---
