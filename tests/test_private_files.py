@@ -1,11 +1,12 @@
 """src/shared/private_files: one property ("only I can read this") on both OSes.
 
-The POSIX tests use real files. The Windows branch runs everywhere by faking
-``icacls``: we check the exact command line and the parsing of its output.
+The first tests use real files and are the proof on each OS. The Windows
+decision logic runs everywhere through the seams of the module.
 """
 
 from __future__ import annotations
 
+import ast
 import os
 import subprocess
 from pathlib import Path
@@ -14,7 +15,8 @@ import pytest
 
 from src.shared import private_files as pf
 
-USER = "PC\\anh"
+ME = "S-1-5-21-1-2-3-1001"
+OTHER = "S-1-1-0"
 
 
 # ---- real files, whatever the OS ------------------------------------------------
@@ -54,95 +56,140 @@ def test_widening_breaks_privacy_and_make_private_restores_it(tmp_path, kind):
     assert pf.is_private(target), pf.acl_report(target)
 
 
-# ---- Windows branch, with a fake icacls (runs on any OS) -----------------------
+# ---- Windows branch through its seams (runs on any OS) --------------------------
 
-class FakeIcacls:
-    def __init__(self, listing: str = "", fail: bool = False):
-        self.calls: list[list[str]] = []
-        self.listing = listing
-        self.fail = fail
+ALLOW, DENY = 0, 1
+OI_CI = 0x3
+INHERITED = 0x10
+FULL = 0x001F01FF
 
-    def __call__(self, args):
-        self.calls.append(list(args))
-        if self.fail:
-            raise pf.PrivateFilesError("icacls failed (5): Access is denied.")
-        return self.listing if len(args) == 1 else "Successfully processed 1 files\n"
+
+def ace(kind=ALLOW, flags=0, sid=ME, mask=FULL):
+    return (kind, flags, mask, sid)
 
 
 @pytest.fixture
 def win(monkeypatch):
-    def install(listing="", fail=False):
-        fake = FakeIcacls(listing, fail)
-        monkeypatch.setattr(pf, "_is_windows", lambda: True)
-        monkeypatch.setattr(pf, "_current_user", lambda: USER)
-        monkeypatch.setattr(pf, "_icacls", fake)
-        return fake
-    return install
+    monkeypatch.setattr(pf, "_is_windows", lambda: True)
+    monkeypatch.setattr(pf, "_current_sid", lambda: ME)
 
 
-def test_windows_file_drops_inheritance_and_grants_only_me(win, tmp_path):
+def test_windows_make_private_writes_a_file_dacl_for_a_file(win, monkeypatch, tmp_path):
     f = tmp_path / "remote_session.json"
     f.write_text("{}")
-    fake = win()
+    calls = []
+    monkeypatch.setattr(pf, "_write_private_dacl", lambda p, is_dir: calls.append((p, is_dir)))
     pf.make_private(f)
-    assert fake.calls == [[str(f), "/inheritance:r", "/grant:r", f"{USER}:F"]]
+    assert calls == [(f, False)]
 
 
-def test_windows_folder_grant_is_inherited_by_its_content(win, tmp_path):
-    fake = win()
+def test_windows_make_private_writes_an_inheritable_dacl_for_a_folder(win, monkeypatch,
+                                                                      tmp_path):
+    calls = []
+    monkeypatch.setattr(pf, "_write_private_dacl", lambda p, is_dir: calls.append((p, is_dir)))
     pf.make_private(tmp_path)
-    assert fake.calls == [[str(tmp_path), "/inheritance:r", "/grant:r",
-                           f"{USER}:(OI)(CI)F"]]
+    assert calls == [(tmp_path, True)]
 
 
-def test_windows_a_failing_icacls_is_an_error_not_silence(win, tmp_path):
+def test_windows_a_failing_api_call_is_an_error_not_silence(win, monkeypatch, tmp_path):
     f = tmp_path / "f"
     f.write_text("x")
-    win(fail=True)
+
+    def boom(*args, **kwargs):
+        raise pf.PrivateFilesError("SetNamedSecurityInfoW failed (5)")
+
+    monkeypatch.setattr(pf, "_write_private_dacl", boom)
+    monkeypatch.setattr(pf, "_read_dacl", boom)
     with pytest.raises(pf.PrivateFilesError):
         pf.make_private(f)
     with pytest.raises(pf.PrivateFilesError):
         pf.is_private(f)
 
 
-def _listing(path: Path, *aces: str) -> str:
-    lines = [f"{path} {aces[0]}"] + [f"{' ' * (len(str(path)) + 1)}{a}" for a in aces[1:]]
-    return "\n".join(lines) + "\n\nSuccessfully processed 1 files; Failed processing 0 files\n"
+def test_windows_is_private_reads_the_dacl_and_the_current_sid(win, monkeypatch, tmp_path):
+    seen = []
+    monkeypatch.setattr(pf, "_read_dacl", lambda p: seen.append(p) or (True, [ace()]))
+    assert pf.is_private(tmp_path)
+    assert seen == [tmp_path]
 
 
-def test_windows_only_me_is_private(win, tmp_path):
+def test_windows_only_me_protected_is_private():
+    assert pf._dacl_is_private((True, [ace()]), ME)
+
+
+def test_windows_a_folder_entry_that_children_inherit_is_private():
+    assert pf._dacl_is_private((True, [ace(flags=OI_CI)]), ME)
+
+
+def test_windows_inherited_entries_are_not_private():
+    assert not pf._dacl_is_private((True, [ace(flags=INHERITED)]), ME)
+    assert not pf._dacl_is_private((True, [ace(flags=OI_CI | INHERITED)]), ME)
+
+
+def test_windows_other_principals_are_not_private():
+    assert not pf._dacl_is_private((True, [ace(), ace(sid=OTHER)]), ME)
+    assert not pf._dacl_is_private((True, [ace(sid=OTHER)]), ME)
+
+
+def test_windows_a_deny_entry_is_not_private():
+    assert not pf._dacl_is_private((True, [ace(kind=DENY)]), ME)
+    assert not pf._dacl_is_private((True, [ace(), ace(kind=DENY)]), ME)
+
+
+def test_windows_an_unprotected_dacl_is_not_private():
+    assert not pf._dacl_is_private((False, [ace()]), ME)
+
+
+def test_windows_the_default_unprotected_acl_is_not_private():
+    default = (False, [ace(flags=INHERITED, sid="S-1-5-18"),
+                       ace(flags=INHERITED, sid="S-1-5-32-544"),
+                       ace(flags=INHERITED)])
+    assert not pf._dacl_is_private(default, ME)
+
+
+def test_windows_a_null_dacl_is_not_private():
+    assert not pf._dacl_is_private(None, ME)
+
+
+def test_windows_an_empty_acl_is_not_private():
+    assert not pf._dacl_is_private((True, []), ME)
+
+
+# ---- the ctypes table -----------------------------------------------------------
+
+def _called_api_names() -> set[str]:
+    tree = ast.parse(Path(pf.__file__).read_text(encoding="utf-8"))
+    return {node.args[0].value for node in ast.walk(tree)
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+            and node.func.id == "_api" and node.args
+            and isinstance(node.args[0], ast.Constant)}
+
+
+def test_every_win32_function_the_module_calls_is_in_the_typed_table():
+    called = _called_api_names()
+    assert called, "no _api(...) call found: the check is blind"
+    assert called <= set(pf._WIN_API), sorted(called - set(pf._WIN_API))
+
+
+def test_every_table_entry_has_a_dll_argtypes_and_restype():
+    for name, (dll, argtypes, restype) in pf._WIN_API.items():
+        assert dll in ("advapi32", "kernel32"), name
+        assert isinstance(argtypes, list), name
+        assert restype is not None, name
+
+
+def test_no_win32_call_bypasses_the_table():
+    tree = ast.parse(Path(pf.__file__).read_text(encoding="utf-8"))
+    dll_attrs = {node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)
+                 and isinstance(node.value, ast.Name) and node.value.id in ("windll", "WinDLL")}
+    assert not dll_attrs, dll_attrs
+
+
+def test_linux_never_loads_a_windows_dll(monkeypatch, tmp_path):
+    monkeypatch.setattr(pf, "_is_windows", lambda: False)
     f = tmp_path / "f"
-    win(_listing(f, f"{USER}:(F)"))
-    assert pf.is_private(f), pf.acl_report(f)
-
-
-def test_windows_inherited_entries_are_not_private(win, tmp_path):
-    f = tmp_path / "f"
-    win(_listing(f, f"{USER}:(I)(F)"))
-    assert not pf.is_private(f), pf.acl_report(f)
-
-
-def test_windows_other_principals_are_not_private(win, tmp_path):
-    f = tmp_path / "f"
-    win(_listing(f, f"{USER}:(F)", "BUILTIN\\Users:(R)"))
-    assert not pf.is_private(f), pf.acl_report(f)
-    win(_listing(f, f"{USER}:(F)", "NT AUTHORITY\\SYSTEM:(F)"))
-    assert not pf.is_private(f), pf.acl_report(f)
-
-
-def test_windows_the_default_unprotected_acl_is_not_private(win, tmp_path):
-    f = tmp_path / "f"
-    win(_listing(f, "NT AUTHORITY\\SYSTEM:(I)(F)", "BUILTIN\\Administrators:(I)(F)",
-                 f"{USER}:(I)(F)"))
-    assert not pf.is_private(f), pf.acl_report(f)
-
-
-def test_windows_an_empty_listing_is_not_private(win, tmp_path):
-    f = tmp_path / "f"
-    win("Successfully processed 1 files; Failed processing 0 files\n")
-    assert not pf.is_private(f), pf.acl_report(f)
-
-
-def test_windows_folder_flags_are_parsed(win, tmp_path):
-    win(_listing(tmp_path, f"{USER}:(OI)(CI)(F)"))
-    assert pf.is_private(tmp_path), pf.acl_report(tmp_path)
+    f.write_text("x")
+    monkeypatch.setattr(pf, "_dlls", {})
+    pf.make_private(f)
+    assert pf.is_private(f)
+    assert pf._dlls == {}
