@@ -55,20 +55,53 @@ def test_backup_without_database_fails(tmp_path):
         backup.backup_once(tmp_path / "empty", tmp_path / "b")
 
 
-def test_background_thread_backs_up_and_survives_failure(tmp_path):
+def test_background_thread_backs_up_and_survives_failure(tmp_path, monkeypatch, caplog):
+    """A failure injected in the copy check (same on every OS: nothing is
+    renamed or deleted while the database is open) is logged, leaves no
+    ``.part``, does not stop the thread, and the next backup still happens."""
+    import logging
     import threading
     import time
     store = _db(tmp_path)
+    bdir = tmp_path / "b"
+    real_check = backup._check
+    broken = threading.Event()
+
+    def check(path):
+        if broken.is_set():
+            raise RuntimeError("integrity_check: injected failure")
+        return real_check(path)
+
+    monkeypatch.setattr(backup, "_check", check)
+    caplog.set_level(logging.INFO, logger="hcpd.backup")
     stop = threading.Event()
-    th = backup.start_background(store.data_dir, tmp_path / "b", 3, 0.2, stop)
-    time.sleep(1.5)
-    (store.data_dir / DB_NAME).rename(store.data_dir / "moved")   # next runs fail
-    time.sleep(0.6)
-    assert th.is_alive()                                           # failure did not kill it
-    stop.set()
-    th.join(2)
+    th = backup.start_background(store.data_dir, bdir, 50, 0.2, stop)
+    try:
+        deadline = time.time() + 5
+        while not list(bdir.glob("server-*.db")) and time.time() < deadline:
+            time.sleep(0.05)
+        first = {p.name for p in bdir.glob("server-*.db")}
+        assert first, "the first backup never happened"
+
+        broken.set()
+        time.sleep(1.0)                                   # several failing runs
+        assert th.is_alive()                              # failure did not kill it
+        assert any("backup FAILED" in r.getMessage() and "injected failure" in r.getMessage()
+                   for r in caplog.records)
+        assert not list(bdir.glob("*.part"))              # no bad copy is kept
+        assert {p.name for p in bdir.glob("server-*.db")} == first
+
+        broken.clear()                                    # the next run must work
+        deadline = time.time() + 5
+        while {p.name for p in bdir.glob("server-*.db")} == first and time.time() < deadline:
+            time.sleep(0.05)
+        assert {p.name for p in bdir.glob("server-*.db")} - first, \
+            "no backup after the failure was cleared"
+    finally:
+        stop.set()
+        th.join(2)
     assert not th.is_alive()
-    assert 1 <= len(list((tmp_path / "b").glob("server-*.db"))) <= 3
+    assert not list(bdir.glob("*.part"))
 
 
 def test_failed_check_leaves_no_file_and_keeps_old_backups(tmp_path):

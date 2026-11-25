@@ -53,20 +53,23 @@ def backup_once(data_dir: Path, backup_dir: Path, keep: int = 7,
     part.unlink(missing_ok=True)
     try:
         src = sqlite3.connect(f"file:{src_path}?mode=ro", uri=True, timeout=30)
-        dst = sqlite3.connect(part)
         try:
-            src.backup(dst)
-            # The copy inherits WAL mode; a plain single file leaves no -wal/-shm
-            # next to it when it is opened or moved.
-            dst.execute("PRAGMA journal_mode = DELETE")
+            dst = sqlite3.connect(part)
+            try:
+                src.backup(dst)
+                # The copy inherits WAL mode; a plain single file leaves no
+                # -wal/-shm next to it when it is opened or moved.
+                dst.execute("PRAGMA journal_mode = DELETE")
+            finally:
+                dst.close()
         finally:
-            dst.close()
             src.close()
-        accounts = _check(part)
+        accounts = _check(part)           # closes its own connection
     except Exception:
+        # Every connection is closed by now: Windows cannot delete an open file.
         part.unlink(missing_ok=True)      # never keep a bad copy
         raise
-    part.replace(final)
+    part.replace(final)                   # nothing is open on `part` here
     old = sorted(backup_dir.glob(f"{PREFIX}*{SUFFIX}"))[:-keep] if keep > 0 else []
     for path in old:
         path.unlink(missing_ok=True)
