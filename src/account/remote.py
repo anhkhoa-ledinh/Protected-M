@@ -22,6 +22,7 @@ from pathlib import Path
 
 from src.account.service import AccountService
 from src.net.central import CentralClient, CentralUnreachable
+from src.shared.private_files import make_private
 from src.shared import account_rules as rules
 
 logger = logging.getLogger(__name__)
@@ -78,6 +79,7 @@ def _write_private(path: Path, data: dict) -> None:
     tmp = path.with_suffix(".tmp")
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        make_private(tmp)              # before any secret is written (Windows ACL)
         json.dump(data, fh)
     os.replace(tmp, path)
 

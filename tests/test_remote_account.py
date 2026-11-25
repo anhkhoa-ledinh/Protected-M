@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import json
 import os
-import stat
 
 import pytest
 
@@ -16,6 +15,7 @@ from src.net.central import CentralClient, CentralIdentityError, CentralUnreacha
 from src.server.admin import main as admin_main
 from src.server.config import ServerConfig
 from src.shared import account_rules as rules
+from src.shared.private_files import is_private
 from tests.test_server_skeleton import Running, make_cert
 
 PW = "correct horse 9"
@@ -47,7 +47,7 @@ def test_sign_up_in_out_and_remember_me(srv, tmp_path):
     assert svc.create_account("alice", PW)[0] == "taken"
     svc.remember("alice", True)
     path = tmp_path / "a" / remote.SESSION_NAME
-    assert stat.S_IMODE(os.stat(path).st_mode) == 0o600
+    assert is_private(path)
     assert PW not in path.read_text()
     # a fresh process: same folder, new connection -> signed in from the token
     again = service(srv, tmp_path / "a")

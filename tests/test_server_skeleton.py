@@ -24,6 +24,7 @@ from src.server.config import ConfigError, ServerConfig
 from src.server.dispatch import (ConnState, Dispatcher, ProtocolViolation)
 from src.server.limits import IpLimiter
 from src.server.store import MIGRATIONS, Store
+from src.shared.private_files import is_private
 
 ROOT = Path(__file__).resolve().parents[1]
 CERT_TOOL = ROOT / "tools" / "make_dev_cert.sh"
@@ -168,8 +169,7 @@ def test_cert_tool_refuses_to_write_inside_the_repo():
 def test_store_creates_a_private_dir_and_migrates_once(tmp_path):
     store = Store(tmp_path / "d")
     assert store.schema_version() == len(MIGRATIONS)
-    if os.name == "posix":                         # Windows has no mode bits
-        assert (tmp_path / "d").stat().st_mode & 0o077 == 0
+    assert is_private(tmp_path / "d")
     store.close()
     again = Store(tmp_path / "d")                 # second open: no re-migration
     rows = again.connect().execute("SELECT COUNT(*) FROM meta").fetchone()[0]

@@ -3,12 +3,16 @@
 
 from __future__ import annotations
 
-import os
+import logging
 import sqlite3
 import threading
 import time
 from contextlib import contextmanager
 from pathlib import Path
+
+from src.shared.private_files import make_private
+
+log = logging.getLogger("hcpd.store")
 
 #: Migrations run in order; the index + 1 is the schema version.
 MIGRATIONS: list[str] = [
@@ -78,9 +82,9 @@ class Store:
         self.data_dir = Path(data_dir).expanduser().resolve()
         self.data_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
         try:
-            os.chmod(self.data_dir, 0o700)
-        except OSError:
-            pass  # e.g. a filesystem without modes; the dir still exists
+            make_private(self.data_dir)
+        except OSError as exc:      # e.g. a filesystem without modes
+            log.warning("could not make %s private: %s", self.data_dir, exc)
         self.path = self.data_dir / DB_NAME
         self._local = threading.local()
         self._migrate()
