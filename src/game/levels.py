@@ -26,6 +26,10 @@ class Level(NamedTuple):
     size: float             # bug size, x the base size
     move_after_s: float | None   # a bug seen this long moves; None = never
     hp: float               # bug health (solo)
+    flee_chance: float = 0.0     # a hit that does not kill sends the bug to a new spot
+    #: a bug that fled cannot flee again for this long. Levels 1-4 never flee
+    #: (``flee_chance`` 0), so 0.0 there is only "no gate", never a rule.
+    flee_cooldown_s: float = 0.0
 
     @property
     def prefer_mid(self) -> float:
@@ -39,15 +43,15 @@ LEGACY_CAMO = 0.75
 
 LEVELS = {
     1: Level("Dễ", "Easy", 6, 180, 2, False,
-             40.0, 70.0, 0.40, 1.0, None, 100.0),
+             40.0, 70.0, 0.40, 1.0, None, 100.0, 0.0, 0.0),
     2: Level("Cơ bản", "Normal", 8, 150, 3, False,
-             50.0, 85.0, 0.55, 1.0, None, 200.0),
+             50.0, 85.0, 0.55, 1.0, None, 200.0, 0.0, 0.0),
     3: Level("Khó", "Hard", 10, 150, 3, True,
-             60.0, 100.0, 0.70, 1.0, None, 300.0),
+             60.0, 100.0, 0.70, 1.0, None, 300.0, 0.0, 0.0),
     4: Level("Xâm thực", "Infestation", 12, 120, 4, True,
-             75.0, 110.0, 0.85, 0.875, 4.0, 400.0),
+             75.0, 110.0, 0.85, 0.875, 4.0, 400.0, 0.0, 0.0),
     5: Level("Châu Á", "Asian Mode", 12, 120, 4, True,
-             90.0, 120.0, 1.00, 0.75, 2.5, 500.0),
+             90.0, 120.0, 1.00, 0.75, 2.5, 500.0, 0.5, 1.0),
 }
 
 
