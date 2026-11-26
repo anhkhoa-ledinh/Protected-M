@@ -10,7 +10,7 @@ import threading
 import pytest
 
 from src.game.levels import LEVELS
-from src.game.pvp import ITEM_WEIGHT, item_price
+from src.game.pvp import item_price
 from src.game.scoring import match_score
 from src.server import economy
 from src.server.app import Context
@@ -66,12 +66,12 @@ def env(tmp_path):
 # ---- the formula is the game's ------------------------------------------------------
 
 def test_the_formula_is_the_games_own():
-    w = ITEM_WEIGHT
-    assert match_score(1, False, 100.0, {}, w) == 100
-    assert match_score(3, False, 50.5, {FLARE: 1}, w) == round(50.5 * 3 - 3)
-    assert match_score(2, True, 100.0, {}, w) == 0
-    assert match_score(1, False, 2.0, {SCAN: 1}, w) == 0                 # never below 0
-    assert match_score(5, False, -4.0, {}, w) == 0                       # overtime
+    assert match_score(1, False, 100.0) == 100
+    assert match_score(3, False, 50.5) == round(50.5 * 3)
+    assert match_score(2, True, 100.0) == 0
+    assert match_score(1, False, 2.0) == 2                               # items cost no score
+    assert match_score(1, False, 0.0) == 0                               # never below 0
+    assert match_score(5, False, -4.0) == 0                              # overtime
     from src.game import match
     assert match.OVERTIME_MAX_S == 30.0 and match.match_score is match_score
 
@@ -145,8 +145,8 @@ def test_a_win_is_scored_from_the_servers_clock_and_credited(env):
     t = env.call(st, "start_match", level=2, items=[FLARE])["ticket"]
     env.now += 40.0
     r = env.call(st, "finish_match", ticket=t, won=True, items_used={FLARE: 1})
-    expected = match_score(2, False, LEVELS[2].seconds - 40.0, {FLARE: 1}, ITEM_WEIGHT)
-    assert r["t"] == "ok" and r["won"] and r["score"] == expected == round(110 * 2 - 3)
+    expected = match_score(2, False, LEVELS[2].seconds - 40.0)
+    assert r["t"] == "ok" and r["won"] and r["score"] == expected == round(110 * 2)
     left = 100 - item_price(FLARE)
     assert r["wallet"] == left + expected and r["earned_total"] == expected
     assert r["levels_cleared"] == [2]
@@ -261,6 +261,28 @@ def test_pvp_matches_charge_items_but_pay_no_points(env):
     env.now += 60
     r = env.call(st, "finish_match", ticket=t, won=True)
     assert r["t"] == "ok" and r["earned_total"] == 0 and r["wallet"] == 100
+
+
+def test_server_and_game_score_the_same_won_match_with_an_item_used(env, monkeypatch):
+    from types import SimpleNamespace
+    from src.game.match import AlbumMatch
+
+    st = env.player()
+    t = env.call(st, "start_match", level=2, items=[FLARE])["ticket"]
+    env.now += 40.0
+    r = env.call(st, "finish_match", ticket=t, won=True, items_used={FLARE: 1})
+    state = SimpleNamespace(props=[1], found=[True])
+    game = AlbumMatch(level=2, state=state, used={FLARE: 1}, started_s=0.0)
+    # elapsed_s is the only place the score reads the clock: freeze it at 40 s
+    monkeypatch.setattr(AlbumMatch, "elapsed_s", property(lambda self: 40.0))
+    assert r["score"] == game.score() == (LEVELS[2].seconds - 40) * 2
+
+
+def test_buying_an_item_still_charges_the_wallet_but_using_it_costs_no_score(env):
+    st = env.player()
+    env.call(st, "start_match", level=1, items=[FLARE])
+    assert env.call(st, "me")["wallet"] == 100 - item_price(FLARE) == 70
+
 
 
 # ---- money never goes negative ----------------------------------------------------------

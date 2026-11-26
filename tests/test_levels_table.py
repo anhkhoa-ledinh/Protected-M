@@ -34,11 +34,10 @@ class TableValues(unittest.TestCase):
 
 
 class HealthAndDamage(unittest.TestCase):
-    def test_health_is_100_times_level_and_divisor_is_the_level(self):
+    def test_health_is_100_times_level_and_damage_has_no_divisor(self):
         self.assertEqual([L.LEVELS[lv].hp for lv in range(1, 6)],
                          [100, 200, 300, 400, 500])
-        self.assertEqual([L.LEVELS[lv].damage_div for lv in range(1, 6)],
-                         [1, 2, 3, 4, 5])
+        self.assertNotIn("damage_div", L.Level._fields)
 
     def test_pierce_follows_the_loadout_order(self):
         from src.ui_album.v3_flow import WEAPONS
@@ -55,12 +54,27 @@ class HealthAndDamage(unittest.TestCase):
         self.assertEqual(L.PVP_WEAPONS_SPEC["Heavy-mag gun"], (50, 0.18, 2.5))
 
     def test_shots_to_kill_three_cells_by_hand(self):
-        # Sniper, body, level 5: 150 * 1.00 / 5 = 30 a hit; 500 / 30 = 16.7 -> 17.
-        self.assertEqual(L.hits_to_kill("Precision gun", False, 5), 17)
-        # Heavy-mag, head, level 4: 51 * 1.5 * 0.70 / 4 = 13.3875; 400 / 13.3875 = 29.9 -> 30.
-        self.assertEqual(L.hits_to_kill("Heavy-mag gun", True, 4), 30)
-        # Shotgun pellet, level 2: 37.5 * 0.85 / 2 = 15.9375; 200 / 15.9375 = 12.5 -> 13.
-        self.assertEqual(L.hits_to_kill("Spread gun", False, 2), 13)
+        # Sniper, body, level 5: 150 * 1.00 = 150 a hit; 500 / 150 = 3.3 -> 4.
+        self.assertEqual(L.hits_to_kill("Precision gun", False, 5), 4)
+        # Heavy-mag, head, level 4: 51 * 1.5 * 0.70 = 53.55; 400 / 53.55 = 7.5 -> 8.
+        self.assertEqual(L.hits_to_kill("Heavy-mag gun", True, 4), 8)
+        # Shotgun pellet, level 2: 37.5 * 0.85 = 31.875; 200 / 31.875 = 6.3 -> 7.
+        self.assertEqual(L.hits_to_kill("Spread gun", False, 2), 7)
+
+    def test_hits_to_kill_table(self):
+        """Damage does not shrink with the level; bug hp is 100 x level."""
+        guns = ("Precision gun", "Spread gun", "Heavy-mag gun")
+        body = {1: (1, 4, 3), 2: (2, 7, 6), 3: (2, 10, 9),
+                4: (3, 13, 12), 5: (4, 16, 15)}
+        head = {1: (1, 4, 2), 2: (1, 7, 4), 3: (1, 10, 6),
+                4: (2, 13, 8), 5: (2, 16, 10)}
+        for level in range(1, 6):
+            self.assertEqual(
+                tuple(L.hits_to_kill(g, False, level) for g in guns), body[level],
+                f"body, level {level}")
+            self.assertEqual(
+                tuple(L.hits_to_kill(g, True, level) for g in guns), head[level],
+                f"head, level {level}")
 
 
 class ReadersFollowTheTable(unittest.TestCase):

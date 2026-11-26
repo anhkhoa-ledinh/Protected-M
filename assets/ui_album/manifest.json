@@ -6737,7 +6737,7 @@
      "fs": 14
     },
     {
-     "c": "Điểm = thời gian còn lại − Σ (vật phẩm × số lượng × trọng số)",
+     "c": "Điểm = thời gian còn lại × cấp",
      "rect": [
       120,
       434.9,

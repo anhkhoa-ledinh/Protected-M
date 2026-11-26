@@ -26,7 +26,6 @@ class Level(NamedTuple):
     size: float             # bug size, x the base size
     move_after_s: float | None   # a bug seen this long moves; None = never
     hp: float               # bug health (solo)
-    damage_div: float       # damage per hit = base * pierce * head / damage_div
 
     @property
     def prefer_mid(self) -> float:
@@ -40,15 +39,15 @@ LEGACY_CAMO = 0.75
 
 LEVELS = {
     1: Level("Dễ", "Easy", 6, 180, 2, False,
-             40.0, 70.0, 0.40, 1.0, None, 100.0, 1.0),
+             40.0, 70.0, 0.40, 1.0, None, 100.0),
     2: Level("Cơ bản", "Normal", 8, 150, 3, False,
-             50.0, 85.0, 0.55, 1.0, None, 200.0, 2.0),
+             50.0, 85.0, 0.55, 1.0, None, 200.0),
     3: Level("Khó", "Hard", 10, 150, 3, True,
-             60.0, 100.0, 0.70, 1.0, None, 300.0, 3.0),
+             60.0, 100.0, 0.70, 1.0, None, 300.0),
     4: Level("Xâm thực", "Infestation", 12, 120, 4, True,
-             75.0, 110.0, 0.85, 0.875, 4.0, 400.0, 4.0),
+             75.0, 110.0, 0.85, 0.875, 4.0, 400.0),
     5: Level("Châu Á", "Asian Mode", 12, 120, 4, True,
-             90.0, 120.0, 1.00, 0.75, 2.5, 500.0, 5.0),
+             90.0, 120.0, 1.00, 0.75, 2.5, 500.0),
 }
 
 
@@ -94,12 +93,13 @@ WEAPON_DAMAGE = {
 
 def hit_damage(weapon_name: str, crit: bool, level: int) -> float | None:
     """Damage of one round on a bug at ``level``; ``None`` for a gun not in
-    the table. ``base * pierce * (head factor if crit) / level divisor``."""
+    the table. ``base * pierce * (head factor if crit)``; it does not depend
+    on the level (bug hp does)."""
     spec = WEAPON_DAMAGE.get(weapon_name)
     if spec is None:
         return None
     head = spec.headshot_mult if crit else 1.0
-    return spec.damage * spec.pierce * head / rules(level).damage_div
+    return spec.damage * spec.pierce * head
 
 
 def hits_to_kill(weapon_name: str, crit: bool, level: int) -> int:

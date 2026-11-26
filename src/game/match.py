@@ -135,10 +135,6 @@ class AlbumMatch:
     layer_label: str = "– / 3"
     effects: list = field(default_factory=list)
     missed_until_s: float = 0.0
-    #: TASK_ui_v3_1107: bảng trọng số vật phẩm. Bộ album đánh khoá tiếng Việt,
-    #: bộ v3 tiếng Anh; ``score()`` phải tra đúng bảng của giao diện đang chạy,
-    #: nếu không mọi vật phẩm tính trọng số 0 và điểm luôn bằng số giây còn lại.
-    weights: dict = field(default_factory=lambda: dict(ITEM_WEIGHT))
     #: Lớp đang xét và tổng số lớp THẬT của ảnh (HUD v3 ``layer``/``layer_pips``).
     layer_index: int = 1
     layer_total: int = 0
@@ -356,13 +352,12 @@ class AlbumMatch:
         return 100.0 * left * min(1.0, self.elapsed_s / max(1.0, self.seconds))
 
     def score(self) -> int:
-        """Match score: ``max(0, seconds left x level - sum(weight x uses))``.
+        """Match score: ``max(0, seconds left x level)``; items cost nothing.
 
         A lost match scores 0. Level 5 keeps its overtime penalty inside the
         same ``max(0, ...)``.
         """
-        return match_score(self.level, self.ended == "lose", self.time_left_s,
-                           self.used, self.weights or ITEM_WEIGHT)
+        return match_score(self.level, self.ended == "lose", self.time_left_s)
 
     def tick(self, head_ok: bool, layer_label: str = "") -> str:
         """Nhịp mỗi khung; trả ``""``/``"win"``/``"lose"``."""
@@ -509,13 +504,11 @@ def fire(match: AlbumMatch, crosshair, aim: AimContext, *,
     return (best, crit)
 
 
-def start_match(level: int, state, weapon_name: str, items,
-                weights: dict | None = None) -> AlbumMatch:
+def start_match(level: int, state, weapon_name: str, items) -> AlbumMatch:
     """Mở một ván mới cho cấp ``level`` với ván chơi ``state`` vừa đặt bọ."""
     match = AlbumMatch(level=int(level), state=state,
                        started_s=time.perf_counter(),
-                       weapon_name=str(weapon_name), items=list(items),
-                       weights=dict(weights or ITEM_WEIGHT))
+                       weapon_name=str(weapon_name), items=list(items))
     logger.info("Album match bat dau: cap %d (%s), %d bo, %d o vat pham",
                 match.level, LEVEL_TABLE[match.level][0], match.bugs_total,
                 LEVEL_TABLE[match.level][3])
