@@ -38,7 +38,7 @@ from src.content.prop_rest_eye import REST_MEASURE_S, rest_eye, spread_mm, z_res
 from src.content import media_gate, shared_album
 from src.content.shared_album_worker import SharedAlbumWorker, PENDING as SHARE_PENDING
 from src.config.schema import AppConfig, ContentSettings, UiSettings, _merge_dataclass
-from src.gui.file_dialog import pick_media_file
+from src.gui.file_dialog import PICK_FAILED, pick_media_file
 from src.engine.adaptive_quality import AdaptiveQualityController
 from src.engine.camera_worker import CameraWorker
 from src.engine.pose_bus import PoseBus
@@ -57,6 +57,11 @@ logger = logging.getLogger(__name__)
 
 #: Cửa sổ nghiệm thu sau khi mở ván: ngồi yên ngần này giây, phải 0 khung lộ vật.
 WATCH_S = 5.0
+
+#: Toast when the OS file picker cannot open (the cause is in the log).
+#: Drag-and-drop is not offered as a fallback: on the choose-photo screen a
+#: dropped file is loaded into the renderer but never reaches the album flow.
+PICKER_FAILED_TEXT = "File picker could not open - see the log"
 
 #: Chờ tách lớp (PB-051): nhịp toast (bằng thời gian sống 2 s của toast), và
 #: trần để một ảnh không bao giờ có lớp (vd. ``_apply_layers`` bỏ qua vì lệch
@@ -1292,7 +1297,9 @@ class HcpdApplication:
         # Hộp thoại vừa đóng: cửa sổ game đang bị thu nhỏ, kéo nó về NGAY
         # (kể cả khi người dùng bấm Huỷ) rồi mới làm gì tiếp.
         self._window.restore_and_focus()
-        if picked is not None:
+        if picked is PICK_FAILED:
+            self._load_error(PICKER_FAILED_TEXT)
+        elif picked is not None:
             state.photo = picked
             if picked not in state.recent:
                 state.recent.insert(0, picked)
@@ -2663,7 +2670,9 @@ class HcpdApplication:
                         )
                     if input_state.open_content_file:
                         picked = pick_media_file()
-                        if picked is not None:
+                        if picked is PICK_FAILED:
+                            self._load_error(PICKER_FAILED_TEXT)
+                        elif picked is not None:
                             self._try_load_media(picked, now)
                     if input_state.toggle_mist:
                         state = self._renderer.toggle_mist()
