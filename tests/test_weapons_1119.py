@@ -107,9 +107,9 @@ def test_damage_table_matches_the_spec():
     assert weapon_damage("Spread gun", True) == 37.5 * 0.85   # khong thuong dau
     assert weapon_damage("Heavy-mag gun", False) == 51.0 * 0.70
     assert weapon_damage("Heavy-mag gun", True) == 51.0 * 1.5 * 0.70
-    # ...and divided by the level.
-    assert weapon_damage("Precision gun", False, 5) == 30.0
-    assert weapon_damage("Precision gun", True, 5) == 60.0
+    # ...and the same at level 5: damage no longer depends on the level.
+    assert weapon_damage("Precision gun", False, 5) == 150.0
+    assert weapon_damage("Precision gun", True, 5) == 300.0
 
 
 def test_every_weapon_has_a_damage_entry():
