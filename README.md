@@ -58,7 +58,7 @@ Everything runs on the CPU. A dedicated GPU is not required.
 - A few GB of free disk space for PyTorch and the models downloaded on first
   run.
 - Optional: Docker, only on the machine that hosts the
-  [central server](#central-server-optional).
+  [central server](#servers).
 
 ---
 
@@ -167,7 +167,7 @@ A round goes like this:
 
 1. **Sign in.** Accounts are stored on this computer
    (`assets/config/accounts.json`) by default, or on a
-   [central server](#central-server-optional) if one is configured. Passwords
+   [central server](#servers) if one is configured. Passwords
    are scrypt-hashed; **Remember me** keeps you signed in next launch, and a
    recovery code gets you back in if you forget your password. Playing as
    guest skips sign-in but saves nothing.
@@ -313,106 +313,162 @@ picked from your computer, or received in PvP — goes through one import gate
 
 ---
 
-## PvP on a local network
+## Servers
 
-Competitive and Hunt & Hide are real matches over your LAN — no internet,
-no cloud account. One machine runs the server; both games find it
-automatically.
+Most of the game needs no server. Pick what you need:
 
-1. **Start the server.** On one machine, on the same Wi-Fi/LAN as the
-   players:
+| I want to… | Run | Ports |
+|---|---|---|
+| Play alone | Nothing | – |
+| Play PvP on the same Wi-Fi/LAN | The PvP server, `run_server` | TCP **47821**, UDP **47822** |
+| Share accounts, wallets and the leaderboard across machines | The central server (Docker, TLS) | TCP **47830** |
+
+A PvP match itself always runs on the LAN server, even when you also use the
+central server (see [Known issues](#known-issues)).
+
+### PvP server
+
+Competitive and Hunt & Hide are real matches over your LAN — no internet, no
+cloud account. One machine runs the server; both games find it automatically.
+
+1. **Start it** on one machine, on the same Wi-Fi/LAN as the players. Leave
+   the window open for the whole session; `Ctrl+C` stops it.
 
    ```bat
    run_server.bat
    ```
 
-   (On Linux: `bash run_server.sh`.) Leave that window open for the whole session (`Ctrl+C` to stop it).
+   ```bash
+   bash run_server.sh
+   ```
 
-2. **Allow Python through Windows Firewall.** The first time you run
-   `run_server.bat` (or `run_game.bat`), Windows will ask to allow Python
-   through the firewall for private networks — click **Allow access**. If
-   you miss the prompt, other players' games won't be able to reach the
-   server or discover it.
+2. **Open the firewall.**
+   - Windows: the first time you run `run_server.bat` (or `run_game.bat`),
+     Windows asks to allow Python on private networks. Click **Allow
+     access**. If you miss the prompt, other games can't reach the server or
+     discover it.
+   - Linux: only if you run a firewall such as ufw or firewalld, open TCP
+     47821 and UDP 47822:
 
-3. **Find a match.** On each player's machine, run `run_game.bat`, open the
+     ```bash
+     # ufw
+     sudo ufw allow 47821/tcp
+     sudo ufw allow 47822/udp
+     # firewalld
+     sudo firewall-cmd --permanent --add-port=47821/tcp --add-port=47822/udp
+     sudo firewall-cmd --reload
+     ```
+
+3. **Find a match.** On each player's machine start the game, open the
    **PvP** tab, and either:
-   - **Find match** — joins the matchmaking queue for the chosen mode and
-     level; the server pairs the first two players waiting; or
-   - **Invite a friend** — creates a 4-digit room code the other player
-     types into **Join room**.
+   - **Find match** — joins the queue for the chosen mode and level; the
+     server pairs the first two players waiting; or
+   - **Invite a friend** — creates a 4-digit room code the other player types
+     into **Join room**.
 
-   Players discover the server automatically over UDP; nothing to type in
-   by default.
+   PvP unlocks after you win levels 1–5.
 
-4. **`pvp.json` override (optional).** If discovery doesn't find the
-   server (different subnet, UDP broadcast blocked by a router/VPN), copy
-   `assets/config/pvp.example.json` to `assets/config/pvp.json` and fill in
-   the server's IP and port:
+4. **How games find the server.** Automatically, over UDP discovery; there is
+   nothing to type. If discovery fails (different subnet, a router or VPN
+   blocks UDP broadcast), copy `assets/config/pvp.example.json` to
+   `assets/config/pvp.json` and put the server's IP and port in it:
 
    ```json
    { "server": "192.168.1.42:47821" }
    ```
 
-   `pvp.json` is ignored by git — it's specific to your machine/session.
+   `pvp.json` is ignored by git.
 
-### Testing PvP on one machine
+#### Try PvP on one machine
 
-- `--no-webcam` runs the game with a simulated head pose instead of
-  opening the real webcam, so you can run two game instances on the same
-  laptop (only one process can open the webcam at a time):
+Only one process can open the webcam, so run the game with `--no-webcam`
+(a simulated head pose). `scripts/pvp_bot.py` is a headless client (no GL, no
+webcam) that joins the queue or a room code, so you can play against it. Use
+three terminals.
 
-  ```bat
-  run_game.bat --no-webcam
-  ```
-
-- `scripts\pvp_bot.py` is a headless client (no GL, no webcam) that joins
-  a queue or a room code and plays either role — useful to test the server
-  and the other, real game instance without needing two players:
-
-  ```bat
-  .venv\Scripts\python.exe scripts\pvp_bot.py --mode Competitive --level 1
-  ```
-
----
-
-## Central server (optional)
-
-By default accounts, wallets and the leaderboard live on each computer. A
-**central server** keeps them in one place, so players on different machines
-share one leaderboard. The server is ours (`src/server/`, Python standard
-library only) and is the referee: it holds the wallets, charges items, and
-computes each score from **its own clock** with one-time match tickets, so a
-modified game cannot simply report a bigger score.
-
-It runs as **one Docker container**, driven by one script. On the machine
-that hosts it:
+Linux:
 
 ```bash
-bash deploy/server.sh setup      # first time: settings, certificate, image
-bash deploy/server.sh start      # start and wait until healthy
-bash deploy/server.sh status     # running? last backup? how many accounts?
-bash deploy/server.sh help       # every command
+bash run_server.sh
+bash run_game.sh --no-webcam
+~/.venvs/protected-m/bin/python scripts/pvp_bot.py --mode Competitive --level 1 --host 127.0.0.1
 ```
 
-- TLS only; the game pins the server's certificate (`cert.pem`). Give players
-  `cert.pem`, never `key.pem`.
-- Not exposed by default: it listens on `127.0.0.1` until you set `HCPD_BIND`
-  in `deploy/.env` (for example a [Tailscale](https://tailscale.com/)
-  `100.x` address, so friends can join without opening your router).
-- Backs itself up at start and every 24 h, keeping the last 7
-  (`backup`, `backups`, `restore`). `export` / `import` move it to another
-  machine; `update` rebuilds it after a code change, keeping the data.
+Windows:
 
-On each player's machine, point the game at the server with
-`assets/config/central.json` (the cert path is relative to that file):
-
-```json
-{"mode": "remote", "host": "100.x.y.z", "port": 47830, "cert": "server_cert.pem", "name": "Home server"}
+```bat
+run_server.bat
+run_game.bat --no-webcam
+.venv\Scripts\python.exe scripts\pvp_bot.py --mode Competitive --level 1 --host 127.0.0.1
 ```
 
-Delete the file to go back to local accounts. Full guide (Vietnamese):
-[docs/deploy.md](docs/deploy.md). Design, roles and known limits:
-[docs/server.md](docs/server.md); threat review:
+Bot flags: `--mode` (`Competitive` or `Hunt & Hide`), `--level`, `--room`
+(a 4-digit code; default is the queue), `--kill-every`, `--matches`, `--name`,
+`--host` (skip discovery), `--port` (default 47821), `-v`.
+
+### Central server
+
+The central server keeps accounts, wallets and the leaderboard in one place.
+It is the referee: it charges items and computes each score from its own
+clock with one-time match tickets, so a modified game cannot report a bigger
+score. The code is `src/server/` (Python standard library only); it runs as
+one Docker container, driven by `deploy/server.sh`.
+
+You need Docker (Engine or Desktop), `python3` and `openssl` on the machine
+that hosts it.
+
+1. **First run:**
+
+   ```bash
+   bash deploy/server.sh setup      # deploy/.env, certificate, image
+   bash deploy/server.sh start      # start and wait until healthy
+   bash deploy/server.sh status     # running? last backup? how many accounts?
+   ```
+
+2. **Point the game at it** (on every player's machine):
+   - copy `cert.pem` (`setup` made it in `~/hcpd-certs`) to
+     `assets/config/server_cert.pem`;
+   - copy `assets/config/central.example.json` to
+     `assets/config/central.json` and set `"mode": "remote"` (the example
+     says `local`), `"host"` to `127.0.0.1` on the same machine, and `"cert"`
+     to `server_cert.pem` (the path is relative to that file). An optional
+     `"name"` shows on the leaderboard:
+
+     ```json
+     {"mode": "remote", "host": "127.0.0.1", "port": 47830, "cert": "server_cert.pem", "name": "Home server"}
+     ```
+
+   - delete `central.json` to go back to local accounts.
+
+3. **Everyday commands** (`bash deploy/server.sh <command>`):
+
+   | Command | What it does |
+   |---|---|
+   | `setup [host-or-ip ...]` | first time: `.env`, certificate (in `~/hcpd-certs`), image, load the cert |
+   | `start` | start, wait until healthy, print the address and `cert.pem` |
+   | `stop` | stop (data kept) |
+   | `status` | running, healthy, address, uptime, last backup, accounts |
+   | `logs [n]` | last n log lines (default 50) |
+   | `backup` | back up now and print the file |
+   | `backups` | list backups |
+   | `restore <file> [--force]` | put a backup back (refuses to replace live data without `--force`) |
+   | `update` | rebuild the image from the current code and recreate the container |
+   | `export <dir>` | image + fresh backup + cert/key + `.env`, for another machine |
+   | `import <dir>` | on the new machine: load image, cert, `.env`, restore, start |
+   | `help` | print this list |
+
+   It backs itself up at start and every 24 h, keeping the last 7.
+
+4. **Let friends join.** The server listens on `127.0.0.1` (this machine
+   only) until you set `HCPD_BIND` in `deploy/.env`, for example to a
+   [Tailscale](https://tailscale.com/) `100.x` address, so friends can join
+   without opening your router. The certificate must name that address: make
+   it again with `bash deploy/server.sh setup 100.x.y.z` (after removing
+   `~/hcpd-certs`), then `start`. Give players `cert.pem`, **never
+   `key.pem`**, and have them use that address as `"host"`.
+
+Full guide (Vietnamese): [docs/deploy.md](docs/deploy.md). Design, roles and
+known limits: [docs/server.md](docs/server.md); threat review:
 [docs/security.md](docs/security.md).
 
 ---
