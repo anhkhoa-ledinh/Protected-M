@@ -133,12 +133,11 @@ def test_sniper_body_shot_kills_at_level_1_not_at_level_3():
     assert three.state.found[0] is False
 
 
-def test_sniper_headshot_needs_9_hits_at_level_5():
-    headshot = _FixedAim(0, True)          # 300 / 5 = 60 a hit, 500 health
+def test_sniper_headshot_needs_2_hits_at_level_5():
+    headshot = _FixedAim(0, True)          # 300 a hit, 500 health
     five = _match(5, "Precision gun")
-    for _ in range(8):
-        fire(five, (10.0, 10.0), headshot)
-        five.next_shot_s = 0.0
+    fire(five, (10.0, 10.0), headshot)
+    five.next_shot_s = 0.0
     assert five.state.found[0] is False
     fire(five, (10.0, 10.0), headshot)
     assert five.state.found[0] is True
