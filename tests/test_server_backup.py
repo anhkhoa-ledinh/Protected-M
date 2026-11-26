@@ -73,6 +73,17 @@ def test_background_thread_backs_up_and_survives_failure(tmp_path, monkeypatch, 
         return real_check(path)
 
     monkeypatch.setattr(backup, "_check", check)
+    real_once = backup.backup_once
+    parts_after_failure = []          # `*.part` seen right after each failed run
+
+    def once(*args, **kwargs):
+        try:
+            return real_once(*args, **kwargs)
+        except Exception:
+            parts_after_failure.append(sorted(p.name for p in bdir.glob("*.part")))
+            raise
+
+    monkeypatch.setattr(backup, "backup_once", once)
     caplog.set_level(logging.INFO, logger="hcpd.backup")
     stop = threading.Event()
     th = backup.start_background(store.data_dir, bdir, 3, 0.2, stop)
@@ -88,7 +99,9 @@ def test_background_thread_backs_up_and_survives_failure(tmp_path, monkeypatch, 
         assert th.is_alive()                              # failure did not kill it
         assert any("backup FAILED" in r.getMessage() and "injected failure" in r.getMessage()
                    for r in caplog.records)
-        assert not list(bdir.glob("*.part"))              # no bad copy is kept
+        seen = list(parts_after_failure)                  # filled by the thread itself
+        assert len(seen) >= 2                             # several failed runs were seen
+        assert seen == [[]] * len(seen)                   # no bad copy is kept
         assert {p.name for p in bdir.glob("server-*.db")} == first
 
         broken.clear()                                    # the next run must work
