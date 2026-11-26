@@ -213,7 +213,8 @@ eight layouts and keeps the fullest. Every number here lives in one table,
 | Shotgun | 8 | 0.38 s | 0.9 s | 5 pellets × 37.5 (no headshot bonus) | 0.85 |
 | Heavy-mag gun | 100 | 0.18 s | 5.0 s | 51 (×1.5 on a headshot) | 0.70 |
 
-Damage to a bug = base damage × armour pierce × headshot bonus ÷ level.
+Damage to a bug = base damage × armour pierce × headshot bonus. It does not
+depend on the level; a bug has 100 × level health.
 Press `R` to reload to a full magazine at any time. Hold right mouse to scope
 in with the Sniper rifle. Hold left click with the Heavy-mag gun for
 full-auto; the other two guns fire once per click.
@@ -236,9 +237,9 @@ Levels 4 and 5 have a fourth slot, but it has no key yet.
 
 Points are both your score and your currency.
 
-- **Match score** = seconds left × level − Σ(uses × item weight). A lost
-  match scores 0. On level 5 the clock does not stop at zero: you get 30 more
-  seconds at −5 points per second, then the match is lost.
+- **Match score** = seconds left × level. Using an item costs no score.
+  A lost match scores 0. On level 5 the clock does not stop at zero: you get
+  30 more seconds at −5 points per second, then the match is lost.
 - **Wallet:** a new account starts with 100 points. A win adds its score to
   your wallet and to your **lifetime total**, which ranks the leaderboard;
   spending never lowers your rank.
