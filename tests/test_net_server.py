@@ -89,13 +89,20 @@ class FakeClient:
 
     def recv_type(self, t: str, timeout: float = 5.0) -> dict:
         deadline = time.monotonic() + timeout
+        skipped: list[str] = []
         while True:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                raise TimeoutError(f"no {t!r} message received in time")
-            msg = self.recv(remaining)
+                raise TimeoutError(f"no {t!r} message received in time; "
+                                   f"skipped: {skipped or 'none'}")
+            try:
+                msg = self.recv(remaining)
+            except TimeoutError:
+                raise TimeoutError(f"no {t!r} message received in time; "
+                                   f"skipped: {skipped or 'none'}") from None
             if msg.get("t") == t:
                 return msg
+            skipped.append(f"{msg.get('t')}/{msg.get('code')}")
 
     def close(self) -> None:
         self._stop.set()
@@ -473,7 +480,8 @@ def test_no_reconnect_within_window_forfeits_the_match_to_the_remaining_player(s
 
 def test_rejoin_within_window_resumes_the_match(server):
     host, guest, ma, mb = _join_competitive(server)
-    token = ma["token"]
+    # Alice may be seated as host OR guest; take the token of the seat we drop.
+    token = (ma if ma["role"] == "host" else mb)["token"]
     host.close()
     guest.recv_type(proto.ERROR, timeout=2.0)  # opponent_offline
 
@@ -484,6 +492,35 @@ def test_rejoin_within_window_resumes_the_match(server):
     guest.recv_type(proto.ERROR, timeout=2.0)  # opponent_reconnected
     new_host.close()
     guest.close()
+
+
+def test_rejoin_window_counts_from_the_disconnect_not_the_last_message():
+    """The window starts at the disconnect. A seat that was quiet for longer
+    than ``reconnect_s`` before it dropped must still get its full window.
+    The heartbeat is parked and the tick is driven by hand, so no timing
+    luck is involved."""
+    srv = Server("127.0.0.1", 0, beacon=False, heartbeat_interval_s=3600.0,
+                 timeout_s=3600.0, reconnect_s=2.0)
+    srv.start()
+    try:
+        host, guest, ma, mb = _join_competitive(srv)
+        token = (ma if ma["role"] == "host" else mb)["token"]
+        (match,) = srv._matches.values()
+        match.host.last_seen = time.monotonic() - 10.0  # quiet for 5x the window
+        host.close()
+        guest.recv_type(proto.ERROR, timeout=2.0)  # opponent_offline
+
+        srv._tick_match(match, time.monotonic())  # the next heartbeat tick
+        assert not match.ended, "forfeited at once: the window ignored the disconnect"
+
+        new_host = FakeClient(srv.port, "Alice")
+        new_host.send({"t": proto.REJOIN, "token": token})
+        resumed = new_host.recv_type(proto.MATCHED, timeout=2.0)
+        assert resumed["resumed"] is True and resumed["role"] == "host"
+        new_host.close()
+        guest.close()
+    finally:
+        srv.stop()
 
 
 # ---- rematch swaps Hunt & Hide roles --------------------------------------
