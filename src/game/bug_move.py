@@ -1,7 +1,7 @@
 """Bugs that move after the player has watched them for a while (levels 4-5).
 
 A bug that has been continuously visible for ``move_after_s`` without dying
-jumps to an unused spare spot: a candidate from the SAME placement run that
+jumps to an unused spare spot (and its old spot becomes a spare): a candidate from the SAME placement run that
 ``_rank`` did not pick, already checked to be hidden at rest, revealed on a
 lean, inside the viewport, and exposed at some eye position. At the moment of
 the move it must also keep the placement spacing (3 x radius) from every other
@@ -88,13 +88,17 @@ class BugMover:
 
     def _relocate(self, index, spare) -> tuple:
         """Put bug ``index`` on ``spare`` (used up), reset its seen timer;
-        returns the old position. Shared by the timed move and the flee."""
+        returns the old position. Shared by the timed move and the flee.
+        The old spot goes back into the pool AFTER the pick, so the bug can
+        never move onto the spot it is leaving."""
         prop = self.game.props[index]
         old = tuple(prop["pos_mm"])
+        old_spot = {key: prop[key] for key in SPOT_KEYS if key in prop}
         self.spares.remove(spare)
         for key in SPOT_KEYS:
             if key in spare:
                 prop[key] = spare[key]
+        self.spares.append(old_spot)
         self.game.visible_since_s[index] = None
         return old
 

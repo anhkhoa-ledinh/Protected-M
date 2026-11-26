@@ -6,7 +6,7 @@ import unittest
 
 from src.content.prop_game import GameState
 from src.game import levels as L
-from src.game.bug_move import BugMover, too_close
+from src.game.bug_move import SPOT_KEYS, BugMover, too_close
 from src.game.match import AlbumMatch
 
 R = 4.8
@@ -25,6 +25,41 @@ def _game(xs):
 
 def _mover(game, spare_xs, after=2.5):
     return BugMover(game, [_prop(x) for x in spare_xs], after, R, seed=1)
+
+
+class OldSpotIsFreed(unittest.TestCase):
+    def test_timed_move_returns_the_old_spot_to_the_pool(self):
+        g = _game([0.0, 100.0])
+        g.visible_since_s[0] = 0.0
+        m = _mover(g, [200.0])
+        old = dict(g.props[0])
+        m.tick((), EYE, 3.0)
+        self.assertEqual(len(m.spares), 1)
+        for key in SPOT_KEYS:
+            self.assertEqual(m.spares[0][key], old[key])
+
+    def test_the_bug_never_lands_on_the_spot_it_is_leaving(self):
+        g = _game([0.0])
+        g.visible_since_s[0] = 0.0
+        m = _mover(g, [200.0])
+        m.tick((), EYE, 3.0)
+        self.assertEqual(g.props[0]["pos_mm"][0], 200.0)
+        m.spares = []                                   # nothing but its own spot
+        g.visible_since_s[0] = 3.0
+        g.props[0]["pos_mm"] = (0.0, 0.0, -174.0)
+        m.tick((), EYE, 9.0)                            # no spare: stays
+        self.assertEqual(g.props[0]["pos_mm"][0], 0.0)
+        self.assertEqual(m.spares, [])                  # and nothing was added
+
+    def test_another_bug_can_take_the_freed_spot(self):
+        g = _game([0.0, 100.0])
+        g.visible_since_s[0] = 0.0
+        m = _mover(g, [200.0])
+        m.tick((), EYE, 3.0)                            # bug 0: 0 -> 200
+        g.visible_since_s[1] = 5.0
+        out = m.tick((), EYE, 8.0)                      # bug 1 takes x = 0
+        self.assertEqual([(i, n[0]) for i, _o, n, _s in out], [(1, 0.0)])
+        self.assertEqual([s["pos_mm"][0] for s in m.spares], [100.0])
 
 
 class MoveRules(unittest.TestCase):
@@ -47,10 +82,8 @@ class MoveRules(unittest.TestCase):
         m = _mover(g, [200.0])
         m.tick((), EYE, 3.0)
         self.assertIsNone(g.visible_since_s[0])
-        self.assertEqual(m.spares, [])
-        self.assertEqual(g.props[0]["pos_mm"][0], 200.0)
-        g.visible_since_s[0] = 3.0
-        self.assertEqual(m.tick((), EYE, 9.0), [])       # no spare left: it stays
+        # the spare is used up, and the old spot took its place in the pool
+        self.assertEqual([s["pos_mm"][0] for s in m.spares], [0.0])
         self.assertEqual(g.props[0]["pos_mm"][0], 200.0)
 
     def test_health_size_and_index_survive(self):

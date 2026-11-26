@@ -6,7 +6,7 @@ import unittest
 
 from src.content.prop_game import GameState
 from src.game import levels as L
-from src.game.bug_move import BugMover
+from src.game.bug_move import SPOT_KEYS, BugMover
 from src.game.match import AlbumMatch, fire
 
 R = 4.8
@@ -103,6 +103,32 @@ class FleeOnLevel5(unittest.TestCase):
         game, match, mover, hits = _setup(5, spare_xs=(103.0,), xs=(0.0, 100.0))
         self.assertEqual(mover.flee(hits, (), EYE, 5.0), [])
         self.assertEqual(game.props[0]["pos_mm"][0], 0.0)
+
+
+class OldSpotIsFreed(unittest.TestCase):
+    def test_flee_returns_the_old_spot_to_the_pool(self):
+        game, match, mover, hits = _setup(5, roll=0.1)
+        old = dict(game.props[0])
+        mover.flee(hits, (), EYE, 5.0)
+        self.assertEqual(len(mover.spares), 1)
+        for key in SPOT_KEYS:
+            self.assertEqual(mover.spares[0][key], old[key])
+
+    def test_a_later_flee_by_another_bug_can_pick_it(self):
+        game = _game([0.0, 100.0])
+        match = AlbumMatch(level=5, state=game, started_s=0.0)
+        mover = BugMover(game, [_prop(200.0)], 2.5, R, seed=1, flee_chance=0.5)
+        mover.flee_rng = FakeRng(0.1, 0.1)
+        match.apply_damage(0, 120.0, (1.0, 1.0), 1.0)
+        mover.flee([(0, False, False)], (), EYE, 5.0)          # 0 -> 200
+        match.apply_damage(1, 120.0, (1.0, 1.0), 6.0)
+        out = mover.flee([(1, False, False)], (), EYE, 6.0)    # 1 -> 0
+        self.assertEqual([(i, n[0]) for i, _o, n in out], [(1, 0.0)])
+
+    def test_the_fleeing_bug_never_lands_on_its_own_old_spot(self):
+        game, match, mover, hits = _setup(5, spare_xs=(), roll=0.1)
+        self.assertEqual(mover.flee(hits, (), EYE, 5.0), [])   # no spare: stays
+        self.assertEqual(mover.spares, [])                     # nothing added
 
 
 class NoFleeBelowLevel5(unittest.TestCase):
