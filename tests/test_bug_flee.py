@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import unittest
 
 from src.content.prop_game import GameState
@@ -44,7 +45,8 @@ def _setup(level, spare_xs=(200.0,), xs=(0.0,), roll=0.1, hp_hit=120.0):
     match = AlbumMatch(level=level, state=game, started_s=0.0)
     killed = match.apply_damage(0, hp_hit, (1.0, 1.0), 1.0)
     mover = BugMover(game, [_prop(x) for x in spare_xs], 2.5, R, seed=1,
-                     flee_chance=L.rules(level).flee_chance)
+                     flee_chance=L.rules(level).flee_chance,
+                     flee_cooldown_s=L.rules(level).flee_cooldown_s)
     mover.flee_rng = FakeRng(roll)
     return game, match, mover, [(0, False, killed)]
 
@@ -53,6 +55,71 @@ class TableField(unittest.TestCase):
     def test_flee_chance_column(self):
         self.assertEqual([L.LEVELS[lv].flee_chance for lv in range(1, 6)],
                          [0.0, 0.0, 0.0, 0.0, 0.5])
+
+
+class Cooldown(unittest.TestCase):
+    def _setup(self):
+        game, match, mover, hits = _setup(5, roll=0.1)
+        mover.flee_rng = FakeRng(0.1, 0.1, 0.1)
+        return game, match, mover, hits
+
+    def test_table_column(self):
+        self.assertEqual(L.LEVELS[5].flee_cooldown_s, 1.0)
+        self.assertTrue(all(L.LEVELS[lv].flee_cooldown_s == 0.0 for lv in range(1, 5)))
+
+    def test_inside_the_cooldown_no_move_and_no_rng_call(self):
+        game, match, mover, hits = self._setup()
+        self.assertEqual(len(mover.flee(hits, (), EYE, 10.0)), 1)
+        self.assertEqual(mover.flee_rng.calls, 1)
+        spot = game.props[0]["pos_mm"]
+        self.assertEqual(mover.flee(hits, (), EYE, 10.5), [])
+        self.assertEqual(mover.flee_rng.calls, 1)              # not asked
+        self.assertEqual(game.props[0]["pos_mm"], spot)
+
+    def test_after_the_cooldown_it_rolls_again(self):
+        game, match, mover, hits = self._setup()
+        mover.flee(hits, (), EYE, 10.0)
+        self.assertEqual(len(mover.flee(hits, (), EYE, 11.1)), 1)
+        self.assertEqual(mover.flee_rng.calls, 2)
+
+    def test_exactly_the_cooldown_counts_as_ready(self):
+        game, match, mover, hits = self._setup()
+        mover.flee(hits, (), EYE, 10.0)
+        self.assertEqual(len(mover.flee(hits, (), EYE, 11.0)), 1)
+
+    def test_a_failed_roll_does_not_start_the_cooldown(self):
+        game, match, mover, hits = self._setup()
+        mover.flee_rng = FakeRng(0.9, 0.1)
+        self.assertEqual(mover.flee(hits, (), EYE, 10.0), [])
+        self.assertEqual(len(mover.flee(hits, (), EYE, 10.1)), 1)
+
+    def test_no_spot_stays_and_does_not_start_the_cooldown(self):
+        game, match, mover, hits = _setup(5, spare_xs=(), roll=0.1)
+        mover.flee_rng = FakeRng(0.1, 0.1)
+        self.assertEqual(mover.flee(hits, (), EYE, 10.0), [])
+        mover.spares = [_prop(200.0)]
+        self.assertEqual(len(mover.flee(hits, (), EYE, 10.1)), 1)
+
+    def test_only_the_eligible_bug_of_a_shot_moves(self):
+        game = _game([0.0, 100.0])
+        match = AlbumMatch(level=5, state=game, started_s=0.0)
+        mover = BugMover(game, [_prop(200.0), _prop(300.0)], 2.5, R, seed=1,
+                         flee_chance=0.5, flee_cooldown_s=1.0)
+        mover.flee_rng = FakeRng(0.1, 0.1)
+        mover.flee([(0, False, False)], (), EYE, 10.0)          # bug 0 flees
+        out = mover.flee([(0, False, False), (1, False, False)], (), EYE, 10.5)
+        self.assertEqual([i for i, _o, _n in out], [1])
+        self.assertEqual(mover.flee_rng.calls, 2)
+
+    def test_heavy_mag_burst_flees_at_most_once_a_second(self):
+        game, match, mover, hits = _setup(5, roll=0.0)
+        mover.flee_rng = FakeRng(*([0.0] * 15))               # always "flee"
+        fled = 0
+        for i in range(15):
+            fled += len(mover.flee(hits, (), EYE, 10.0 + i * 0.18))
+        self.assertEqual(fled, 3)
+        self.assertLessEqual(fled, math.ceil(15 * 0.18 / 1.0))
+        self.assertEqual(mover.flee_rng.calls, fled)
 
 
 class FleeOnLevel5(unittest.TestCase):
@@ -197,12 +264,14 @@ class Log(unittest.TestCase):
 class Statistics(unittest.TestCase):
     def test_flee_rate_with_the_real_seeded_rng(self):
         game = _game([0.0])
-        mover = BugMover(game, [], 2.5, R, seed="stat", flee_chance=L.rules(5).flee_chance)
+        mover = BugMover(game, [], 2.5, R, seed="stat", flee_chance=L.rules(5).flee_chance,
+                         flee_cooldown_s=L.rules(5).flee_cooldown_s)
         n, fled = 10_000, 0
-        for _ in range(n):
+        for i in range(n):
             mover.spares = [_prop(200.0)]
             game.props[0]["pos_mm"] = (0.0, 0.0, -174.0)
-            fled += bool(mover.flee([(0, False, False)], (), EYE, 5.0))
+            # one shot every 2 s: past the cooldown, so every shot is an eligible roll
+            fled += bool(mover.flee([(0, False, False)], (), EYE, 5.0 + 2.0 * i))
         self.assertTrue(0.48 <= fled / n <= 0.52, fled / n)
 
     def test_same_seed_replays_the_same_rolls(self):

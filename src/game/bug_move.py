@@ -38,7 +38,8 @@ def too_close(pos_a, pos_b, radius_mm: float) -> bool:
 
 class BugMover:
     def __init__(self, game, spares, move_after_s: float, radius_mm: float,
-                 seed, flee_chance: float = 0.0) -> None:
+                 seed, flee_chance: float = 0.0,
+                 flee_cooldown_s: float = 0.0) -> None:
         self.game = game
         self.spares = list(spares)
         self.move_after_s = float(move_after_s)
@@ -49,6 +50,10 @@ class BugMover:
         #: the shuffle the timed move uses and a match replays the same.
         self.flee_chance = float(flee_chance)
         self.flee_rng = random.Random(f"flee:{seed}")
+        #: A bug that fled cannot flee again for this long (level table's
+        #: ``flee_cooldown_s``); ``_fled_at`` = bug index -> time it last moved.
+        self.flee_cooldown_s = float(flee_cooldown_s)
+        self._fled_at: dict = {}
 
     def _pick(self, index, planes, eye):
         """A spare that keeps the spacing from every other live bug; one that
@@ -106,13 +111,18 @@ class BugMover:
         """After ONE shot: ``hits`` is ``match.last_shot_hits``
         (``(index, crit, killed)`` per pellet). One roll per shot, and only
         if some bug was damaged without dying; on success every such bug
-        moves to a spare spot (same ``_pick`` rules as the timed move). No
-        spot means it stays, logged. Returns ``[(index, old_pos, new_pos)]``.
+        moves to a spare spot (same ``_pick`` rules as the timed move). A bug
+        is eligible only if its last flee was ``flee_cooldown_s`` or more ago;
+        with none eligible there is no roll at all. The cooldown starts only
+        when the bug really moved. No spot means it stays, logged. Returns ``[(index, old_pos, new_pos)]``.
         ``hp_of(index)`` only feeds the log line; HP itself is never touched."""
         if self.flee_chance <= 0.0:
             return []
         dead = {i for i, _c, killed in hits if killed}
-        wounded = sorted({i for i, _c, killed in hits if i not in dead})
+        wounded = sorted({
+            i for i, _c, killed in hits
+            if i not in dead
+            and now - self._fled_at.get(i, float("-inf")) >= self.flee_cooldown_s})
         if not wounded:
             return []
         if self.flee_rng.random() >= self.flee_chance:
@@ -126,6 +136,7 @@ class BugMover:
                             "(stays) · mau %s", index, hp)
                 continue
             old = self._relocate(index, spare)
+            self._fled_at[index] = now
             new = tuple(self.game.props[index]["pos_mm"])
             logger.info("Bo #%d bi ban va tron (flee) · mau giu %s · "
                         "(%.0f, %.0f, %.0f) -> (%.0f, %.0f, %.0f)",

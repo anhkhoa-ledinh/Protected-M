@@ -2099,7 +2099,8 @@ class HcpdApplication:
                                  self._viewport_rect(), glass, centre)
             self._bug_mover = BugMover(self._game, spares, rule.move_after_s,
                                        bug_radius_mm(self._content),
-                                       self._bug_seed, rule.flee_chance)
+                                       self._bug_seed, rule.flee_chance,
+                                       rule.flee_cooldown_s)
             logger.info("Album bo: %d cho du phong, bo doi cho sau %.1f s",
                         len(spares), rule.move_after_s)
         state.go(F.PLAY)
