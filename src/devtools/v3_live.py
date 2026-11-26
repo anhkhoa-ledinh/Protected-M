@@ -52,7 +52,7 @@ def _match(flow, *, found: int, seconds_left: float, hp: float,
                        - (flow.seconds() - seconds_left),
                        weapon_name=flow.weapon_name() or F.WEAPONS[0],
                        items=list(flow.items), used=dict(used or {}),
-                       hp=hp, stamina=stamina, weights=F.ITEM_WEIGHT)
+                       hp=hp, stamina=stamina)
     match.effects = list(effects)
     # ``rounds`` nay la thuoc tinh tinh tu bang dan, khong gan thang duoc.
     match.rounds_left, match.mag_size = int(rounds[0]), int(rounds[1])

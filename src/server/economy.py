@@ -145,7 +145,7 @@ def finish_match(store: Store, key: str, nonce: str, won: bool,
             won, reason = False, "too_fast"
         elif won and elapsed > limit:
             won, reason = False, "time"
-        score = match_score(level, not won, seconds - elapsed, used, ITEM_WEIGHT)
+        score = match_score(level, not won, seconds - elapsed)
         result = {"won": bool(won), "score": score, "elapsed": round(elapsed, 3),
                   "level": level, "mode": mode}
         if reason:

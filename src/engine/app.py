@@ -1845,8 +1845,7 @@ class HcpdApplication:
         if not self._album.charge_items(items, state.mode):
             F.say(state, "Not enough points for these items — going in without.")
             items = []
-        match = start_match(state.level, self._game, weapon, items,
-                            F.ITEM_WEIGHT)
+        match = start_match(state.level, self._game, weapon, items)
         match.layer_total = len(self._renderer.layer_records())
         spec = WEAPONS_SPEC.get(weapon, DEFAULT_SPEC)
         match.ammo_enabled = True
@@ -2055,8 +2054,7 @@ class HcpdApplication:
             weapon = (f"Sung {state.weapon}" if state.weapon is not None
                       else "Sung")
             items = list(state.stickers)
-        match = start_match(state.level, self._game, weapon, items,
-                            F.ITEM_WEIGHT)
+        match = start_match(state.level, self._game, weapon, items)
         match.layer_total = len(self._renderer.layer_records())
         if self._album_options.is_v3:
             # Đếm đạn CHỈ ở giao diện v3; bộ album giữ nguyên lối bắn không

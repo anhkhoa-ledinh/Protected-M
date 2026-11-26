@@ -16,8 +16,7 @@ SOON = tuple(n for n in ITEM_WEIGHT if n not in LIVE)
 
 def _match(items, level=1):
     state = type("S", (), {"props": [{}] * 6, "found": [False] * 6})()
-    return AlbumMatch(level=level, state=state, started_s=0.0, items=list(items),
-                      weights=dict(ITEM_WEIGHT))
+    return AlbumMatch(level=level, state=state, started_s=0.0, items=list(items))
 
 
 def test_exactly_two_items_are_live_and_six_are_soon():
@@ -63,10 +62,10 @@ def test_use_item_refuses_what_is_not_equipped_or_not_working():
     assert match.used == {}
 
 
-def test_score_with_one_flare_equals_the_formula():
+def test_score_with_one_flare_equals_seconds_left_times_level():
     match = _match(["Flare"])
     match.use_item("Flare", 1.0)
     match.ended = "win"
     left = match.time_left_s
-    assert match.score() == match_score(1, False, left, {"Flare": 1}, ITEM_WEIGHT)
-    assert match.score() == max(0, int(round(left * 1 - ITEM_WEIGHT["Flare"])))
+    assert match.score() == match_score(1, False, left)
+    assert match.score() == max(0, int(round(left * 1)))
