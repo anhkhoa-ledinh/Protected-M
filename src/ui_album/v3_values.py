@@ -950,10 +950,6 @@ def _result(state, flow, manifest, win: bool, accounts=None) -> None:
     else:
         rows.append((f"Time left {left} s × level {level}",
                      f"+{points}" if points > 0 else str(points), False))
-    for item, count in ({} if rejected else (result.get("used") or {})).items():
-        weight = F.ITEM_WEIGHT.get(item, 0) * int(count)
-        rows.append((f"{item} ×{count} · weight {F.ITEM_WEIGHT.get(item, 0)}",
-                     f"-{weight}", True))
     if level == 5 and result.get("overtime_s") and not rejected:
         penalty = int(round(result["overtime_s"] * 5))
         rows.append((f"Overtime {mmss(result['overtime_s'])} · penalty",

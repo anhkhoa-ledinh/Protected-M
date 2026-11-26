@@ -177,7 +177,7 @@ def test_a_photo_with_one_winnable_spot_keeps_it(monkeypatch):
         lambda planes, pos_mm, *a, **k: 0 if pos_mm is unwinnable["pos_mm"] else 3)
     monkeypatch.setattr(
         "src.game.match.start_match",
-        lambda level, game, weapon, items, item_weight: type(
+        lambda level, game, weapon, items: type(
             "Match", (), {"layer_total": 0, "ammo_enabled": False})())
 
     app._start_album_match(0.0)

@@ -107,9 +107,9 @@ def test_damage_table_matches_the_spec():
     assert weapon_damage("Spread gun", True) == 37.5 * 0.85   # khong thuong dau
     assert weapon_damage("Heavy-mag gun", False) == 51.0 * 0.70
     assert weapon_damage("Heavy-mag gun", True) == 51.0 * 1.5 * 0.70
-    # ...and divided by the level.
-    assert weapon_damage("Precision gun", False, 5) == 30.0
-    assert weapon_damage("Precision gun", True, 5) == 60.0
+    # ...and the same at level 5: damage no longer depends on the level.
+    assert weapon_damage("Precision gun", False, 5) == 150.0
+    assert weapon_damage("Precision gun", True, 5) == 300.0
 
 
 def test_every_weapon_has_a_damage_entry():
@@ -133,12 +133,11 @@ def test_sniper_body_shot_kills_at_level_1_not_at_level_3():
     assert three.state.found[0] is False
 
 
-def test_sniper_headshot_needs_9_hits_at_level_5():
-    headshot = _FixedAim(0, True)          # 300 / 5 = 60 a hit, 500 health
+def test_sniper_headshot_needs_2_hits_at_level_5():
+    headshot = _FixedAim(0, True)          # 300 a hit, 500 health
     five = _match(5, "Precision gun")
-    for _ in range(8):
-        fire(five, (10.0, 10.0), headshot)
-        five.next_shot_s = 0.0
+    fire(five, (10.0, 10.0), headshot)
+    five.next_shot_s = 0.0
     assert five.state.found[0] is False
     fire(five, (10.0, 10.0), headshot)
     assert five.state.found[0] is True
