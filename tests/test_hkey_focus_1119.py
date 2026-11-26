@@ -167,3 +167,47 @@ def test_item_slot_still_applies_in_play_without_focus():
     app = make_app(F.PLAY)
     app._tick_v3_input(InputState(item_slot=3), 0.0)
     assert app._album.state.slot_selected == 3
+
+
+# ---- a leftover MAIN-MENU focus must not block match keys ------------------
+# TASK_item_keys_1125: ``state.focus`` also holds a menu button after a click
+# or Up/Down on the main menu (``v3_routes`` / ``move_menu_focus``). That is
+# not a text field, so keys 1-3, H and C must still work in a match.
+
+def _menu_focus_app(screen: str = F.PLAY):
+    from src.ui_album.ids import BTN_SOLO
+    app = make_app(screen)
+    app._album.state.focus = BTN_SOLO
+    app._used_slots = []
+    app._use_item_slot = lambda slot, now: app._used_slots.append(slot)
+    app._album.game = object()
+    return app
+
+
+def test_menu_button_focus_is_not_a_text_field():
+    assert _menu_focus_app()._v3_field_focused() is False
+
+
+def test_item_slot_works_in_play_with_a_leftover_menu_focus():
+    app = _menu_focus_app()
+    app._tick_v3_input(InputState(item_slot=1), 0.0)
+    assert app._album.state.slot_selected == 1
+    assert app._used_slots == [1]
+
+
+def test_h_toggles_the_hud_in_play_with_a_leftover_menu_focus():
+    app = _menu_focus_app()
+    app._tick_v3_input(InputState(hud_hide_toggle=True), 0.0)
+    assert app._album.hud_toggled == 1
+
+
+def test_recentre_key_guard_passes_with_a_leftover_menu_focus():
+    # ``album_centre`` is gated by the same ``_v3_field_focused()`` call.
+    assert _menu_focus_app()._v3_field_focused() is False
+
+
+def test_join_code_field_still_counts_as_a_text_field():
+    from src.ui_album.ids import FIELD_JOIN
+    app = make_app(F.PVP_INVITE)
+    app._album.state.focus = FIELD_JOIN
+    assert app._v3_field_focused() is True
