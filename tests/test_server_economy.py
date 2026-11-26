@@ -263,8 +263,7 @@ def test_pvp_matches_charge_items_but_pay_no_points(env):
     assert r["t"] == "ok" and r["earned_total"] == 0 and r["wallet"] == 100
 
 
-def test_server_and_game_score_the_same_won_match_with_an_item_used(env):
-    import time
+def test_server_and_game_score_the_same_won_match_with_an_item_used(env, monkeypatch):
     from types import SimpleNamespace
     from src.game.match import AlbumMatch
 
@@ -273,8 +272,9 @@ def test_server_and_game_score_the_same_won_match_with_an_item_used(env):
     env.now += 40.0
     r = env.call(st, "finish_match", ticket=t, won=True, items_used={FLARE: 1})
     state = SimpleNamespace(props=[1], found=[True])
-    game = AlbumMatch(level=2, state=state, used={FLARE: 1},
-                      started_s=time.perf_counter() - 40.0)
+    game = AlbumMatch(level=2, state=state, used={FLARE: 1}, started_s=0.0)
+    # elapsed_s is the only place the score reads the clock: freeze it at 40 s
+    monkeypatch.setattr(AlbumMatch, "elapsed_s", property(lambda self: 40.0))
     assert r["score"] == game.score() == (LEVELS[2].seconds - 40) * 2
 
 
