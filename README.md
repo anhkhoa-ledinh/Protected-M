@@ -198,6 +198,7 @@ must lean further, blend in more, are smaller, take more hits, and on levels
 | 3 · Hard | 10 | 150 s | 3 | 60–100 mm | 0.70 | ×1.0 | — | 300 |
 | 4 · Infestation | 12 | 120 s | 4 | 75–110 mm | 0.85 | ×0.875 | 4 s | 400 |
 | 5 · Asian Mode | 12 | 120 s | 4 | 90–120 mm | 1.00 | ×0.75 | 2.5 s | 500 |
+On level 5 a hit that does not kill has a 50% chance to send the bug to a new hiding spot; it keeps its HP.
 
 A photo can only hide as many bugs as it has hiding spots. When it holds
 fewer than the level asks for, the loading screen and the HUD say so (e.g.
