@@ -1177,8 +1177,8 @@ class HcpdApplication:
             return
         fled = mover.flee(match.last_shot_hits, self._game_planes, eye, now,
                           hp_of=lambda i: match.bug_hp[i])
-        for index, _old, _new in fled:
-            self._after_bug_moved(index, match)
+        for index, old, new in fled:
+            self._after_bug_moved(index, match, old, new, restamp_s=now)
 
     def _tick_auto_fire(self, now: float) -> None:
         """
@@ -2449,21 +2449,24 @@ class HcpdApplication:
         if not was_done and self._game.finished_at_s is not None:
             self._write_game_csv(now, "finished")
 
-    def _after_bug_moved(self, index: int, match) -> None:
+    def _after_bug_moved(self, index: int, match, old_mm, new_mm,
+                         restamp_s: float | None = None) -> None:
         """A bug now sits on a new spot (timed move or flee): re-camouflage it
-        against the photo there and drop its floating HP bar (the HP stays)."""
+        against the photo there and carry its floating HP bar along (the HP
+        stays). ``restamp_s`` = the time of a flee (the bar shows as a fresh
+        hit); ``None`` for a timed move (the bar keeps its remaining time)."""
         prop = self._game.props[index]
+        rest = self._rest_eye or (
+            float(self._content.overscan_design_eye_mm[0]),
+            float(self._content.overscan_design_eye_mm[1]), 450.0)
+        glass, centre = self._glass_mm()
         photo_rgb = self._photo_rgb_for_camo()
         if photo_rgb is not None:
             from src.ui_album.bugs import assign_bug_camo
 
-            rest = self._rest_eye or (
-                float(self._content.overscan_design_eye_mm[0]),
-                float(self._content.overscan_design_eye_mm[1]), 450.0)
-            glass, centre = self._glass_mm()
             assign_bug_camo([prop], photo_rgb, rest, glass, centre,
                             strength=prop.get("camo_strength", 0.75))
-        match.bug_last_hit.pop(index, None)      # its HP bar was at the old spot
+        match.follow_bug(index, old_mm, new_mm, rest, glass, centre, restamp_s)
 
     def _tick_bug_moves(self, now: float, eye) -> None:
         """Levels 4-5: a bug seen for long enough moves to a spare spot."""
@@ -2473,7 +2476,7 @@ class HcpdApplication:
                 or match.ended or self._pvp_active):
             return
         for index, old, new, seen_s in mover.tick(self._game_planes, eye, now):
-            self._after_bug_moved(index, match)
+            self._after_bug_moved(index, match, old, new)
             logger.info("Album bo #%d doi cho: (%.0f, %.0f, %.0f) -> (%.0f, %.0f, %.0f)",
                         index, *old, *new)
             from src.game.match import BUG_HP_BY_LEVEL

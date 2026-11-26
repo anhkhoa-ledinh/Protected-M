@@ -212,6 +212,29 @@ class AlbumMatch:
         self.bug_last_hit[index] = (float(point[0]), float(point[1]), float(now))
         return False
 
+    def follow_bug(self, index: int, old_mm, new_mm, rest_eye_mm, glass_mm,
+                   centre_mm, restamp_s: float | None = None) -> None:
+        """Bug ``index`` moved from ``old_mm`` to ``new_mm``: carry its HP bar
+        along. The bar keeps the stored hit point, shifted by how far the bug's
+        sprite centre moved on screen (same projection the hit test uses).
+        ``restamp_s`` = a flee: the bar counts as a fresh hit at that time;
+        ``None`` = a timed move: it keeps its remaining time. A bug with no
+        bar gets none. The HP is never touched."""
+        last = self.bug_last_hit.get(index)
+        if last is None:
+            return
+        from src.game.viewport_filter import project_to_design
+
+        old = project_to_design(old_mm, rest_eye_mm, glass_mm, centre_mm)
+        new = project_to_design(new_mm, rest_eye_mm, glass_mm, centre_mm)
+        if old is None or new is None:
+            self.bug_last_hit.pop(index, None)
+            return
+        x, y, hit_s = last
+        self.bug_last_hit[index] = (
+            x + new[0] - old[0], y + new[1] - old[1],
+            hit_s if restamp_s is None else float(restamp_s))
+
     def hp_bars(self, now: float) -> list[tuple[float, float, float, float]]:
         """``[(x, y, phần máu còn, độ mờ), ...]`` của mỗi con còn sống bị
         bắn (không hạ) trong ``HP_BAR_FADE_S`` giây gần nhất.
