@@ -127,7 +127,6 @@ def test_layer_pass_gets_no_clip_rectangle():
 
 
 def test_room_buffers_depend_on_s():
-    pytest.importorskip("OpenGL")
     from src.renderer.virtual_room_gl import VirtualRoomRenderer
 
     colors = vr.room_colors(__import__("numpy").zeros((4, 4, 3), "uint8"))
