@@ -1,8 +1,10 @@
 """Virtual room behind the photo: pure geometry and colours (no GL).
 
 All lengths are millimetres. The screen plane is z = 0 and behind it is z < 0.
-The room is a box whose open front is the screen rectangle (half sizes
-``hx``, ``hy``, centred on the origin) and whose back wall is at ``z = -D``.
+The room's open front is the screen rectangle (half sizes ``hx``, ``hy``,
+centred on the origin); its back wall is at ``z = -D`` with half sizes
+``hx * f`` and ``hy * f``, ``f = max(1, s)``. So the room is a straight box
+for ``s <= 1`` and flares for ``s > 1``, and no layer is ever cut by it.
 """
 
 from __future__ import annotations
@@ -38,17 +40,28 @@ def layer_size_mm(screen_w_mm: float, screen_h_mm: float, s: float,
     return screen_w_mm * f, screen_h_mm * f
 
 
-def clip_rect_mm(z_mm: float, eye_mm, hx: float, hy: float
-                 ) -> tuple[float, float, float, float]:
-    """Room cross-section at depth ``z_mm`` projected on the screen plane.
+def flare(s: float) -> float:
+    """Back wall scale: the room is a straight box up to ``s = 1``."""
+    return max(1.0, float(s))
 
-    Returns ``(x0, x1, y0, y1)``. Its centre is ``e * (1 - E / (E + |z|))``
-    and its half size is the room half size times ``E / (E + |z|)``.
-    """
-    ex, ey, ez = (float(v) for v in eye_mm)
-    k = ez / (ez + abs(z_mm))
-    cx, cy = ex * (1.0 - k), ey * (1.0 - k)
-    return cx - hx * k, cx + hx * k, cy - hy * k, cy + hy * k
+
+def cross_section_half(hx: float, hy: float, depth_mm: float, s: float,
+                       z_mm: float) -> tuple[float, float]:
+    """Half sizes of the room cross-section at depth ``z_mm`` (<= 0)."""
+    k = 1.0 + (flare(s) - 1.0) * min(abs(z_mm) / depth_mm, 1.0)
+    return hx * k, hy * k
+
+
+def room_corners(hx: float, hy: float, depth_mm: float, s: float
+                 ) -> dict[str, list[tuple]]:
+    """Corners of the front and back rectangles, counter-clockwise from the
+    bottom-left."""
+    f = flare(s)
+    out = {}
+    for name, k, z in (("front", 1.0, 0.0), ("back", f, -depth_mm)):
+        out[name] = [(-hx * k, -hy * k, z), (hx * k, -hy * k, z),
+                     (hx * k, hy * k, z), (-hx * k, hy * k, z)]
+    return out
 
 
 # ---- grid ------------------------------------------------------------------
@@ -70,20 +83,33 @@ def _steps(lo: float, hi: float, n: int) -> list[float]:
     return [lo + (hi - lo) * i / n for i in range(n + 1)]
 
 
-def grid_lines(hx: float, hy: float, depth_mm: float) -> dict[str, list[tuple]]:
-    """Grid segments ``((x, y, z), (x, y, z))`` per wall, edges included."""
+def grid_lines(hx: float, hy: float, depth_mm: float, s: float = 1.0
+               ) -> dict[str, list[tuple]]:
+    """Grid segments ``((x, y, z), (x, y, z))`` per wall, edges included.
+
+    Depth lines join a front grid point to the matching back grid point
+    (scaled by ``f``); cross lines at depth ``z`` span that cross-section.
+    """
     nx, ny, nz = grid_divisions(2 * hx, 2 * hy, depth_mm)
     xs, ys, zs = _steps(-hx, hx, nx), _steps(-hy, hy, ny), _steps(0.0, -depth_mm, nz)
-    z0, zf = 0.0, -depth_mm
+    f, zf = flare(s), -depth_mm
+
+    def depth_line(x, y):
+        return ((x, y, 0.0), (x * f, y * f, zf))
+
     walls: dict[str, list[tuple]] = {}
-    for name, y in (("floor", -hy), ("ceiling", hy)):
-        walls[name] = ([((x, y, z0), (x, y, zf)) for x in xs]
-                       + [((-hx, y, z), (hx, y, z)) for z in zs])
-    for name, x in (("left", -hx), ("right", hx)):
-        walls[name] = ([((x, y, z0), (x, y, zf)) for y in ys]
-                       + [((x, -hy, z), (x, hy, z)) for z in zs])
-    walls["back"] = ([((x, -hy, zf), (x, hy, zf)) for x in xs]
-                     + [((-hx, y, zf), (hx, y, zf)) for y in ys])
+    for name, sign in (("floor", -1.0), ("ceiling", 1.0)):
+        walls[name] = ([depth_line(x, sign * hy) for x in xs]
+                       + [((-cx, sign * cy, z), (cx, sign * cy, z))
+                          for z in zs
+                          for cx, cy in (cross_section_half(hx, hy, depth_mm, s, z),)])
+    for name, sign in (("left", -1.0), ("right", 1.0)):
+        walls[name] = ([depth_line(sign * hx, y) for y in ys]
+                       + [((sign * cx, -cy, z), (sign * cx, cy, z))
+                          for z in zs
+                          for cx, cy in (cross_section_half(hx, hy, depth_mm, s, z),)])
+    walls["back"] = ([((x * f, -hy * f, zf), (x * f, hy * f, zf)) for x in xs]
+                     + [((-hx * f, y * f, zf), (hx * f, y * f, zf)) for y in ys])
     return walls
 
 
@@ -187,6 +213,7 @@ class RoomLayout:
 
     ``hx``/``hy``: Kooima screen half sizes; ``centre_mm``: the screen centre;
     ``eye_mm``: eye relative to that centre (z = distance to the glass).
+    The room flares with ``s`` so every layer lies inside it: no clipping.
     """
 
     hx: float
@@ -198,6 +225,10 @@ class RoomLayout:
     centre_mm: tuple
     width_px: int
     height_px: int
+
+    @property
+    def flare(self) -> float:
+        return flare(self.s)
 
     def layer_size_mm(self, depth_mm: float) -> tuple[float, float]:
         z = -max(0.0, float(depth_mm))
@@ -224,16 +255,3 @@ class RoomLayout:
         m[1, 3] = self.centre_mm[1] / 1000.0 - centre_y_m * r
         m[2, 3] = plane_z_m
         return m
-
-    def scissor_px(self, depth_mm: float) -> tuple[int, int, int, int]:
-        """``(x, y, w, h)`` of the room cross-section at ``depth_mm`` in pixels."""
-        x0, x1, y0, y1 = clip_rect_mm(-max(0.0, float(depth_mm)), self.eye_mm,
-                                      self.hx, self.hy)
-        px0 = (x0 + self.hx) / (2 * self.hx) * self.width_px
-        px1 = (x1 + self.hx) / (2 * self.hx) * self.width_px
-        py0 = (y0 + self.hy) / (2 * self.hy) * self.height_px
-        py1 = (y1 + self.hy) / (2 * self.hy) * self.height_px
-        x, y = max(0, int(np.floor(px0))), max(0, int(np.floor(py0)))
-        x2 = min(self.width_px, int(np.ceil(px1)))
-        y2 = min(self.height_px, int(np.ceil(py1)))
-        return x, y, max(0, x2 - x), max(0, y2 - y)

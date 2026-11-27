@@ -17,7 +17,8 @@ _SIDE_STRIPS = 8
 
 class VirtualRoomRenderer:
     """Five dark walls with grid lines, drawn first and without depth writes
-    (the layers are then painted far to near over them)."""
+    (the layers are then painted far to near over them). The walls flare with
+    the photo scale ``s`` (see ``virtual_room``)."""
 
     def __init__(self, shader_dir: Path) -> None:
         self._shader = ShaderProgram(shader_dir / "room.vert", shader_dir / "room.frag")
@@ -39,7 +40,7 @@ class VirtualRoomRenderer:
 
     @staticmethod
     def build(colors: vr.RoomColors, hx: float, hy: float, depth_mm: float,
-              centre_mm) -> tuple[np.ndarray, np.ndarray]:
+              centre_mm, s: float = 1.0) -> tuple[np.ndarray, np.ndarray]:
         """Interleaved (x, y, z, r, g, b) vertices in metres / 0..1:
         wall fills (triangles) and grid lines."""
         cx, cy = centre_mm
@@ -58,24 +59,29 @@ class VirtualRoomRenderer:
                 fill.extend(v(p, c))
 
         d = -depth_mm
+        corners = vr.room_corners(hx, hy, depth_mm, s)
+        (fbl, fbr, ftr, ftl), (bbl, bbr, btr, btl) = corners["front"], corners["back"]
         cf, cc = colors.fill("floor"), colors.fill("ceiling")
-        quad((-hx, -hy, 0), (hx, -hy, 0), (hx, -hy, d), (-hx, -hy, d), cf, cf)
-        quad((-hx, hy, 0), (-hx, hy, d), (hx, hy, d), (hx, hy, 0), cc, cc)
+        quad(fbl, fbr, bbr, bbl, cf, cf)
+        quad(ftl, btl, btr, ftr, cc, cc)
         cb = colors.fill("back")
-        quad((-hx, -hy, d), (hx, -hy, d), (hx, hy, d), (-hx, hy, d), cb, cb)
+        quad(bbl, bbr, btr, btl, cb, cb)
+        f = vr.flare(s)
         for x in (-hx, hx):
             for i in range(_SIDE_STRIPS):
                 t0, t1 = i / _SIDE_STRIPS, (i + 1) / _SIDE_STRIPS
                 y0, y1 = -hy + 2 * hy * t0, -hy + 2 * hy * t1
                 c0, c1 = colors.fill("side", t0), colors.fill("side", t1)
-                quad((x, y0, 0), (x, y0, d), (x, y1, d), (x, y1, 0), c0, c1)
+                quad((x, y0, 0), (x * f, y0 * f, d), (x * f, y1 * f, d), (x, y1, 0),
+                     c0, c1)
 
         lines: list[float] = []
-        for name, segs in vr.grid_lines(hx, hy, depth_mm).items():
+        for name, segs in vr.grid_lines(hx, hy, depth_mm, s).items():
             for a, b in segs:
                 for p in (a, b):
                     if name in ("left", "right"):
-                        t = (p[1] + hy) / (2 * hy)
+                        hh = hy * (1.0 + (f - 1.0) * abs(p[2]) / depth_mm)
+                        t = (p[1] + hh) / (2 * hh)
                         rgb = colors.line("side", t)
                     else:
                         rgb = colors.line(name)
@@ -84,14 +90,15 @@ class VirtualRoomRenderer:
                 np.asarray(lines, dtype=np.float32))
 
     def update(self, colors: vr.RoomColors, hx: float, hy: float,
-               depth_mm: float, centre_mm) -> None:
-        """Rebuild the buffers only when the photo or the room size changed."""
+               depth_mm: float, centre_mm, s: float = 1.0) -> None:
+        """Rebuild the buffers only when the photo, the room size or the
+        flare (``max(1, s)``) changed."""
         key = (colors, round(hx, 3), round(hy, 3), round(depth_mm, 3),
-               tuple(round(c, 3) for c in centre_mm))
+               round(vr.flare(s), 4), tuple(round(c, 3) for c in centre_mm))
         if key == self._key:
             return
         self._key = key
-        for i, buf in enumerate(self.build(colors, hx, hy, depth_mm, centre_mm)):
+        for i, buf in enumerate(self.build(colors, hx, hy, depth_mm, centre_mm, s)):
             GL.glBindBuffer(GL.GL_ARRAY_BUFFER, self._vbo[i])
             GL.glBufferData(GL.GL_ARRAY_BUFFER, buf.nbytes, buf, GL.GL_STATIC_DRAW)
             self._counts[i] = buf.size // 6

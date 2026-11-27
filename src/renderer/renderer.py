@@ -447,7 +447,7 @@ class SceneRenderer:
             if self._room_gl is None:
                 self._room_gl = VirtualRoomRenderer(self._shader_dir)
             self._room_gl.update(self._photo_room_colors(), room.hx, room.hy,
-                                 room.depth_mm, room.centre_mm)
+                                 room.depth_mm, room.centre_mm, room.s)
             self._room_gl.draw(view_flat, proj_flat)
         # TASK_game_feel_1118 P6: the "steady eye" while scoped (a no-op
         # otherwise) — ``uViewPos`` feeds specular lighting, which would

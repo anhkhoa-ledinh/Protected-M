@@ -62,41 +62,6 @@ def test_layers_line_up_into_the_photo_from_the_design_eye():
     assert rects[0] == pytest.approx((-half, half), abs=0.01)
 
 
-# ---- clip rectangle --------------------------------------------------------
-
-def test_clip_rect_at_screen_plane_is_the_screen():
-    r = vr.clip_rect_mm(0.0, (37.0, -20.0, E0), SW / 2, SH / 2)
-    assert r == pytest.approx((-SW / 2, SW / 2, -SH / 2, SH / 2))
-
-
-def test_clip_rect_is_smaller_when_deeper():
-    eye = (0.0, 0.0, E0)
-    prev = None
-    for z in (0.0, -100.0, -300.0, -D):
-        x0, x1, _, _ = vr.clip_rect_mm(z, eye, SW / 2, SH / 2)
-        if prev is not None:
-            assert (x1 - x0) < prev
-        prev = x1 - x0
-
-
-def test_clip_rect_worked_example():
-    # hx = 172, eye x = +100, E = 450, z = -450:
-    #   scale = 450 / 900 = 0.5 -> half width 86
-    #   centre = 100 * (1 - 450 / 900) = 50 -> x in [-36, 136]
-    # hy = 96.75, eye y = -40: half height 48.375, centre -40 * 0.5 = -20.
-    x0, x1, y0, y1 = vr.clip_rect_mm(-450.0, (100.0, -40.0, 450.0), 172.0, 96.75)
-    assert (x0, x1) == pytest.approx((-36.0, 136.0))
-    assert (y0, y1) == pytest.approx((-20.0 - 48.375, -20.0 + 48.375))
-
-
-def test_clip_rect_shifts_toward_the_eye_side():
-    left = vr.clip_rect_mm(-300.0, (-120.0, 0.0, E0), SW / 2, SH / 2)
-    right = vr.clip_rect_mm(-300.0, (120.0, 0.0, E0), SW / 2, SH / 2)
-    assert (left[0] + left[1]) / 2 < 0 < (right[0] + right[1]) / 2
-    z = 300.0
-    assert (right[0] + right[1]) / 2 == pytest.approx(120.0 * (1 - E0 / (E0 + z)))
-
-
 # ---- grid ------------------------------------------------------------------
 
 def test_cell_is_screen_width_over_16():
@@ -287,25 +252,6 @@ def test_layer_matrix_keeps_the_plane_z_and_follows_the_screen_centre():
                          centre_x_m=0.0, centre_y_m=0.0, plane_z_m=-0.1)
     p = m @ np.array([0.0, 0.0, 0.0, 1.0])
     assert p[:3] == pytest.approx([0.03, -0.01, -0.1])
-
-
-def test_scissor_covers_the_screen_at_depth_zero_and_shrinks_with_depth():
-    lay = _layout()
-    assert lay.scissor_px(0.0) == (0, 0, 1000, 500)
-    x, y, w, h = lay.scissor_px(D)
-    f = E0 / (E0 + D)
-    assert w == pytest.approx(1000 * f, abs=2)
-    assert h == pytest.approx(500 * f, abs=2)
-    assert x == pytest.approx(500 - w / 2, abs=2)
-
-
-def test_scissor_moves_with_the_eye():
-    right = _layout(eye=(120.0, 0.0, E0)).scissor_px(300.0)
-    centre = _layout().scissor_px(300.0)
-    assert right[0] > centre[0]
-    # shift = 120 * (1 - E/(E+300)) mm, and 1000 px = SW mm
-    assert right[0] - centre[0] == pytest.approx(
-        120 * (1 - E0 / (E0 + 300)) * 1000 / SW, abs=2)
 
 
 def test_layer_depth_in_the_layout_is_clamped_at_the_glass():

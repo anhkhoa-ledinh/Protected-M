@@ -992,17 +992,14 @@ class ContentPlaneRenderer:
             GL.glUniform1i(self._layer_video_uniform, 0)
         GL.glActiveTexture(GL.GL_TEXTURE0)
         room = self.room_layout
-        if room is not None:
-            GL.glEnable(GL.GL_SCISSOR_TEST)
         for idx, layer in enumerate(self._layers):
             if room is not None:
                 # Virtual room (demo): the layer is resized to the room at its
-                # own depth, and clipped to the room cross-section there.
+                # own depth. The room flares with s, so nothing is clipped.
                 depth_mm = -float(layer.z_world_m) * 1000.0
                 self._layer_shader.set_mat4("uModel", to_column_major_flat(
                     room.layer_matrix(depth_mm, layer.quad_w_m, layer.quad_h_m,
                                       layer.centre_x_m, layer.centre_y_m, float(self._position[2]))))
-                GL.glScissor(*room.scissor_px(depth_mm))
             GL.glBindTexture(GL.GL_TEXTURE_2D, layer.texture)
             layer.mesh.draw()
             # PB-073: bóng vẽ NGAY SAU mặt nhận, trước lớp gần hơn, nên nó nằm
@@ -1020,8 +1017,6 @@ class ContentPlaneRenderer:
             ):
                 with stage("mist"):
                     self._draw_mist(model_flat, view_flat, proj_flat)
-        if room is not None:
-            GL.glDisable(GL.GL_SCISSOR_TEST)
         GL.glDepthMask(GL.GL_TRUE)
         GL.glDisable(GL.GL_BLEND)
         GL.glEnable(GL.GL_CULL_FACE)
