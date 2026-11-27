@@ -22,11 +22,12 @@ from src.config.schema import RendererSettings
 from src.renderer import window as window_mod
 from src.renderer.window import GlfwWindow
 
-#: Mọi phím sandbox mà demo phải bỏ qua (F1, F2, F3, F7–F10, [ ] , . ; ' +/-).
+#: Mọi phím sandbox mà demo phải bỏ qua (F1, F2, F3, F7–F9, [ ] , . ; ' +/-; F10 is allowed since 27/11).
 BLOCKED = (glfw.KEY_F1, glfw.KEY_F2, glfw.KEY_F3, glfw.KEY_F7, glfw.KEY_F8,
-           glfw.KEY_F9, glfw.KEY_F10, glfw.KEY_LEFT_BRACKET, glfw.KEY_RIGHT_BRACKET,
-           glfw.KEY_COMMA, glfw.KEY_PERIOD, glfw.KEY_SEMICOLON, glfw.KEY_APOSTROPHE,
-           glfw.KEY_EQUAL, glfw.KEY_MINUS, glfw.KEY_KP_ADD, glfw.KEY_KP_SUBTRACT)
+           glfw.KEY_F9, glfw.KEY_LEFT_BRACKET, glfw.KEY_RIGHT_BRACKET,
+           glfw.KEY_COMMA, glfw.KEY_PERIOD, glfw.KEY_SEMICOLON, glfw.KEY_APOSTROPHE)
+# + = - are no longer blocked in the demo: they zoom the virtual-room photo
+# (see tests/test_virtual_room_keys.py).
 #: Phím đang giữ khi đọc: D, W, Q (dịch pose) và Esc.
 HELD = {glfw.KEY_D, glfw.KEY_W, glfw.KEY_Q, glfw.KEY_ESCAPE}
 

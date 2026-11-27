@@ -1,5 +1,5 @@
 @echo off
-rem PB-055: che do demo - chi G, T, F6, keo-tha, F4, Esc co tac dung;
+rem PB-055: che do demo - chi G, T, B, + = - 0, F10 (relief), F6, keo-tha, F4, Esc co tac dung;
 rem doc assets\config\content.demo.json, khong ghi file config nao.
 rem Log UTF-8 vao logs\demo_<ngay>_<gio>.log (logs\ da gitignore).
 cd /d "%~dp0..\.."

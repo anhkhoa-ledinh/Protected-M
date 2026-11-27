@@ -43,6 +43,17 @@ class DevTools:
         from src.engine.dev_hooks import DevHooks
 
         self._app = app if isinstance(app, DevHooks) else DevHooks(app)
+        from src.devtools import room_1127
+
+        self._room_script = room_1127.from_env(self._app)
+
+    def pinned_eye(self):
+        """HCPD_ROOM_1127: the eye pinned by the script, else ``None``."""
+        return None if self._room_script is None else self._room_script.pinned_eye()
+
+    def tick_room(self, now: float) -> None:
+        if self._room_script is not None:
+            self._room_script.tick(now)
 
     def env(self, name: str, default: str = "") -> str:
         """The one place that actually reads an ``HCPD_*`` env var —

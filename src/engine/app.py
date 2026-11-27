@@ -47,6 +47,7 @@ from src.common import stage_profile
 from src.engine.tracking_worker import TrackingWorker
 from src.filters import PoseFilterPipeline
 from src.renderer import DebugMetrics, GlfwWindow, SceneRenderer, VirtualCamera
+from src.renderer.virtual_room import S_MIN, RoomState
 from src.renderer.webcam_preview import WebcamPreviewSettings
 from src.scene import build_room_scene
 from src.scene.window_box import build_scene_for
@@ -81,6 +82,7 @@ HOOK_ENV_VARS = (
     "HCPD_PROP_PROBE", "HCPD_VIDEO_STATS", "HCPD_HUD_FIX_1119_SHOTS",
     "HCPD_ALBUM_AUTOWIN", "HCPD_BUG_SEED", "HCPD_ECONOMY_1124",
     "HCPD_HARDENING_1124_SHOTS", "HCPD_BAD_PHOTO_1124", "HCPD_CENTRAL_CONFIG", "HCPD_DISPLAY_MODE", "HCPD_RELOAD_1124",
+    "HCPD_ROOM_1127",
 )
 
 #: Bug-placement seed an automatch run uses unless ``HCPD_BUG_SEED`` says
@@ -121,6 +123,12 @@ class _NullDevTools:
         pass
 
     def tick_post_render(self, now: float) -> None:
+        pass
+
+    def pinned_eye(self):
+        return None
+
+    def tick_room(self, now: float) -> None:
         pass
 
 
@@ -2142,6 +2150,30 @@ class HcpdApplication:
         save_framebuffer(path, width, height)
         return path
 
+    def _tick_room_keys(self, input_state) -> None:
+        """Demo keys of the virtual room: B toggles, + = - zoom, 0 resets."""
+        room = self._room
+        if not (input_state.room_toggle or input_state.room_zoom_in
+                or input_state.room_zoom_out or input_state.room_zoom_reset):
+            return
+        if input_state.room_toggle:
+            state = "ON" if room.toggle() else "OFF"
+            logger.info("Virtual room: %s", state)
+            self._renderer.show_toast(f"Room {state}  s={room.s:.2f}")
+        s_max = self._renderer.room_s_max()
+        s_max = 1.0 if s_max is None else s_max
+        before = room.s
+        if input_state.room_zoom_in:
+            room.zoom_in(s_max)
+        if input_state.room_zoom_out:
+            room.zoom_out(s_max)
+        if input_state.room_zoom_reset:
+            room.reset()
+        if room.s != before:
+            logger.info("Virtual room: photo scale s=%.3f (range %.1f..%.3f)",
+                        room.s, S_MIN, s_max)
+            self._renderer.show_toast(f"Room s={room.s:.2f}")
+
     def _begin_rest_measure(self, now: float) -> None:
         """Phím G: đo mắt nghỉ 2 giây thay vì đặt vật ngay."""
         if len(self._renderer.layer_records()) < 2:
@@ -2559,6 +2591,9 @@ class HcpdApplication:
         )
         self._window.pump_events()
         self._renderer.initialize()
+        # Virtual room: only the research demo (not the game) has one.
+        self._room = RoomState(demo=self._demo and not self._album_options.enabled)
+        self._renderer.room_state = self._room
         if self._album_options.enabled:
             if self._album_options.is_v3:
                 from src.ui_album.v3_ui import V3UI
@@ -2657,7 +2692,7 @@ class HcpdApplication:
         # nay sai neu in ca luc --demo --album cung bat.
         if self._demo and not self._album_options.enabled:
             logger.info(
-                "DEMO MODE (PB-055): chi G, T, F6, keo-tha, F4, Esc co tac dung; "
+                "DEMO MODE (PB-055): chi G, T, B, + = - 0, F10, F6, keo-tha, F4, Esc co tac dung; "
                 "doc content.demo.json, khong ghi file config"
             )
 
@@ -2770,6 +2805,8 @@ class HcpdApplication:
                     if value is not None:
                         self._renderer.show_toast(f"Overscan e_max {value:.0f} mm")
 
+                self._tick_room_keys(input_state)
+
                 if input_state.zoom_in:
                     self._virtual_camera.adjust_zoom(self._virtual_camera.zoom_step_mm)
                     logger.info(
@@ -2825,6 +2862,9 @@ class HcpdApplication:
                     if control_eye is not None:
                         # Điều kiện đối chứng: mắt đứng im ở tư thế nghỉ ĐO ĐƯỢC.
                         self._virtual_camera.set_eye_mm(control_eye)
+                pinned = self._devtools.pinned_eye()
+                if pinned is not None:           # HCPD_ROOM_1127 scripted run
+                    self._virtual_camera.set_eye_mm(pinned)
                 live_eye = self._virtual_camera.eye_position_mm
                 self._tick_rest_measure(now, live_eye, self._tracking.face_detected)
                 self._tick_prop_game(now, live_eye)
@@ -2851,6 +2891,7 @@ class HcpdApplication:
                     self._drawing = False
                 if self._album is not None:
                     self._devtools.tick_post_render(now)
+                self._devtools.tick_room(now)
                 self._profiler.render_latency_ms = (
                     time.perf_counter() - render_start
                 ) * 1000.0
