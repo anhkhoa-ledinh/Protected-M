@@ -1,4 +1,4 @@
-"""Virtual room keys (no GL): B toggles; demo only."""
+"""Virtual room keys (no GL): B toggles, + = - zoom, 0 resets; demo only."""
 
 from __future__ import annotations
 
@@ -11,7 +11,8 @@ from src.config.schema import RendererSettings
 from src.renderer import window as window_mod
 from src.renderer.window import ALBUM_KEYS, DEMO_KEYS, V3_KEYS, GlfwWindow
 
-ROOM = (glfw.KEY_B,)
+ROOM = (glfw.KEY_B, glfw.KEY_EQUAL, glfw.KEY_KP_ADD, glfw.KEY_MINUS,
+        glfw.KEY_KP_SUBTRACT, glfw.KEY_0)
 
 
 def _press(window, keys):
@@ -31,6 +32,17 @@ def _room_flags(state):
 def test_demo_maps_each_key_to_its_room_action():
     mk = lambda: GlfwWindow(RendererSettings(), demo=True)  # noqa: E731
     assert _room_flags(_press(mk(), [glfw.KEY_B])) == {"room_toggle": True}
+    for key in (glfw.KEY_EQUAL, glfw.KEY_KP_ADD):
+        assert _room_flags(_press(mk(), [key])) == {"room_zoom_in": True}
+    for key in (glfw.KEY_MINUS, glfw.KEY_KP_SUBTRACT):
+        assert _room_flags(_press(mk(), [key])) == {"room_zoom_out": True}
+    assert _room_flags(_press(mk(), [glfw.KEY_0])) == {"room_zoom_reset": True}
+
+
+def test_demo_zoom_keys_do_not_touch_the_sandbox_zoom_offset():
+    st = _press(GlfwWindow(RendererSettings(), demo=True),
+                [glfw.KEY_EQUAL, glfw.KEY_MINUS])
+    assert not st.zoom_in and not st.zoom_out
 
 
 def test_g_still_starts_the_rest_eye_measure_in_demo():
@@ -40,6 +52,7 @@ def test_g_still_starts_the_rest_eye_measure_in_demo():
 
 def test_sandbox_keeps_its_zoom_offset_and_has_no_room_keys():
     st = _press(GlfwWindow(RendererSettings()), ROOM)
+    assert st.zoom_in and st.zoom_out
     assert not _room_flags(st)
 
 
@@ -49,6 +62,7 @@ def test_album_ignores_every_room_key():
                    {"demo": False, "album": True, "ui_v3": True}):
         st = _press(GlfwWindow(RendererSettings(), **kwargs), ROOM)
         assert not _room_flags(st), kwargs
+        assert not st.zoom_in and not st.zoom_out, kwargs
 
 
 def test_key_sets_keep_album_and_v3_as_on_main():

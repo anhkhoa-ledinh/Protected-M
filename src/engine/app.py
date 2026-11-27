@@ -47,7 +47,7 @@ from src.common import stage_profile
 from src.engine.tracking_worker import TrackingWorker
 from src.filters import PoseFilterPipeline
 from src.renderer import DebugMetrics, GlfwWindow, SceneRenderer, VirtualCamera
-from src.renderer.virtual_room import RoomState
+from src.renderer.virtual_room import S_MIN, RoomState
 from src.renderer.webcam_preview import WebcamPreviewSettings
 from src.scene import build_room_scene
 from src.scene.window_box import build_scene_for
@@ -2151,9 +2151,28 @@ class HcpdApplication:
         return path
 
     def _tick_room_keys(self, input_state) -> None:
-        """Demo key of the virtual room: B toggles."""
+        """Demo keys of the virtual room: B toggles, + = - zoom, 0 resets."""
+        room = self._room
+        if not (input_state.room_toggle or input_state.room_zoom_in
+                or input_state.room_zoom_out or input_state.room_zoom_reset):
+            return
         if input_state.room_toggle:
-            logger.info("Virtual room: %s", "ON" if self._room.toggle() else "OFF")
+            state = "ON" if room.toggle() else "OFF"
+            logger.info("Virtual room: %s", state)
+            self._renderer.show_toast(f"Room {state}  s={room.s:.2f}")
+        s_max = self._renderer.room_s_max()
+        s_max = 1.0 if s_max is None else s_max
+        before = room.s
+        if input_state.room_zoom_in:
+            room.zoom_in(s_max)
+        if input_state.room_zoom_out:
+            room.zoom_out(s_max)
+        if input_state.room_zoom_reset:
+            room.reset()
+        if room.s != before:
+            logger.info("Virtual room: photo scale s=%.3f (range %.1f..%.3f)",
+                        room.s, S_MIN, s_max)
+            self._renderer.show_toast(f"Room s={room.s:.2f}")
 
     def _begin_rest_measure(self, now: float) -> None:
         """Phím G: đo mắt nghỉ 2 giây thay vì đặt vật ngay."""
@@ -2673,7 +2692,7 @@ class HcpdApplication:
         # nay sai neu in ca luc --demo --album cung bat.
         if self._demo and not self._album_options.enabled:
             logger.info(
-                "DEMO MODE (PB-055): chi G, T, B, F6, keo-tha, F4, Esc co tac dung; "
+                "DEMO MODE (PB-055): chi G, T, B, + = - 0, F6, keo-tha, F4, Esc co tac dung; "
                 "doc content.demo.json, khong ghi file config"
             )
 

@@ -164,6 +164,21 @@ class RoomState:
         self.s = min(max(self.s, S_MIN), max(S_MIN, s_max_value))
 
 
+    def zoom_in(self, s_max_value: float) -> None:
+        if self.demo:
+            self.s *= S_STEP
+            self.clamp(s_max_value)
+
+    def zoom_out(self, s_max_value: float) -> None:
+        if self.demo:
+            self.s /= S_STEP
+            self.clamp(s_max_value)
+
+    def reset(self) -> None:
+        if self.demo:
+            self.s = S_DEFAULT
+
+
 # ---- one frame's placement of the layers -----------------------------------
 
 @dataclass(frozen=True)

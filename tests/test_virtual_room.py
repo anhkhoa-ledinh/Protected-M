@@ -226,6 +226,34 @@ def test_album_room_is_off_and_keys_change_nothing():
     assert not st.shown and st.s == 1.0 and st.on is False
 
 
+def test_zoom_steps_by_1_1_and_clamps_at_both_ends():
+    smax = vr.s_max(E0, D)
+    st = vr.RoomState(demo=True)
+    st.zoom_in(smax)
+    assert st.s == pytest.approx(1.1)
+    st.zoom_out(smax)
+    st.zoom_out(smax)
+    assert st.s == pytest.approx(1 / 1.1)
+    for _ in range(40):
+        st.zoom_out(smax)
+    assert st.s == vr.S_MIN
+    for _ in range(40):
+        st.zoom_in(smax)
+    assert st.s == pytest.approx(smax)
+    st.reset()
+    assert st.s == 1.0
+
+
+def test_album_zoom_keys_change_nothing():
+    st = vr.RoomState(demo=False)
+    smax = vr.s_max(E0, D)
+    st.zoom_in(smax)
+    st.zoom_out(smax)
+    st.s = 0.8
+    st.reset()
+    assert st.s == 0.8 and not st.shown
+
+
 def test_clamp_follows_a_smaller_s_max():
     st = vr.RoomState(demo=True)
     st.s = 2.0
