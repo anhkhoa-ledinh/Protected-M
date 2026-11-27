@@ -530,6 +530,9 @@ tools\launch\run.bat        :: sandbox: all research keys (main.py, no flags)
 tools\launch\run_demo.bat   :: presentation mode: only G, T, B, + = - 0, F4, F6, Esc (main.py --demo)
 ```
 
+On Linux the demo launcher is `bash tools/launch/run_demo.sh` (same flags; log in
+`logs/demo_<date>_<time>.log`; set `PM_PYTHON` to use another interpreter).
+
 `--album` is the game (`run_game.bat` in the repo root); `--demo` is this
 research presentation mode. They are independent — the game no longer needs
 `--demo`, and running both together behaves exactly like `--album` alone.
@@ -537,7 +540,9 @@ research presentation mode. They are independent — the game no longer needs
 ### Virtual room (`--demo` only)
 
 The demo shows the photo inside a room: a box of grid walls behind the screen,
-the screen being its open front. The ceiling grid takes the colour of the
+the screen being its open front. At the default size the box is straight; zoomed
+in (`s` > 1) the back wall grows by `s`, so the walls flare and no part of the photo
+is ever cut. The ceiling grid takes the colour of the
 photo's sky (top 8 % of rows) and the floor grid the colour of its ground
 (bottom 8 %). The room is on by default. The game (`--album`) has no room.
 
@@ -641,7 +646,7 @@ run_server.bat / .sh    Launch the PvP LAN server
 deploy/                 Central server: Dockerfile, docker-compose.yml,
                         server.sh (the one script to run it), .env.example
 tools/launch/           Research launchers: run.bat/run.ps1 (sandbox),
-                        run_demo.bat (presentation mode)
+                        run_demo.bat / run_demo.sh (presentation mode)
 src/
   engine/               Main loop, worker threads, app wiring (app.py)
   game/                 Match and weapon rules, plain Python — no engine/
