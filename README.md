@@ -544,7 +544,7 @@ photo's sky (top 8 % of rows) and the floor grid the colour of its ground
 | Key | Action (`--demo`) |
 |---|---|
 | `B` | Room on / off |
-| `+` (or `=`), `-` | Photo larger / smaller inside the room, x1.1 per press (0.6 to the largest size at which the photo has its old size at the centre) |
+| `+` (or `=`), `-` | Photo larger / smaller inside the room, x1.1 per press (0.6 to the largest size at which the photo has its old size at the centre). Above 1 the room flares wider toward the back, so zooming never cuts the photo |
 | `0` | Photo scale back to 1 |
 
 
