@@ -1964,6 +1964,7 @@ class HcpdApplication:
         from src.game.match import start_match
 
         from src.content.hidden_props_search import exposure_count
+        from src.game.bug_capacity import hold_back_spares
         from src.game.viewport_filter import filter_props
 
         state = self._album.state
@@ -1983,6 +1984,7 @@ class HcpdApplication:
             chosen = self._album_layout(planes, count, rule, rest, glass,
                                         centre).layout
         self._bug_mover = None
+        held_spots = []
         self._start_prop_game(count=count * 3,
                               prefer=(rule.prefer_lo, rule.prefer_hi),
                               props=chosen.kept if chosen else None)
@@ -2011,9 +2013,15 @@ class HcpdApplication:
                 if exposed_n > 0:
                     winnable.append(prop)
             dropped_unwinnable = len(kept) - len(winnable)
-            kept = winnable
-            logger.info("Album bo: xin %d · dat %d · ngoai o %d · khong the lo %d",
-                        count, len(kept), outside, dropped_unwinnable)
+            capacity = len(winnable)
+            # Levels 4-5 keep ``min_spare_spots`` spots free; the held-back
+            # spots join the spare pool below.
+            kept, held_spots = hold_back_spares(winnable, count,
+                                                rule.min_spare_spots)
+            logger.info("Album bo: xin %d · cho %d · dat %d · giu trong %d · "
+                        "ngoai o %d · khong the lo %d",
+                        count, capacity, len(kept), len(held_spots),
+                        outside, dropped_unwinnable)
             if state.bug_hold is not None and state.bug_hold != len(kept):
                 logger.warning("Album bo: man tai xong bao %d con nhung van dat %d "
                                "(cua so hoac mat nghi doi sau do)",
@@ -2031,8 +2039,11 @@ class HcpdApplication:
                 # tưởng hỏng. Nói thẳng ra: lỗi ở tấm ảnh, không ở họ.
                 # Lời báo cũ đi qua ``renderer.show_toast``, mà ở v3 toast ấy
                 # vẽ trong pass cảnh 3D nên gần như không ai thấy.
+                note = (f" ({len(held_spots)} spot kept free)"
+                        if held_spots else "")
                 F.say(state, f"This photo can only hide {len(kept)} of "
-                             f"{count} bugs — try one with more depth.", 6.0)
+                             f"{count} bugs{note} — try one with more depth.",
+                      6.0)
             self._album_place_stats = {"xin": count, "dat": len(kept),
                                        "ngoai_o": outside}
             self._game.props = kept
@@ -2097,6 +2108,7 @@ class HcpdApplication:
 
             spares = spare_spots(self._game_planes, chosen, rest,
                                  self._viewport_rect(), glass, centre)
+            spares = spares + held_spots
             self._bug_mover = BugMover(self._game, spares, rule.move_after_s,
                                        bug_radius_mm(self._content),
                                        self._bug_seed, rule.flee_chance,
@@ -2212,12 +2224,15 @@ class HcpdApplication:
         planes = layer_planes(self._renderer.layer_records())
         if len(planes) < 2:
             return
+        from src.game.bug_capacity import bugs_to_place
+
         self._bug_hold_key, self._bug_hold_t = key, now
         F = self._album.flow
         count = F.LEVEL_TABLE[state.level][1]
         rule = level_rules(state.level)
         choice = self._album_layout(planes, count, rule, rest, glass, centre)
-        state.bug_hold = len(choice.layout.kept)
+        state.bug_hold = bugs_to_place(len(choice.layout.kept), count,
+                                       rule.min_spare_spots)
         logger.info("Album bo: anh chua duoc %d / %d (seed=%d, man tai xong)",
                     state.bug_hold, count, self._pending_bug_seed)
 

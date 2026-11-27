@@ -30,6 +30,14 @@ SPACING_K = 3.0
 #: The keys of a placement dict that describe WHERE the bug is.
 SPOT_KEYS = ("pos_mm", "reveal_axis", "reveal_450_mm", "reveal_330_mm")
 
+#: How long a death still draws on its spot (``ui_album.bugs``: ``FADE_S`` +
+#: ``DUST_S``; a test keeps the two equal). The spot is freed after this.
+DEATH_EFFECT_S = 2.4
+
+
+def _same_spot(a, b) -> bool:
+    return all(a.get(k) == b.get(k) for k in SPOT_KEYS)
+
 
 def too_close(pos_a, pos_b, radius_mm: float) -> bool:
     return (abs(pos_a[0] - pos_b[0]) < SPACING_K * radius_mm
@@ -54,6 +62,31 @@ class BugMover:
         #: ``flee_cooldown_s``); ``_fled_at`` = bug index -> time it last moved.
         self.flee_cooldown_s = float(flee_cooldown_s)
         self._fled_at: dict = {}
+        #: Dead bugs: index -> when their death was first seen, and the
+        #: indices whose spot already went back to the pool.
+        self.death_effect_s = DEATH_EFFECT_S
+        self._dead_seen: dict = {}
+        self._freed: set = set()
+
+    def free_dead(self, now: float) -> None:
+        """The ONE place a dead bug's spot goes back into ``spares``.
+
+        It reads ``game.found``, so every way a bug can die (any gun, the
+        auto-find, the dev auto-win) reaches it without a hook of its own.
+        The spot is freed ``death_effect_s`` after the death was first seen,
+        when the fade and dust no longer draw on it, and only if no spare
+        already has the same ``SPOT_KEYS``."""
+        for index, prop in enumerate(self.game.props):
+            if (prop is None or not self.game.found[index]
+                    or index in self._freed):
+                continue
+            seen = self._dead_seen.setdefault(index, now)
+            if now - seen < self.death_effect_s:
+                continue
+            self._freed.add(index)
+            spot = {key: prop[key] for key in SPOT_KEYS if key in prop}
+            if not any(_same_spot(spot, s) for s in self.spares):
+                self.spares.append(spot)
 
     def _pick(self, index, planes, eye):
         """A spare that keeps the spacing from every other live bug; one that
@@ -78,6 +111,7 @@ class BugMover:
         (``seen_s`` = how long the bug had been continuously visible)."""
         moved = []
         game = self.game
+        self.free_dead(now)
         for index, prop in enumerate(game.props):
             if game.found[index]:
                 continue
@@ -116,6 +150,7 @@ class BugMover:
         with none eligible there is no roll at all. The cooldown starts only
         when the bug really moved. No spot means it stays, logged. Returns ``[(index, old_pos, new_pos)]``.
         ``hp_of(index)`` only feeds the log line; HP itself is never touched."""
+        self.free_dead(now)
         if self.flee_chance <= 0.0:
             return []
         dead = {i for i, _c, killed in hits if killed}
