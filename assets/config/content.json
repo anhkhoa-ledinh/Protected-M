@@ -1,7 +1,7 @@
 {
   "enabled": true,
   "mode": "video",
-  "content_path": "/mnt/data/PycharmProjects/test_images/t28.png",
+  "content_path": "D:\\PycharmProjects\\test_images\\t22.png",
   "content_type": "image",
   "video_path": "assets/video/demo.mp4",
   "loop_video": true,
