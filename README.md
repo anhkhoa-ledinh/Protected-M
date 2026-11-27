@@ -200,6 +200,8 @@ must lean further, blend in more, are smaller, take more hits, and on levels
 | 5 · Asian Mode | 12 | 120 s | 4 | 90–120 mm | 1.00 | ×0.75 | 2.5 s | 500 |
 On level 5 a hit that does not kill has a 50% chance to send the bug to a new hiding spot; it keeps its HP and cannot flee again for 1 s.
 
+On levels 4–5 the game keeps one hiding spot free, so a photo with few spots gets one bug fewer; a dead bug's spot is freed for the others.
+
 A photo can only hide as many bugs as it has hiding spots. When it holds
 fewer than the level asks for, the loading screen and the HUD say so (e.g.
 "photo holds 4 of 12"). Bug positions are random each match; the game tries
