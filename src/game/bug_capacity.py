@@ -97,3 +97,19 @@ def choose_layout(planes, count, radius_mm, rest_eye_mm, glass_mm, rect,
     best = [i for i, c in enumerate(counts) if c == max(counts)]
     index = random.Random(f"layout:{seed}").choice(best)
     return Choice(layouts[index], counts, index, seeds[index])
+
+
+def bugs_to_place(capacity, bug_count, min_spare_spots) -> int:
+    """Bugs a photo of ``capacity`` winnable spots gets: ``bug_count``, minus
+    what it takes to keep ``min_spare_spots`` spots free, but never fewer
+    than one (a match is never empty because of this rule)."""
+    return min(int(bug_count), max(int(capacity) - int(min_spare_spots), 1))
+
+
+def hold_back_spares(kept, bug_count, min_spare_spots):
+    """``(bugs, held)``: the first ``bugs_to_place`` of ``kept`` (the seeded
+    placement order, so no new randomness) become bugs; the rest are held
+    back as spare spots for the moves."""
+    kept = list(kept)
+    n = bugs_to_place(len(kept), bug_count, min_spare_spots)
+    return kept[:n], kept[n:]
