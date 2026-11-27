@@ -2692,7 +2692,7 @@ class HcpdApplication:
         # nay sai neu in ca luc --demo --album cung bat.
         if self._demo and not self._album_options.enabled:
             logger.info(
-                "DEMO MODE (PB-055): chi G, T, B, + = - 0, F6, keo-tha, F4, Esc co tac dung; "
+                "DEMO MODE (PB-055): chi G, T, B, + = - 0, F10, F6, keo-tha, F4, Esc co tac dung; "
                 "doc content.demo.json, khong ghi file config"
             )
 

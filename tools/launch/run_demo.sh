@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Protected M - research demo (Linux), the twin of run_demo.bat.
-# Only G, T, B, + = - 0, F6, drag-drop, F4, Esc work; reads assets/config/content.demo.json,
+# Only G, T, B, + = - 0, F10 (relief on/off), F6, drag-drop, F4, Esc work; reads assets/config/content.demo.json,
 # writes no config file. Log (UTF-8): logs/demo_<date>_<time>.log.
 # Use: bash tools/launch/run_demo.sh [extra main.py args]. Override the interpreter with $PM_PYTHON.
 cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../.." || exit 1

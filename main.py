@@ -55,7 +55,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--demo",
         action="store_true",
         help="Demo mode (PB-055): content.demo.json, no config writes, "
-             "only G/T/F6/drag-drop/F4/Esc",
+             "only G/T/F6/F10/drag-drop/F4/Esc",
     )
     # Giao diện "album bọc nhựa" (TASK_album_ui_1106). Không có --album thì
     # app chạy **y hệt hôm nay**: mọi cờ dưới đây chỉ có nghĩa khi --album bật.
