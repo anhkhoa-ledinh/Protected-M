@@ -177,7 +177,9 @@ _DEMO_BASE_KEYS = frozenset({glfw.KEY_G, glfw.KEY_T, glfw.KEY_F6, glfw.KEY_F4})
 #: Virtual room keys: only ``--demo`` (not ``--album``) has them.
 ROOM_KEYS = frozenset({glfw.KEY_B, glfw.KEY_EQUAL, glfw.KEY_KP_ADD, glfw.KEY_MINUS,
                        glfw.KEY_KP_SUBTRACT, glfw.KEY_0, glfw.KEY_KP_0})
-DEMO_KEYS = _DEMO_BASE_KEYS | ROOM_KEYS
+#: F10 (relief A/B for the thesis, 27/11) is demo-only: not in _DEMO_BASE_KEYS,
+#: so ALBUM_KEYS (the game) never gets it.
+DEMO_KEYS = _DEMO_BASE_KEYS | ROOM_KEYS | frozenset({glfw.KEY_F10})
 
 #: TASK_album_ui_1106: giao diện album dùng chuột là chính; bàn phím thêm F12
 #: (chụp màn), F9 (diễn cảnh mất kết nối) và C (căn lại theo chỗ ngồi).

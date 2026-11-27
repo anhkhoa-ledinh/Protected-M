@@ -7,6 +7,7 @@ Steps (each waits for 8 drawn frames and 1 s after the previous one):
 ``pose:x,y[,z]``   pin the eye (mm, relative to the screen centre; z defaults to
                    the design distance); ``pose:free`` releases it
 ``room:on|off``    the B key
+``relief:on|off``  set the per-layer relief (the demo F10 key) to that state
 ``s:<v>|max|1``    photo scale (like + - 0, clamped)
 ``shot:<stem>``    framebuffer -> ``<out>/<stem>.png`` (what F12 saves) and a
                    line with its size and pixel standard deviation
@@ -99,6 +100,11 @@ class RoomScript:
         elif name == "room":
             app.room.on = arg == "on"
             logger.info("Room script: room %s", arg)
+        elif name == "relief":
+            want = arg == "on"
+            if app.renderer.relief_enabled != want:
+                app.renderer.toggle_relief()
+            logger.info("Room script: relief %s", arg)
         elif name == "s":
             smax = app.renderer.room_s_max() or 1.0
             app.room.s = smax if arg == "max" else float(arg)

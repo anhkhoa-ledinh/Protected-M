@@ -69,3 +69,47 @@ def test_key_sets_keep_album_and_v3_as_on_main():
     assert set(ROOM) & ALBUM_KEYS == set()
     assert set(ROOM) & V3_KEYS == set()
     assert set(ROOM) <= DEMO_KEYS
+
+
+# --- F10 relief toggle in the demo (user rule 27/11) -------------------------
+
+#: Sandbox research keys that stay blocked in the demo.
+STILL_BLOCKED = (glfw.KEY_F1, glfw.KEY_F2, glfw.KEY_F3, glfw.KEY_F7,
+                 glfw.KEY_F8, glfw.KEY_F9)
+
+
+def test_demo_f10_sets_the_relief_toggle():
+    st = _press(GlfwWindow(RendererSettings(), demo=True), [glfw.KEY_F10])
+    assert st.toggle_relief
+    assert glfw.KEY_F10 in DEMO_KEYS
+
+
+def test_f10_is_not_in_the_album_or_v3_key_sets():
+    from src.renderer.window import _DEMO_BASE_KEYS
+
+    assert glfw.KEY_F10 not in _DEMO_BASE_KEYS
+    assert glfw.KEY_F10 not in ALBUM_KEYS
+    assert glfw.KEY_F10 not in V3_KEYS
+    assert ALBUM_KEYS == frozenset({
+        glfw.KEY_G, glfw.KEY_T, glfw.KEY_F6, glfw.KEY_F4, glfw.KEY_F9,
+        glfw.KEY_F12, glfw.KEY_C, glfw.KEY_BACKSPACE, glfw.KEY_ENTER,
+        glfw.KEY_KP_ENTER, glfw.KEY_TAB})
+
+
+def test_album_and_demo_album_ignore_f10():
+    for kwargs in ({"demo": False, "album": True},
+                   {"demo": True, "album": True},
+                   {"demo": False, "album": True, "ui_v3": True}):
+        st = _press(GlfwWindow(RendererSettings(), **kwargs), [glfw.KEY_F10])
+        assert not st.toggle_relief, kwargs
+
+
+def test_sandbox_f10_still_toggles_relief():
+    assert _press(GlfwWindow(RendererSettings()), [glfw.KEY_F10]).toggle_relief
+
+
+def test_other_ab_keys_stay_ignored_in_the_demo():
+    st = dataclasses.asdict(_press(GlfwWindow(RendererSettings(), demo=True),
+                                   STILL_BLOCKED))
+    on = [k for k, v in st.items() if v is True and k != "quit_app"]
+    assert on == []

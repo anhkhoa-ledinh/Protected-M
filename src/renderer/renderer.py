@@ -243,6 +243,11 @@ class SceneRenderer:
             return None
         return self._video_plane.toggle_mist()
 
+    @property
+    def relief_enabled(self) -> bool | None:
+        """Current relief state of the content plane; ``None`` if unavailable."""
+        return None if self._video_plane is None else self._video_plane.relief_enabled
+
     def toggle_relief(self) -> bool | None:
         """Flip intra-layer relief meshes on the content plane; ``None`` if unavailable."""
         if self._video_plane is None:
