@@ -19,6 +19,12 @@ from src.gui import file_dialog
 from src.ui_album import v3_flow as F
 
 
+@pytest.fixture(autouse=True)
+def _tk_backend(monkeypatch):
+    """These tests are about the Tk backend, so pin it on every OS."""
+    monkeypatch.setattr(file_dialog, "_current_platform", lambda: "linux")
+
+
 class FakeTclError(Exception):
     pass
 
