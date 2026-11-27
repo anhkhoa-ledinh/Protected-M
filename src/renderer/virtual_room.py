@@ -138,3 +138,87 @@ def room_colors(photo) -> RoomColors:
     top = arr[:n, :, :3].reshape(-1, 3).mean(axis=0)
     bottom = arr[rows - n:, :, :3].reshape(-1, 3).mean(axis=0)
     return RoomColors(tuple(float(v) for v in top), tuple(float(v) for v in bottom))
+
+
+# ---- state (keys) ----------------------------------------------------------
+
+class RoomState:
+    """Room on/off and the photo scale ``s``. Only ``--demo`` can use it:
+    in the game (``demo=False``) the room stays off and every key is a no-op."""
+
+    def __init__(self, demo: bool) -> None:
+        self.demo = bool(demo)
+        self.on = self.demo
+        self.s = S_DEFAULT
+
+    @property
+    def shown(self) -> bool:
+        return self.demo and self.on
+
+    def toggle(self) -> bool:
+        if self.demo:
+            self.on = not self.on
+        return self.shown
+
+    def clamp(self, s_max_value: float) -> None:
+        self.s = min(max(self.s, S_MIN), max(S_MIN, s_max_value))
+
+
+# ---- one frame's placement of the layers -----------------------------------
+
+@dataclass(frozen=True)
+class RoomLayout:
+    """Everything the draw pass needs to put the layers inside the room.
+
+    ``hx``/``hy``: Kooima screen half sizes; ``centre_mm``: the screen centre;
+    ``eye_mm``: eye relative to that centre (z = distance to the glass).
+    """
+
+    hx: float
+    hy: float
+    depth_mm: float
+    e0_mm: float
+    s: float
+    eye_mm: tuple
+    centre_mm: tuple
+    width_px: int
+    height_px: int
+
+    def layer_size_mm(self, depth_mm: float) -> tuple[float, float]:
+        z = -max(0.0, float(depth_mm))
+        return layer_size_mm(2 * self.hx, 2 * self.hy, self.s, self.e0_mm,
+                             self.depth_mm, z)
+
+    def layer_matrix(self, depth_mm: float, quad_w_m: float, quad_h_m: float,
+                     centre_x_m: float, centre_y_m: float,
+                     plane_z_m: float) -> np.ndarray:
+        """Model matrix replacing the plane's translation for one layer.
+
+        The quad is rescaled (same factor in x and y) to fit the room size of
+        its depth: it fills the width, or the height if the photo is taller
+        than the screen, so it never spills out of the walls. It is moved to
+        the screen centre and keeps its z (relief included). This also
+        cancels today's overscan.
+        """
+        w_mm, h_mm = self.layer_size_mm(depth_mm)
+        r = min((w_mm / 1000.0) / max(quad_w_m, 1e-9),
+                (h_mm / 1000.0) / max(quad_h_m, 1e-9))
+        m = np.eye(4)
+        m[0, 0] = m[1, 1] = r
+        m[0, 3] = self.centre_mm[0] / 1000.0 - centre_x_m * r
+        m[1, 3] = self.centre_mm[1] / 1000.0 - centre_y_m * r
+        m[2, 3] = plane_z_m
+        return m
+
+    def scissor_px(self, depth_mm: float) -> tuple[int, int, int, int]:
+        """``(x, y, w, h)`` of the room cross-section at ``depth_mm`` in pixels."""
+        x0, x1, y0, y1 = clip_rect_mm(-max(0.0, float(depth_mm)), self.eye_mm,
+                                      self.hx, self.hy)
+        px0 = (x0 + self.hx) / (2 * self.hx) * self.width_px
+        px1 = (x1 + self.hx) / (2 * self.hx) * self.width_px
+        py0 = (y0 + self.hy) / (2 * self.hy) * self.height_px
+        py1 = (y1 + self.hy) / (2 * self.hy) * self.height_px
+        x, y = max(0, int(np.floor(px0))), max(0, int(np.floor(py0)))
+        x2 = min(self.width_px, int(np.ceil(px1)))
+        y2 = min(self.height_px, int(np.ceil(py1)))
+        return x, y, max(0, x2 - x), max(0, y2 - y)

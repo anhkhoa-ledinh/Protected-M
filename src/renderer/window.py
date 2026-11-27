@@ -121,6 +121,8 @@ class InputState:
     toggle_disocclusion: bool = False
     zoom_in: bool = False
     zoom_out: bool = False
+    #: Virtual room, ``--demo`` only: B toggles.
+    room_toggle: bool = False
     # Quét chiều sâu (Phase 2). plane_z là cần gạt CHÍNH, z_far là phụ —
     # xem ContentPlaneRenderer.nudge_plane_z để biết vì sao.
     plane_closer: bool = False
@@ -167,11 +169,15 @@ class InputState:
 
 #: Phím có tác dụng ở chế độ demo (PB-055; quyết định 11/10: demo không có phím
 #: A/B và F1). Esc và kéo-thả đi đường riêng nên vẫn chạy; WASD/QE bị tắt.
-DEMO_KEYS = frozenset({glfw.KEY_G, glfw.KEY_T, glfw.KEY_F6, glfw.KEY_F4})
+_DEMO_BASE_KEYS = frozenset({glfw.KEY_G, glfw.KEY_T, glfw.KEY_F6, glfw.KEY_F4})
+
+#: Virtual room keys: only ``--demo`` (not ``--album``) has them.
+ROOM_KEYS = frozenset({glfw.KEY_B})
+DEMO_KEYS = _DEMO_BASE_KEYS | ROOM_KEYS
 
 #: TASK_album_ui_1106: giao diện album dùng chuột là chính; bàn phím thêm F12
 #: (chụp màn), F9 (diễn cảnh mất kết nối) và C (căn lại theo chỗ ngồi).
-ALBUM_KEYS = DEMO_KEYS | frozenset({glfw.KEY_F9, glfw.KEY_F12, glfw.KEY_C,
+ALBUM_KEYS = _DEMO_BASE_KEYS | frozenset({glfw.KEY_F9, glfw.KEY_F12, glfw.KEY_C,
                                     glfw.KEY_BACKSPACE, glfw.KEY_ENTER,
                                     glfw.KEY_KP_ENTER, glfw.KEY_TAB})
 
@@ -286,6 +292,7 @@ class GlfwWindow:
         self._disocclusion_toggle_requested = False
         self._zoom_in_requested = False
         self._zoom_out_requested = False
+        self._room_toggle_requested = False
         self._plane_closer_requested = False
         self._plane_farther_requested = False
         self._far_closer_requested = False
@@ -512,6 +519,7 @@ class GlfwWindow:
             toggle_disocclusion=self._disocclusion_toggle_requested,
             zoom_in=self._zoom_in_requested,
             zoom_out=self._zoom_out_requested,
+            room_toggle=self._room_toggle_requested,
             plane_closer=self._plane_closer_requested,
             plane_farther=self._plane_farther_requested,
             far_layer_closer=self._far_closer_requested,
@@ -555,6 +563,7 @@ class GlfwWindow:
         self._disocclusion_toggle_requested = False
         self._zoom_in_requested = False
         self._zoom_out_requested = False
+        self._room_toggle_requested = False
         self._plane_closer_requested = False
         self._plane_farther_requested = False
         self._far_closer_requested = False
@@ -1151,6 +1160,9 @@ class GlfwWindow:
             self._disocclusion_toggle_requested = True
         elif key == glfw.KEY_F10:
             self._relief_toggle_requested = True
+        elif self._demo and not self._album and key in ROOM_KEYS:
+            # Virtual room (demo only).
+            self._room_toggle_requested = True
         elif key == glfw.KEY_G:
             self._game_toggle_requested = True
         elif key == glfw.KEY_T:

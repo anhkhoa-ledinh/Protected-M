@@ -11,7 +11,7 @@ from __future__ import annotations
 
 #: Attributes of the app the devtools read; the first three are also assigned.
 _READ_ONLY = ("album", "window", "root", "album_options", "renderer", "bugs",
-              "last_scene", "content")
+              "last_scene", "content", "room")
 _READ_WRITE = ("game", "game_planes", "game_layers_revision")
 #: App methods the devtools call.
 _METHODS = ("tick_scope", "album_draw_guarded", "try_load_media", "save_album_shot",

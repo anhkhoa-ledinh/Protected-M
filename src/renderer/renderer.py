@@ -13,6 +13,8 @@ from src.common.stage_profile import stage
 from src.math.homogeneous import to_column_major_flat
 from src.renderer.camera import VirtualCamera
 from src.renderer.debug_geometry import DebugGeometryRenderer
+from src.renderer import virtual_room
+from src.renderer.virtual_room_gl import VirtualRoomRenderer
 from src.renderer.debug_overlay import DebugMetrics, DebugOverlay
 from src.renderer.shader import ShaderProgram
 from src.renderer.webcam_preview import (
@@ -70,6 +72,12 @@ class SceneRenderer:
             shader_dir / "line.frag",
         )
         self._debug_geometry = DebugGeometryRenderer(self._line_shader)
+        #: Virtual room (``--demo`` only). ``None`` everywhere else, so the
+        #: game renders exactly as before.
+        self.room_state: virtual_room.RoomState | None = None
+        self._room_gl: VirtualRoomRenderer | None = None
+        self._room_colors_key = None
+        self._room_colors = virtual_room.room_colors(np.zeros((1, 1, 3), np.uint8))
         self._debug = DebugOverlay(window._window, shader_dir)
         self._preview = WebcamPreviewOverlay(
             shader_dir, preview_settings or WebcamPreviewSettings()
@@ -342,6 +350,75 @@ class SceneRenderer:
     def webcam_preview(self) -> WebcamPreviewOverlay:
         return self._preview
 
+    # ---- virtual room (demo) ------------------------------------------------
+
+    def room_s_max(self) -> float | None:
+        """Largest photo scale for the current photo, ``None`` with no layers."""
+        depth = self._room_depth_mm()
+        return None if depth is None else virtual_room.s_max(self._room_e0(), depth)
+
+    def _room_e0(self) -> float:
+        return float(self._content.overscan_design_distance_mm)
+
+    def _room_depth_mm(self) -> float | None:
+        plane = self._video_plane
+        if plane is None or not plane.layer_records():
+            return None
+        depth = max(-float(r.z_world_m) * 1000.0 for r in plane.layer_records())
+        return depth if depth > 1.0 else None
+
+    def _photo_room_colors(self) -> virtual_room.RoomColors:
+        """Sky / ground colours of the original photo, computed once per photo
+        in a thread (decoding the PNG must not stall the render thread)."""
+        photo = self.current_clean_photo
+        key = None if photo is None else photo.sha256
+        if key != self._room_colors_key:
+            self._room_colors_key = key
+            if photo is not None:
+                import threading
+
+                def work(photo=photo, sha=key):
+                    try:
+                        from src.content.media_gate import load_rgb
+
+                        colors = virtual_room.room_colors(load_rgb(photo))
+                    except Exception:
+                        logger.exception("Room colours: cannot read %s", photo.path)
+                        return
+                    if self._room_colors_key == sha:
+                        self._room_colors = colors
+                        logger.info("Room colours: ceiling=%s floor=%s",
+                                    tuple(round(c) for c in colors.ceiling),
+                                    tuple(round(c) for c in colors.floor))
+
+                threading.Thread(target=work, daemon=True).start()
+        return self._room_colors
+
+    def _prepare_room(self) -> "virtual_room.RoomLayout | None":
+        """Decide, for this frame, whether the room is drawn. Sets the layout on
+        the content plane (``None`` = today's rendering) and returns it."""
+        state = self.room_state
+        layout = None
+        if state is not None and state.shown:
+            depth = self._room_depth_mm()
+            if depth is not None:
+                cam = self._camera
+                e0 = self._room_e0()
+                state.clamp(virtual_room.s_max(e0, depth))
+                centre = (float(cam.screen_center_m[0]) * 1000.0,
+                          float(cam.screen_center_m[1]) * 1000.0)
+                eye = cam.effective_eye_position_mm
+                layout = virtual_room.RoomLayout(
+                    hx=cam.screen_width_m * 500.0, hy=cam.screen_height_m * 500.0,
+                    depth_mm=depth, e0_mm=e0, s=state.s,
+                    eye_mm=(float(eye[0]) - centre[0], float(eye[1]) - centre[1],
+                            float(eye[2]) - float(cam.screen_center_m[2]) * 1000.0),
+                    centre_mm=centre,
+                    width_px=self._window.width, height_px=self._window.height)
+        if self._video_plane is not None:
+            self._video_plane.room_layout = layout
+        return layout
+
     def render(
         self,
         metrics: DebugMetrics,
@@ -365,6 +442,13 @@ class SceneRenderer:
             self._log_depth_state("sau glClear")
 
         view_flat, proj_flat = self._camera.view_projection_flat()
+        room = self._prepare_room()
+        if room is not None:
+            if self._room_gl is None:
+                self._room_gl = VirtualRoomRenderer(self._shader_dir)
+            self._room_gl.update(self._photo_room_colors(), room.hx, room.hy,
+                                 room.depth_mm, room.centre_mm)
+            self._room_gl.draw(view_flat, proj_flat)
         # TASK_game_feel_1118 P6: the "steady eye" while scoped (a no-op
         # otherwise) — ``uViewPos`` feeds specular lighting, which would
         # otherwise use the raw tracked eye while the vertex transform
@@ -391,7 +475,8 @@ class SceneRenderer:
         self._shader.set_vec3("uPointLightColor", 1.0, 0.85, 0.65)
         self._shader.set_float("uAmbient", self._ambient)
 
-        for node, world in self._scene_root.traverse():
+        # The void scene (backdrop, side panels, frame) would hide the room.
+        for node, world in (() if room is not None else self._scene_root.traverse()):
             if node.mesh is None:
                 continue
             self._shader.set_mat4("uModel", to_column_major_flat(world))
@@ -448,6 +533,8 @@ class SceneRenderer:
             self._video_plane.release()
         self._preview.release()
         self._debug_geometry.release()
+        if self._room_gl is not None:
+            self._room_gl.release()
         self._line_shader.release()
         self._debug.shutdown()
         self._shader.release()
